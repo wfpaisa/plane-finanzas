@@ -125,10 +125,18 @@ function toDate(s: string): string | null {
   return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 }
 
+/** Un número del archivo: "51000", "51000.0", "3.4E7", o con adornos como "$ 51,000". */
+function num(s: string): number {
+  const raw = clean(s);
+  const n = raw ? Number(raw) : NaN;
+  // Tal cual primero: así "3.4E7" es 34.000.000 y no 3,47.
+  return Number.isFinite(n) ? n : Number(raw.replace(/[^\d.-]/g, ""));
+}
+
 function amountOf(cop: string, importe: string): number {
-  const a = Number(clean(cop).replace(/[^\d.-]/g, ""));
+  const a = num(cop);
   if (Number.isFinite(a) && a > 0) return a;
-  const b = Number(clean(importe));
+  const b = num(importe);
   return Number.isFinite(b) ? Math.abs(b) : 0;
 }
 
@@ -189,6 +197,12 @@ export function planFromCsv(text: string): CsvPlan {
     }
 
     if (kind === "dinero gastado" || kind === "transferencia") {
+      // Sin la cuenta de destino no hay transferencia (y una cuenta sin
+      // nombre no se puede crear).
+      if (!cat) {
+        skipped++;
+        continue;
+      }
       transactions.push({
         key,
         type: "transfer",

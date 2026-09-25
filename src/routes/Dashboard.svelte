@@ -6,20 +6,19 @@
   import type { ChartConfiguration } from "chart.js";
 
   import Money from "../components/app/Money.svelte";
-  import ColorDot from "../components/app/ColorDot.svelte";
   import TransactionList from "../components/app/TransactionList.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button } from "../components/ui";
   import { alpha, colorsFor, tintColor, token } from "../lib/colors";
-  import { addMonths, bucketize, byCategory, monthRange, planSummary, today } from "../lib/finance";
+  import { addMonths, bucketize, budgetUse, byCategory, monthRange, today } from "../lib/finance";
   import { money, monthLabel } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
   import { colorOf, tintFor } from "../lib/palettes";
-    import { pb, session } from "../lib/pb.svelte";
+  import { pb, session } from "../lib/pb.svelte";
   import { go } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
-  import { byTag, hasTag, tagsOf } from "../lib/tags";
+  import { byTag, FIXED_TAG, hasTag, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
   import { txModal } from "../lib/ui.svelte";
 
@@ -32,24 +31,30 @@
 
   $effect(() => {
     void store.txVersion;
+    // Una respuesta que llega tarde no pisa la de una recarga más nueva.
+    let alive = true;
     pb.collection("transactions")
       .getFullList<Transaction>({
         filter: pb.filter("date >= {:from} && date < {:to}", { from, to: nextMonth }),
         sort: "-date,-created",
       })
-      .then((r) => (txs = r))
+      .then((r) => alive && (txs = r))
       .catch(notify.fail)
-      .finally(() => (loading = false));
+      .finally(() => alive && (loading = false));
+    return () => (alive = false);
   });
 
   const month = $derived(txs.filter((t) => t.date.slice(0, 7) === ym));
   const income = $derived(month.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0));
-  const expense = $derived(month.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0));
-  const plan = $derived(planSummary(store.recurring, store.activeSavings));
-  // Lo libre del mes se mide contra todos los gastos del mes.
-  const budget = $derived(Math.max(0, plan.free));
-  const left = $derived(budget - expense);
-  const pctUsed = $derived(budget > 0 ? Math.min(100, (expense / budget) * 100) : 0);
+  const monthExpenses = $derived(month.filter((t) => t.type === "expense"));
+  const expense = $derived(monthExpenses.reduce((s, t) => s + t.amount, 0));
+  const plan = $derived(store.plan);
+  // Contra lo libre van los gastos variables: los que no llevan #fijo (propia
+  // o de su categoría), como en el móvil. Ver `budgetUse`.
+  const use = $derived(budgetUse(plan, monthExpenses.map((t) => ({ amount: t.amount, fixed: hasTag(t, FIXED_TAG) }))));
+  const budget = $derived(use.budget);
+  const left = $derived(use.left);
+  const pctUsed = $derived(use.pct);
   const review = $derived(month.filter((t) => t.tags?.includes("revisar")).length);
 
   const months = Array.from({ length: 6 }, (_, i) => addMonths(ym, i - 5));
@@ -57,7 +62,6 @@
   // "¿En qué gastaste?": primero por etiqueta de la categoría; al elegir una,
   // sus categorías. `null` es arriba; "" es "sin etiqueta".
   let catTag = $state<string | null>(null);
-  const monthExpenses = $derived(month.filter((t) => t.type === "expense"));
   const tagRows = $derived(byTag(monthExpenses));
   const showTags = $derived(catTag === null && tagRows.some((r) => r.tag));
   const cats = $derived(
@@ -228,6 +232,9 @@
         <div class="kpi-val"><Money value={Math.abs(left)} tone={left < 0 ? "expense" : undefined} /></div>
         <progress class="progress" max="100" value={pctUsed}></progress>
         <div class="kpi-foot">Has usado {Math.round(pctUsed)}% de lo disponible: <Money value={budget} /></div>
+        {#if use.fixedOver > 0}
+          <div class="kpi-foot">Incluye <Money value={use.fixedOver} /> de gastos fijos por encima de lo planeado.</div>
+        {/if}
       </div>
     </div>
 

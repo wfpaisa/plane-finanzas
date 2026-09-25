@@ -105,9 +105,14 @@
     const first = movs.reduce((a, m) => (m.date.slice(0, 7) < a ? m.date.slice(0, 7) : a), addMonths(ym, -5));
     const months: string[] = [];
     for (let m = first; m <= ym; m = addMonths(m, 1)) months.push(m);
+    // Lo de cada mes y luego la suma corrida: una pasada, no una por mes.
     const lines = simulated.map((s) => {
-      const own = movs.filter((m) => m.saving === s.id);
-      return { s, data: months.map((mo) => own.filter((m) => m.date.slice(0, 7) <= mo).reduce((a, m) => a + m.amount, 0)) };
+      const byMonth = new Map<string, number>();
+      for (const m of movs) {
+        if (m.saving === s.id) byMonth.set(m.date.slice(0, 7), (byMonth.get(m.date.slice(0, 7)) ?? 0) + m.amount);
+      }
+      let sum = 0;
+      return { s, data: months.map((mo) => (sum += byMonth.get(mo) ?? 0)) };
     });
     return { months, lines };
   });
@@ -368,7 +373,7 @@
             {#each list as s (s.id)}
               {@const current = store.savingCurrent(s.id)}
               {@const e = eta(s, current)}
-              {@const pct = s.target_amount ? Math.min(100, (current / s.target_amount) * 100) : 0}
+              {@const pct = s.target_amount ? Math.min(100, Math.max(0, (current / s.target_amount) * 100)) : 0}
               <tr class:sv-archived={s.archived}>
                 <td class="sv-check">
                   <input type="checkbox" aria-label="Ver {s.name} en la gráfica" checked={selIds.has(s.id)} onchange={() => toggle(s)} />
@@ -390,7 +395,8 @@
                 <td class="sv-cell">
                   {#if s.allocations?.length}
                     <span class="alloc-chips">
-                      {#each s.allocations as a (a.account)}
+                      <!-- Por posición: un reparto viejo puede repetir cuenta. -->
+                      {#each s.allocations as a, i (i)}
                         {@const acc = store.account(a.account)}
                         <span class="alloc-chip"><i style:background={colorOf(acc?.palette)}></i>{acc?.name ?? "Otra cuenta"} {a.percent}%</span>
                       {/each}

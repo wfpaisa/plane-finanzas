@@ -35,6 +35,48 @@
     selected?: SvelteSet<string>;
   } = $props();
 
+  // Orden de la tabla: sin columna elegida, el que traen los movimientos
+  // (fecha, del más nuevo al más viejo).
+  type SortKey = "date" | "description" | "category" | "account" | "amount";
+  let sortKey = $state<SortKey | null>(null);
+  let sortAsc = $state(false);
+
+  function sortBy(key: SortKey) {
+    if (sortKey === key) sortAsc = !sortAsc;
+    else {
+      sortKey = key;
+      // Fechas y valores empiezan por lo más grande; los textos, de la A a la Z.
+      sortAsc = key !== "date" && key !== "amount";
+    }
+  }
+
+  const collator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+
+  function sortValue(t: Transaction, key: SortKey): string | number {
+    if (key === "date") return t.date.slice(0, 10);
+    if (key === "amount") return t.amount;
+    if (key === "description") return titleOf(t);
+    if (key === "category")
+      return t.type === "transfer" ? "Transferencia" : (store.category(t.category)?.name ?? "Sin categoría");
+    return store.account(t.account)?.name ?? "";
+  }
+
+  const rows = $derived.by(() => {
+    const key = sortKey;
+    if (!key) return items;
+    const dir = sortAsc ? 1 : -1;
+    // `sort` es estable: a igual valor se respeta el orden original.
+    return [...items].sort((a, b) => {
+      const x = sortValue(a, key);
+      const y = sortValue(b, key);
+      const c = typeof x === "number" && typeof y === "number" ? x - y : collator.compare(String(x), String(y));
+      return c * dir;
+    });
+  });
+
+  const ariaSort = (key: SortKey) =>
+    sortKey === key ? (sortAsc ? "ascending" : "descending") : "none";
+
   let anchor: string | null = null;
 
   function toggle(t: Transaction, e: MouseEvent) {
@@ -42,7 +84,7 @@
     e.preventDefault();
     const on = !selected.has(t.id);
     if (e.shiftKey && anchor) {
-      const ids = items.map((x) => x.id);
+      const ids = (compact ? rows : items).map((x) => x.id);
       const [a, b] = [ids.indexOf(anchor), ids.indexOf(t.id)].sort(
         (x, y) => x - y,
       );
@@ -65,7 +107,9 @@
     const map = new Map<string, Transaction[]>();
     for (const t of items) {
       const d = t.date.slice(0, 10);
-      map.set(d, [...(map.get(d) ?? []), t]);
+      const day = map.get(d);
+      if (day) day.push(t);
+      else map.set(d, [t]);
     }
     return [...map.entries()].map(([day, list]) => ({
       day,
@@ -86,12 +130,12 @@
   // Cuántas filas abarca la celda de fecha de cada fila: la primera del día
   // las cubre todas; las demás (0) no dibujan la suya.
   const dateSpans = $derived.by(() => {
-    const spans = items.map(() => 0);
-    for (let i = 0; i < items.length; ) {
+    const spans = rows.map(() => 0);
+    for (let i = 0; i < rows.length; ) {
       let j = i + 1;
       while (
-        j < items.length &&
-        items[j].date.slice(0, 10) === items[i].date.slice(0, 10)
+        j < rows.length &&
+        rows[j].date.slice(0, 10) === rows[i].date.slice(0, 10)
       )
         j++;
       spans[i] = j - i;
@@ -100,7 +144,8 @@
     return spans;
   });
 
-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  /** "lunes 2 de septiembre" -> "Lunes 2 de Septiembre" (el "de" queda en minúscula). */
+  const titleCase = (s: string) => s.replace(/(^|\s)(?!de\b)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
 
   const total = $derived(
     items.reduce(
@@ -139,18 +184,28 @@
     <table class="tx-table">
       <thead>
         <tr>
-          <th>Fecha</th>
-          <th>Descripción</th>
-          <th>Categoría</th>
-          {#if showAccount}<th>Cuenta</th>{/if}
+          {#snippet head(key: SortKey, label: string, cls = "")}
+            <th class={cls} aria-sort={ariaSort(key)}>
+              <button type="button" class="tx-sort" onclick={() => sortBy(key)}
+                >{label}{#if sortKey === key}<Icon
+                    name={sortAsc ? "arrow-up-01" : "arrow-down-01"}
+                    size={12}
+                  />{/if}</button
+              >
+            </th>
+          {/snippet}
+          {@render head("date", "Fecha")}
+          {@render head("description", "Descripción")}
+          {@render head("category", "Categoría")}
+          {#if showAccount}{@render head("account", "Cuenta")}{/if}
           <th class="tx-mail-col" aria-label="Importado de Gmail"
             ><Icon name="mail-01" size={14} /></th
           >
-          <th class="num">Valor</th>
+          {@render head("amount", "Valor", "num")}
         </tr>
       </thead>
       <tbody>
-        {#each items as t, i (t.id)}
+        {#each rows as t, i (t.id)}
           {@const acc = store.account(t.account)}
           {@const to = store.account(t.to_account)}
           {@const cat = store.category(t.category)}
@@ -168,12 +223,12 @@
               <td
                 class="tx-date"
                 rowspan={dateSpans[i]}
-                data-tip={capitalize(dateLong(t.date.slice(0, 10)))}
+                data-tip={t.date.slice(0, 10).replaceAll("-", "/")}
                 onclick={(e) => e.stopPropagation()}
                 oncontextmenu={(e) => {
                   e.stopPropagation();
-                  toggleDay(items.slice(i, i + dateSpans[i]), e);
-                }}>{t.date.slice(0, 10).replaceAll("-", "/")}</td
+                  toggleDay(rows.slice(i, i + dateSpans[i]), e);
+                }}>{titleCase(dateLong(t.date.slice(0, 10)))}</td
               >
             {/if}
             <!-- El filo izquierdo lleva el color de la categoría. -->
@@ -403,6 +458,23 @@
       & :global(.money) {
         font-weight: 600;
       }
+    }
+  }
+
+  /* El encabezado entero es el botón de ordenar; se ve como el texto de antes. */
+  .tx-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text-primary);
     }
   }
 

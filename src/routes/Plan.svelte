@@ -15,7 +15,7 @@
   import { Button, Field } from "../components/ui";
   import Tag from "../components/ui/Tag.svelte";
   import { alpha, colorsFor, token } from "../lib/colors";
-  import { addMonths, monthlyEquivalent, occursIn, planSummary, simulate, today, whenTotalReaches, type Kind } from "../lib/finance";
+  import { activeIn, addMonths, monthlyEquivalent, occursIn, simulate, today, whenTotalReaches, type Kind } from "../lib/finance";
   import { money, monthLabel, monthName, monthsLabel } from "../lib/format";
   import { colorOf } from "../lib/palettes";
   import { store } from "../lib/store.svelte";
@@ -33,39 +33,36 @@
   let baseRate = $state(0);
   let goal = $state(0);
 
-  const plan = $derived(planSummary(store.recurring, store.activeSavings));
+  const plan = $derived(store.plan);
   const incomes = $derived(store.recurring.filter((r) => r.kind === "income"));
   const expenses = $derived(store.recurring.filter((r) => r.kind === "expense"));
 
+  // La barra se mide contra el ingreso o, si lo planeado se pasa, contra lo
+  // planeado: así los tramos nunca suman más del ancho.
+  const barBase = $derived(Math.max(plan.income, plan.fixed + plan.savings));
   const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
+  const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
 
-  const sim = $derived(
-    simulate({
-      from: ym,
-      months: Math.max(months, 1),
-      total: store.total,
-      recurring: store.recurring,
-      savings: store.activeSavings.map((s) => ({ ...s, current: store.savingCurrent(s.id) })),
-      spendRatio: spendPct / 100,
-      extraMonthly: extra,
-      baseRate,
-    }),
+  // Los ahorros como los ve la simulación: lo que tienen en las cuentas
+  // propias y la parte del aporte que sale de ellas. En uno compartido, lo
+  // que ponen los demás no es plata de uno.
+  const simSavings = $derived(
+    store.activeSavings
+      .map((s) => ({ ...s, share: store.savingShare(s), current: store.savingMine(s.id) }))
+      .filter((s) => s.share > 0 || s.current !== 0),
   );
+  const simInput = $derived({
+    from: ym,
+    total: store.total,
+    recurring: store.recurring,
+    savings: simSavings,
+    spendRatio: spendPct / 100,
+    extraMonthly: extra,
+    baseRate,
+  });
+  const sim = $derived(simulate({ ...simInput, months: Math.max(months, 1) }));
   const last = $derived(sim[sim.length - 1]);
-  const longSim = $derived(
-    goal > store.total
-      ? simulate({
-          from: ym,
-          months: 600,
-          total: store.total,
-          recurring: store.recurring,
-          savings: store.activeSavings.map((s) => ({ ...s, current: store.savingCurrent(s.id) })),
-          spendRatio: spendPct / 100,
-          extraMonthly: extra,
-          baseRate,
-        })
-      : [],
-  );
+  const longSim = $derived(goal > store.total ? simulate({ ...simInput, months: 600 }) : []);
   const reach = $derived(goal > store.total ? whenTotalReaches(longSim, goal) : null);
   const reachIn = $derived(reach ? longSim.indexOf(reach) + 1 : 0);
 
@@ -81,6 +78,13 @@
       : r.frequency === "once"
         ? `Una vez · ${r.start_date?.slice(0, 10) ?? ""}`
         : `Día ${r.day_of_month || 1}`;
+
+  /** Por qué un fijo no suma en el plan de este mes: ya terminó o aún no empieza. */
+  const outOfPlan = (r: Recurring) => {
+    if (r.paused || r.frequency === "once" || activeIn(r, ym)) return "";
+    const end = r.end_date?.slice(0, 7);
+    return end && end < ym ? `terminó en ${monthLabel(end)}` : `empieza en ${monthLabel(r.start_date.slice(0, 7))}`;
+  };
 
   /** $2,5 M · $800 mil: para los ejes, donde el número entero no cabe. */
   const short = (n: number) => {
@@ -187,13 +191,13 @@
   const simConfig = (): ChartConfiguration => {
     const labels = ["Hoy", ...sim.map((r) => monthLabel(r.month))];
     // Cada ahorro en su color.
-    const colors = colorsFor(store.activeSavings.map((s) => colorOf(s.palette)));
-    const pots = store.activeSavings.map((s, i) => {
+    const colors = colorsFor(simSavings.map((s) => colorOf(s.palette)));
+    const pots = simSavings.map((s, i) => {
       const color = colors[i];
       return {
         type: "line" as const,
         label: s.name,
-        data: [store.savingCurrent(s.id), ...sim.map((r) => r.perSaving[s.id] ?? 0)],
+        data: [s.current, ...sim.map((r) => r.perSaving[s.id] ?? 0)],
         borderColor: color,
         backgroundColor: alpha(color, 0.5),
         borderWidth: 1,
@@ -274,9 +278,9 @@
         </div>
       </div>
       <div class="plan-bar" aria-hidden="true">
-        <span class="seg-fixed" style:width="{share(plan.fixed)}%"></span>
-        <span class="seg-save" style:width="{share(plan.savings)}%"></span>
-        <span class="seg-free" style:width="{share(plan.free)}%"></span>
+        <span class="seg-fixed" style:width="{width(plan.fixed)}%"></span>
+        <span class="seg-save" style:width="{width(plan.savings)}%"></span>
+        <span class="seg-free" style:width="{width(plan.free)}%"></span>
       </div>
       <div class="legend">
         <span class="legend-item"><span class="swatch seg-fixed"></span>Gastos frecuentes <b>{Math.round(share(plan.fixed))}%</b></span>
@@ -323,8 +327,9 @@
       </div>
       <div class="card-body savings-chips">
         {#each store.activeSavings as s (s.id)}
+          <!-- En uno compartido, la parte propia: la que suma arriba. -->
           <a class="saving-chip" href="#/ahorros">
-            <ColorDot color={s.palette} />{s.name}<Money value={s.monthly_amount} />
+            <ColorDot color={s.palette} />{s.name}<Money value={(s.monthly_amount || 0) * store.savingShare(s)} />
           </a>
         {:else}
           <span class="muted">Sin ahorros.</span>
@@ -402,11 +407,12 @@
 </div>
 
 {#snippet row(r: Recurring)}
-  <button type="button" class="fixed-row" class:paused={r.paused} onclick={() => edit(r)}>
+  {@const out = outOfPlan(r)}
+  <button type="button" class="fixed-row" class:paused={r.paused || !!out} onclick={() => edit(r)}>
     <span class="fixed-main">
       <span class="fixed-name">{r.name}</span>
       <span class="fixed-sub">
-        {freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> automático{/if}{#if r.paused} · pausado{/if}
+        {freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
       </span>
     </span>
     {#if r.category}<CategoryPill id={r.category} />{/if}

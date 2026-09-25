@@ -89,3 +89,45 @@ describe("apply", () => {
     expect(r.apply(admin, { ...tx, type: "transfer", category: "" }).category).toBe("");
   });
 });
+
+describe("applyExisting", () => {
+  // Un `app` de mentira con lo que usa: la regla y un movimiento guardado.
+  function fakeApp(tx: Record<string, unknown>) {
+    const saved: Record<string, unknown>[] = [];
+    const rec = (id: string, f: Record<string, unknown>) => ({
+      id,
+      getString: (k: string) => (typeof f[k] === "object" ? JSON.stringify(f[k]) : String(f[k] ?? "")),
+      getFloat: (k: string) => Number(f[k]) || 0,
+      getBool: (k: string) => !!f[k],
+      set: (k: string, v: unknown) => (f[k] = v),
+    });
+    return {
+      saved,
+      findRecordsByFilter: (col: string) =>
+        col === "rules" ? [rec("r1", { ...admin, match: admin.match, tags: admin.tags })] : [rec("t1", tx)],
+      save: (r: { getString: (k: string) => string }) => saved.push({ notes: r.getString("notes"), description: r.getString("description") }),
+    };
+  }
+
+  test("las notas largas no se cortan", () => {
+    const notes = "x".repeat(3000);
+    const app = fakeApp({ type: "expense", date: "2026-09-20 12:00:00.000Z", amount: 412000, description: "GOU PAYMENTS", notes, raw: "", category: "", tags: [] });
+    expect(r.applyExisting(app, "u", "")).toBe(1);
+    expect(app.saved[0].notes).toBe(`GOU PAYMENTS\n${notes}`);
+    expect(app.saved[0].description).toBe("Administración septiembre");
+  });
+
+  test("lo que ya está como la regla lo deja no se vuelve a guardar", () => {
+    const app = fakeApp({
+      type: "expense",
+      date: "2026-09-20 12:00:00.000Z",
+      amount: 1,
+      description: "Administración septiembre",
+      notes: "GOU PAYMENTS",
+      raw: "",
+      category: "cat-admin",
+      tags: ["administración", "casa"],
+    });
+    expect(r.applyExisting(app, "u", "")).toBe(0);
+  });
+});

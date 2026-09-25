@@ -124,6 +124,8 @@
   let csvName = $state("");
   let csvBusy = $state(false);
   let csvProgress = $state("");
+  // La fecha más antigua, venga el archivo en el orden que venga.
+  const csvFirst = $derived(csvPlan?.transactions.reduce((m, t) => (!m || t.date < m ? t.date : m), "") ?? "");
 
   async function readCsv(file: File | undefined) {
     if (!file) return;
@@ -295,10 +297,12 @@
             <div class="stat"><span class="s-label">Movimientos</span><span class="s-val">{csvPlan.transactions.length}</span></div>
             <div class="stat"><span class="s-label">Cuentas</span><span class="s-val">{csvPlan.accounts.length}</span></div>
             <div class="stat"><span class="s-label">Categorías</span><span class="s-val">{csvPlan.categories.length}</span></div>
-            <div class="stat">
-              <span class="s-label">Desde</span>
-              <span class="s-val">{dateShort(csvPlan.transactions.at(-1)?.date ?? "")}</span>
-            </div>
+            {#if csvFirst}
+              <div class="stat">
+                <span class="s-label">Desde</span>
+                <span class="s-val">{dateShort(csvFirst)}</span>
+              </div>
+            {/if}
             <span class="flex-1"></span>
             <Button variant="secondary" loading={csvBusy} onclick={importCsv}>
               <Icon name="database-import" />{csvBusy ? `Importando ${csvProgress}` : "Importar"}

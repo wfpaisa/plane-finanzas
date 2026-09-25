@@ -5,16 +5,16 @@
 -->
 <script lang="ts">
   import Money from "../app/Money.svelte";
-  import { planSummary } from "../../lib/finance";
   import { percent } from "../../lib/format";
   import { sumOf } from "../../lib/mobile";
   import { FIXED_TAG, hasTag } from "../../lib/tags";
   import { store } from "../../lib/store.svelte";
   import type { Transaction } from "../../lib/types";
 
-  let { txs }: { txs: Transaction[] } = $props();
+  let { ym, txs }: { ym: string; txs: Transaction[] } = $props();
 
-  const plan = $derived(planSummary(store.recurring, store.activeSavings));
+  // El plan del mes que se está viendo, no el de hoy.
+  const plan = $derived(store.planFor(ym));
   const expenses = $derived(txs.filter((t) => t.type === "expense"));
   // Fijo es lo etiquetado #fijo: en su categoría o en el propio movimiento
   // (los que crea un gasto frecuente la llevan).

@@ -16,7 +16,10 @@ function load(app, userId) {
     return { id: a.id, name: a.getString("name"), match_keys: a.getString("match_keys") + "," + a.getString("bank") };
   });
   var plainCats = categories.map(function (c) {
-    return { id: c.id, name: c.getString("name"), kind: c.getString("kind"), keywords: c.getString("keywords") };
+    var cat = { id: c.id, name: c.getString("name"), kind: c.getString("kind"), keywords: c.getString("keywords") };
+    // Partidas una vez, no una por mensaje.
+    cat.keys = parsers.keywordsOf(cat);
+    return cat;
   });
   return { accounts: plainAccounts, categories: plainCats, rules: rules.load(app, userId) };
 }
@@ -73,6 +76,8 @@ function plan(mail, ctx, defaultAccount) {
   // Una regla del usuario manda sobre las palabras clave: categoría,
   // etiquetas y una descripción legible, con el texto del banco a las notas.
   var description = parsed.description;
+  // Entre cuentas propias, sin comercio: "Pago Mastercard" dice más que "Pagaste".
+  if (type === "transfer" && !parsed.merchant) description = "Pago " + toAccount.name;
   var notes = "";
   var rule = ctx.rules && ctx.rules.length ? rules.find(parsed.merchant + " " + parsed.description + " " + (mail.subject || ""), ctx.rules, parsed.amount) : null;
   if (rule) {

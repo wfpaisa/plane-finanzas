@@ -21,6 +21,42 @@ function lastDay(y, m) {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
+/**
+ * Reparte `total` en pesos enteros en la proporción de `percents`, sin que
+ * se pierda ni sobre un peso: lo que dejan los redondeos va a las partes con
+ * más decimales. La misma cuenta de `splitByPercent` en src/lib/finance.ts.
+ */
+function splitByPercent(total, percents) {
+  var weights = percents.map(function (p) {
+    return Math.max(0, +p || 0);
+  });
+  var sum = weights.reduce(function (a, w) {
+    return a + w;
+  }, 0);
+  if (!sum) {
+    return weights.map(function () {
+      return 0;
+    });
+  }
+  var whole = Math.round(total);
+  var raw = weights.map(function (w) {
+    return (whole * w) / sum;
+  });
+  var parts = raw.map(function (v) {
+    return Math.floor(v);
+  });
+  var rest = whole - parts.reduce(function (a, v) {
+    return a + v;
+  }, 0);
+  var order = [];
+  for (var i = 0; i < raw.length; i++) if (weights[i] > 0) order.push({ i: i, frac: raw[i] - parts[i] });
+  order.sort(function (a, b) {
+    return b.frac - a.frac || a.i - b.i;
+  });
+  for (var k = 0; rest > 0; k = (k + 1) % order.length, rest--) parts[order[k].i]++;
+  return parts;
+}
+
 function has(app, collection, filter, params) {
   try {
     app.findFirstRecordByFilter(collection, filter, params);
@@ -99,11 +135,32 @@ function runSavings(app, userId) {
       alloc = [];
     }
     if (!alloc.length) alloc = [{ account: "", percent: 100 }];
+    // Una parte por cuenta: la marca del aporte es por cuenta y mes, así que
+    // un reparto viejo que repite cuenta solo haría la primera.
+    var byAccount = {};
+    var parts = [];
+    for (var p = 0; p < alloc.length; p++) {
+      var acc = String(alloc[p].account || "");
+      if (!(acc in byAccount)) {
+        byAccount[acc] = parts.length;
+        parts.push({ account: acc, percent: 0 });
+      }
+      parts[byAccount[acc]].percent += Math.max(0, +alloc[p].percent || 0);
+    }
+    alloc = parts;
+    // Cada parte es su porcentaje del aporte, en pesos enteros que suman
+    // justo lo que toca: con 33/33/34 no se pierde ni se inventa un peso.
+    var pcts = alloc.map(function (x) {
+      return x.percent;
+    });
+    var pctSum = pcts.reduce(function (acc, p) {
+      return acc + p;
+    }, 0);
+    var amounts = splitByPercent((monthly * pctSum) / 100, pcts);
 
     for (var j = 0; j < alloc.length; j++) {
       var a = alloc[j];
-      var pct = +a.percent || 0;
-      if (pct <= 0) continue;
+      if (pcts[j] <= 0 || !amounts[j]) continue;
       var key = "auto:" + ym + ":" + (a.account || "sin-cuenta");
       if (has(app, "saving_movements", "saving = {:s} && external_id = {:k}", { s: s.id, k: key })) continue;
       var creator = s.getString("owner");
@@ -119,7 +176,7 @@ function runSavings(app, userId) {
       mv.set("saving", s.id);
       if (a.account) mv.set("account", a.account);
       mv.set("created_by", creator);
-      mv.set("amount", Math.round((monthly * pct) / 100));
+      mv.set("amount", amounts[j]);
       mv.set("date", date + " 12:00:00.000Z");
       mv.set("note", "Aporte automático");
       mv.set("external_id", key);
@@ -130,4 +187,4 @@ function runSavings(app, userId) {
   return created;
 }
 
-module.exports = { runRecurring: runRecurring, runSavings: runSavings };
+module.exports = { runRecurring: runRecurring, runSavings: runSavings, splitByPercent: splitByPercent };

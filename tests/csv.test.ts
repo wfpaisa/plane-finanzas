@@ -48,3 +48,19 @@ describe("registro contable", () => {
     expect(new Set(plan.transactions.map((t) => t.key)).size).toBe(plan.transactions.length);
   });
 });
+
+describe("filas raras", () => {
+  const head = "Fecha,Cuenta,Categoría,Subcategorías,Nota,COP,Ingreso/Gasto,Descripción,Importe\n";
+
+  test("notación científica también en COP", () => {
+    const p = planFromCsv(`${head}01/09/2026 10:00:00,Banco Principal,Variables,Mercado,Fruver,3.4E4,Gasto,,\n`);
+    expect(p.transactions[0].amount).toBe(34000);
+  });
+
+  test("una transferencia sin cuenta de destino no se inventa una cuenta sin nombre", () => {
+    const p = planFromCsv(`${head}01/09/2026 10:00:00,Banco Principal,,,Pago,50000,Dinero gastado,,\n`);
+    expect(p.transactions).toEqual([]);
+    expect(p.skipped).toBe(1);
+    expect(p.accounts.map((a) => a.name)).toEqual([]);
+  });
+});

@@ -11,7 +11,7 @@
   import Segmented from "../components/app/Segmented.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Select } from "../components/ui";
+  import { MonthPicker, Select } from "../components/ui";
   import { colorsFor, token } from "../lib/colors";
   import {
     addMonths,
@@ -19,6 +19,7 @@
     byCategory,
     monthRange,
     monthsOfYear,
+    periodSpan,
     today,
     weeksOfMonth,
     type Granularity,
@@ -56,6 +57,8 @@
   $effect(() => {
     void store.txVersion;
     const [a, b] = range;
+    // Al pasar rápido de un año a otro, solo vale la respuesta del último.
+    let alive = true;
     loading = true;
     pb.collection("transactions")
       .getFullList<Transaction>({
@@ -67,9 +70,10 @@
         fields: "id,type,date,amount,category,account,tags",
         batch: 1000,
       })
-      .then((r) => (txs = r))
+      .then((r) => alive && (txs = r))
       .catch(notify.fail)
-      .finally(() => (loading = false));
+      .finally(() => alive && (loading = false));
+    return () => (alive = false);
   });
 
   const keys = $derived.by(() => {
@@ -94,7 +98,13 @@
   const tagRows = $derived(byTag(inRange.filter((t) => t.type === catKind)));
   const tagMax = $derived(Math.max(0, ...tagRows.map((r) => r.total)));
   const tagOptions = $derived([...new Set([...categoryTags(), ...txs.flatMap((t) => t.tags ?? [])])].sort());
-  const periods = $derived(g === "week" ? 1 : g === "month" ? 12 : 6);
+
+  // Lo que va del periodo, para promediar y para el presupuesto: desde el
+  // primer movimiento hasta hoy (ver `periodSpan`).
+  const firstDay = $derived(txs.reduce<string | null>((m, t) => (!m || t.date < m ? t.date : m), null));
+  const span = $derived(periodSpan(range, firstDay, now, g));
+  const periods = $derived(g === "week" ? span.weeks : g === "month" ? span.months : span.years);
+  const per = $derived(g === "week" ? "semana" : g === "month" ? "mes" : "año");
 
   const label = (k: string) => (g === "week" ? weekLabel(k) : g === "month" ? monthLabel(k) : k);
 
@@ -205,7 +215,7 @@
     {#if g === "week"}
       <div class="nav">
         <button type="button" class="btn-icon sm" aria-label="Mes anterior" data-tip="Mes anterior (←)" onclick={() => (ym = addMonths(ym, -1))}><Icon name="arrow-left-01" /></button>
-        <input type="month" class="field-control sm" bind:value={ym} />
+        <MonthPicker bind:value={ym} />
         <button type="button" class="btn-icon sm" aria-label="Mes siguiente" data-tip="Mes siguiente (→)" onclick={() => (ym = addMonths(ym, 1))}><Icon name="arrow-right-01" /></button>
       </div>
     {:else}
@@ -243,12 +253,12 @@
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="money-receive-01" /></span><span class="kpi-label">Ingresos</span></div>
         <div class="kpi-val"><Money value={income} tone="income" /></div>
-        <div class="kpi-foot">Promedio <Money value={income / periods} /> por {g === "week" ? "mes" : g === "month" ? "mes" : "año"}</div>
+        <div class="kpi-foot">Promedio <Money value={income / periods} /> por {per}</div>
       </div>
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="money-send-01" /></span><span class="kpi-label">Gastos</span></div>
         <div class="kpi-val"><Money value={expense} tone="expense" /></div>
-        <div class="kpi-foot">Promedio <Money value={expense / periods} /> por {g === "year" ? "año" : "mes"}</div>
+        <div class="kpi-foot">Promedio <Money value={expense / periods} /> por {per}</div>
       </div>
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico"><Icon name="coins-01" /></span><span class="kpi-label">Ingresos menos gastos</span></div>
@@ -299,7 +309,7 @@
                 {@const cat = store.category(c.category)}
                 {@const key = c.category || "none"}
                 {@const tint = cat?.color || "tint-10"}
-                {@const budget = (cat?.budget ?? 0) * (g === "year" ? 72 : g === "month" ? 12 : 1)}
+                {@const budget = (cat?.budget ?? 0) * span.budgetMonths}
                 {@const over = budget > 0 && c.total > budget}
                 {@const share = catTotal ? (c.total / catTotal) * 100 : 0}
                 <li class="cr" class:dim={focus && focus !== key} class:on={focus === key}>
@@ -443,10 +453,6 @@
     display: flex;
     align-items: center;
     gap: var(--sp-4);
-
-    & input {
-      width: 10rem;
-    }
   }
 
   .nav-year {

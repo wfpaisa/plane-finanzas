@@ -87,8 +87,24 @@
     }
   }
 
+  /**
+   * El reparto que se guarda: sin filas vacías y una sola por cuenta. Dos
+   * filas con la misma cuenta se suman; si no, el aporte automático, que
+   * lleva una marca por cuenta y mes, solo haría la primera.
+   */
+  function cleanAllocations(): Allocation[] {
+    const byAccount = new Map<string, number>();
+    for (const a of allocations) {
+      const pct = Number(a.percent) || 0;
+      if (a.account && pct > 0) byAccount.set(a.account, (byAccount.get(a.account) ?? 0) + pct);
+    }
+    return [...byAccount].map(([account, percent]) => ({ account, percent }));
+  }
+
   async function save() {
     if (!name.trim()) return notify.fail(new Error("Ponle nombre al ahorro."));
+    if (allocations.some((a) => !a.account && (Number(a.percent) || 0) > 0))
+      return notify.fail(new Error("Elige la cuenta de cada parte del reparto, o quita la que sobra."));
     if (allocations.length && Math.round(pctSum) !== 100)
       return notify.fail(new Error(`El reparto entre cuentas suma ${pctSum}%, debe sumar 100%.`));
     busy = true;
@@ -102,7 +118,7 @@
         annual_rate: rate,
         target_amount: target,
         target_date: targetDate ? `${targetDate} 12:00:00.000Z` : "",
-        allocations: allocations.filter((a) => a.account && a.percent > 0),
+        allocations: cleanAllocations(),
         auto,
         archived,
         notes,

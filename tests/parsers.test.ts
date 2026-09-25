@@ -64,6 +64,14 @@ describe("parseMessage", () => {
     expect(r).toMatchObject({ amount: 2132121, type: "expense", merchant: "CREDITO HIPOTECARIO", date: "2026-09-05" });
   });
 
+  test("pagaste la tarjeta: la tarjeta no es el comercio", () => {
+    const r = p.parseMessage({
+      text: "Bancolombia: Pagaste $602,264 en la tarjeta de credito *5678 desde la cuenta *1234, el 25/09/2026 10:05.",
+    });
+    expect(r).toMatchObject({ amount: 602264, type: "expense", merchant: "", description: "Pagaste" });
+    expect(r.last4).toEqual(["1234", "5678"]);
+  });
+
   test("retiro en cajero", () => {
     const r = p.parseMessage({ text: "Bancolombia le informa Retiro por $200.000 en CAJERO LA 70. 10:31 12/09/2026 T.Deb *1234." });
     expect(r).toMatchObject({ amount: 200000, type: "expense", merchant: "CAJERO LA 70" });
@@ -76,6 +84,24 @@ describe("parseMessage", () => {
 
   test("sin importe no inventa", () => {
     expect(p.parseMessage({ text: "Actualizamos nuestros términos y condiciones" })).toBeNull();
+  });
+
+  test("la cuenta de origen va primero aunque se nombre de segunda", () => {
+    const r = p.parseMessage({
+      text: "Bancolombia: Pagaste $800.000 a la tarjeta *5678 desde tu cuenta *1234 el 22/09/2026.",
+    });
+    expect(r.last4).toEqual(["1234", "5678"]);
+  });
+
+  test("sin fecha en el texto, hoy en Colombia aunque el servidor ya esté en mañana", () => {
+    const now = Date.now;
+    // 9 p. m. del 25 en Colombia: 2 a. m. del 26 en UTC.
+    Date.now = () => Date.parse("2026-09-26T02:00:00Z");
+    try {
+      expect(p.parseMessage({ text: "Compraste $20.000 en PANADERIA con tu T.Deb *1234" }).date).toBe("2026-09-25");
+    } finally {
+      Date.now = now;
+    }
   });
 });
 
@@ -101,6 +127,20 @@ describe("categorize y matchAccount", () => {
     expect(p.matchAccount({ last4: ["1234"], bank: "Bancolombia" }, accounts).account.id).toBe("a");
     expect(p.matchAccount({ last4: [], bank: "Nequi" }, accounts).account.id).toBe("b");
     expect(p.matchAccount({ last4: ["9999"], bank: null }, accounts)).toBeNull();
+  });
+
+  test("con dos cuentas propias gana la terminación que va primero, no el orden de las cuentas", () => {
+    const accounts = [
+      { id: "tarjeta", match_keys: "5678" },
+      { id: "ahorros", match_keys: "1234" },
+    ];
+    expect(p.matchAccount({ last4: ["1234", "5678"], bank: null }, accounts).account.id).toBe("ahorros");
+    expect(p.matchAccount({ last4: ["5678"], bank: null }, accounts).account.id).toBe("tarjeta");
+  });
+
+  test("categorías con las palabras ya partidas", () => {
+    const withKeys = cats.map((c) => ({ ...c, keys: p.keywordsOf(c) }));
+    expect(p.categorize("EXITO LAURELES", "expense", withKeys).id).toBe("m");
   });
 
   test("pista de texto: una llave propia en el mensaje", () => {

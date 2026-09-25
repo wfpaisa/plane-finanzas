@@ -4,8 +4,10 @@ const num = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 
 /** $9.917.228 · −$169.000: el número completo, nunca abreviado. */
 export function money(n: number | null | undefined): string {
-  const v = Math.round(n ?? 0);
-  return `${v < 0 ? "−" : ""}$${num.format(Math.abs(v))}`;
+  const v = Number.isFinite(n) ? (n as number) : 0;
+  // El redondeo, igual para los dos lados: −1,5 da −$2 como 1,5 da $2.
+  const abs = Math.round(Math.abs(v));
+  return `${v < 0 && abs ? "−" : ""}$${num.format(abs)}`;
 }
 
 export const plainNumber = (n: number) => num.format(Math.round(n));

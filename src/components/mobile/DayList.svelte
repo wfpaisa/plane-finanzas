@@ -27,7 +27,9 @@
     const map = new Map<string, Tx[]>();
     for (const t of txs) {
       const d = t.date.slice(0, 10);
-      map.set(d, [...(map.get(d) ?? []), t]);
+      const day = map.get(d);
+      if (day) day.push(t);
+      else map.set(d, [t]);
     }
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   });

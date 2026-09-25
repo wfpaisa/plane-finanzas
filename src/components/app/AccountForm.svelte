@@ -45,6 +45,8 @@
   // Con la cuenta ya creada se escribe el saldo de HOY; por debajo se ajusta
   // el saldo inicial para que la suma cuadre sin inventar movimientos.
   const current = $derived(account ? store.balance(account.id) : 0);
+  /** El saldo que se mostró al abrir: si no se toca, el saldo inicial no se toca. */
+  let shownBalance = 0;
 
   // Se llena al abrir o al cambiar de account, y solo entonces: lo demás que
   // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
@@ -58,7 +60,7 @@
       bank = account?.bank ?? "";
       icon = account?.icon ?? "";
       color = account?.palette ? colorOf(account.palette) : nextColor(store.accounts.map((a) => a.palette));
-      balance = account ? store.balance(account.id) : 0;
+      balance = shownBalance = account ? store.balance(account.id) : 0;
       matchKeys = account?.match_keys ?? "";
       exclude = account?.exclude_from_total ?? false;
       archived = account?.archived ?? false;
@@ -83,8 +85,13 @@
         notes,
       };
       if (account) {
-        const initial = (account.initial_balance ?? 0) + (balance - current);
-        await pb.collection("accounts").update(account.id, { ...data, initial_balance: initial });
+        // Solo si se cambió el saldo. Si no, un movimiento que llegó con el
+        // formulario abierto (Gmail, otro dispositivo) quedaría anulado por
+        // el ajuste. Si sí, se mide contra el saldo de ahora mismo, para que
+        // quede exactamente el que se escribió.
+        const changed = balance !== shownBalance;
+        const initial = (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) + (balance - current);
+        await pb.collection("accounts").update(account.id, changed ? { ...data, initial_balance: initial } : data);
       } else {
         await pb.collection("accounts").create({ ...data, initial_balance: balance, sort: store.accounts.length });
       }

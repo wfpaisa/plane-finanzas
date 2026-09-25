@@ -179,13 +179,15 @@
     const amount = parseMoney(amountText);
     if (!amount || amount <= 0) return notify.fail(new Error("Escribe la cantidad de dinero."));
     if (!account) return notify.fail(new Error("Elige la cuenta."));
+    // Con la fecha borrada, hoy: el mes que se abre después es el mismo.
+    const day = date || today();
     busy = true;
     try {
       await offline.create("transactions", {
         owner: session.id,
         type: sheet,
         amount,
-        date: `${date || today()} 12:00:00.000Z`,
+        date: `${day} 12:00:00.000Z`,
         account,
         to_account: "",
         category,
@@ -202,7 +204,7 @@
             : "Ingreso anotado",
       );
       sheet = null;
-      ym = date.slice(0, 7);
+      ym = day.slice(0, 7);
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -446,7 +448,7 @@
         }}
       />
     {:else if view === "total"}
-      <TotalView txs={monthTxs} />
+      <TotalView {ym} txs={monthTxs} />
     {:else}
       <NotesView txs={monthTxs} onPick={findNote} />
     {/if}

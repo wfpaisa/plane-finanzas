@@ -30,7 +30,9 @@
   const counted = $derived(store.activeAccounts.filter((a) => !a.exclude_from_total));
   const positives = $derived(counted.filter((a) => store.balance(a.id) > 0));
   const debts = $derived(counted.filter((a) => store.balance(a.id) < 0).reduce((s, a) => s + store.balance(a.id), 0));
-  const earmarked = $derived(store.movements.filter((m) => store.account(m.account)).reduce((s, m) => s + m.amount, 0));
+  // Solo lo apartado en las cuentas que suman en el total: así el total es
+  // lo reservado más lo que queda sin reservar.
+  const earmarked = $derived(counted.reduce((s, a) => s + store.earmarked(a.id), 0));
 
   // Lo marcado para sumar. Solo cuenta lo que está a la vista: si se
   // esconden las archivadas, salen de la suma sin perder la marca.

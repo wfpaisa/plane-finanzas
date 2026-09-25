@@ -12,7 +12,7 @@
   import TransactionList from "../components/app/TransactionList.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Button, Input, Loading, Select } from "../components/ui";
+  import { Input, Loading, MonthPicker, Select } from "../components/ui";
   import Tag, { type Tone } from "../components/ui/Tag.svelte";
   import { alpha, token } from "../lib/colors";
   import { addMonths, dayOf, monthRange, today, ymd } from "../lib/finance";
@@ -66,12 +66,15 @@
       parts.push("(tags ~ {:tag} || category.tags ~ {:tag})");
       params.tag = `"${tag}"`;
     }
+    // Al cambiar rápido de mes o de filtro, solo vale la respuesta del último.
+    let alive = true;
     loading = true;
     pb.collection("transactions")
       .getFullList<Transaction>({ filter: pb.filter(parts.join(" && "), params), sort: "-date,-created", batch: 500 })
-      .then((r) => (items = r))
+      .then((r) => alive && (items = r))
       .catch(notify.fail)
-      .finally(() => (loading = false));
+      .finally(() => alive && (loading = false));
+    return () => (alive = false);
   });
 
   const shown = $derived.by(() => {
@@ -94,6 +97,12 @@
   const pickedTransfer = $derived(sumOf("transfer"));
 
   const tags = $derived([...new Set([...categoryTags(), ...items.flatMap((t) => t.tags ?? [])])].sort());
+  const types: [string, string, Tone][] = [
+    ["expense", "Gastos", "tag-error"],
+    ["income", "Ingresos", "tag-success"],
+    ["transfer", "Transferencias", "tint-10"],
+  ];
+
   const filtered = $derived(!!(account || category || type || tag || search));
 
   // Ampliado (por días, con etiquetas y notas) o compacto (tabla). Se
@@ -236,13 +245,12 @@
         <button type="button" class="btn-icon sm" aria-label="Mes anterior" data-tip="Mes anterior (←)" disabled={all} onclick={() => (ym = addMonths(ym, -1))}>
           <Icon name="arrow-left-01" />
         </button>
-        <input type="month" class="field-control sm" bind:value={ym} disabled={all} />
+        <MonthPicker bind:value={ym} disabled={all} />
         <button type="button" class="btn-icon sm" aria-label="Mes siguiente" data-tip="Mes siguiente (→)" disabled={all} onclick={() => (ym = addMonths(ym, 1))}>
           <Icon name="arrow-right-01" />
         </button>
-        <Tag tone={all ? "tint-1" : "off"} onclick={() => (all = !all)} pressed={all}>Todo</Tag>
+        <Tag class="month-all" tone={all ? "tint-1" : "off"} onclick={() => (all = !all)} pressed={all}>Todo</Tag>
       </div>
-      <Button variant="secondary" onclick={() => txModal.new({ account: account || undefined })}><Icon name="add-01" />Agregar</Button>
     </div>
   </header>
 
@@ -263,15 +271,16 @@
           {#each store.categories.filter((c) => c.kind === "income") as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
         </optgroup>
       </Select>
-      <Select bind:value={type}>
-        <option value="">Todos los tipos</option>
-        <option value="expense">Gastos</option>
-        <option value="income">Ingresos</option>
-        <option value="transfer">Transferencias</option>
-      </Select>
     </div>
-    {#if tags.length || tag}
-      <div class="filters-tags">
+    <div class="filters-tags">
+      <!-- El tipo: uno a la vez; tocar el elegido lo quita. -->
+      {#each types as [value, label, tone] (value)}
+        <Tag tone={type === value ? tone : "off"} pressed={type === value} onclick={() => (type = type === value ? "" : value)}
+          >{label}</Tag
+        >
+      {/each}
+      {#if tags.length || tag}
+        <span class="filters-sep" aria-hidden="true"></span>
         {#each [...new Set([tag, ...tags].filter(Boolean))] as t (t)}
           <Tag
             tone={tag === t ? ((t === "revisar" ? "tag-warning" : tintFor(t)) as Tone) : "off"}
@@ -279,8 +288,8 @@
             onclick={() => (tag = tag === t ? "" : t)}>#{t}</Tag
           >
         {/each}
-      </div>
-    {/if}
+      {/if}
+    </div>
     <div class="filters-foot">
       <span>Ingresos <Money value={income} tone="income" /></span>
       <span>Gastos <Money value={expense} tone="expense" /></span>
@@ -372,8 +381,11 @@
     align-items: center;
     gap: var(--sp-4);
 
-    & input {
-      width: 10rem;
+    /* "Todo" del alto del selector de mes, un poco aparte de las flechas. */
+    & :global(.month-all) {
+      height: 34px;
+      margin-left: var(--sp-8);
+      padding-inline: var(--sp-14);
     }
   }
 
@@ -387,7 +399,7 @@
 
   .filters-grid {
     display: grid;
-    grid-template-columns: 1.3fr repeat(3, 1fr);
+    grid-template-columns: 1.3fr repeat(2, 1fr);
     gap: var(--sp-8);
 
     @media (max-width: 48rem) {
@@ -398,7 +410,16 @@
   .filters-tags {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--sp-6);
+  }
+
+  /* Entre los tipos y las etiquetas. */
+  .filters-sep {
+    width: var(--border-width);
+    height: 1rem;
+    margin-inline: var(--sp-4);
+    background: var(--border);
   }
 
   .list-bar {

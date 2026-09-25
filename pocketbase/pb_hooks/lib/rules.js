@@ -39,7 +39,7 @@ function find(text, rules, amount) {
     if (rules[i].paused || !amountMatches(rules[i], amount)) continue;
     // Con valor pesa más que cualquier largo de texto (máx. 500).
     var bonus = +rules[i].amount ? 1000 : 0;
-    var keys = keysOf(rules[i]);
+    var keys = rules[i].keys || keysOf(rules[i]);
     for (var j = 0; j < keys.length; j++) {
       if (hay.indexOf(keys[j]) >= 0 && keys[j].length + bonus > bestLen) {
         best = rules[i];
@@ -101,7 +101,11 @@ function apply(rule, tx) {
   return out;
 }
 
-/** Las reglas activas de un usuario, como objetos simples. */
+/**
+ * Las reglas activas de un usuario, como objetos simples. Con sus textos ya
+ * partidos (`keys`): al aplicarlas a todo lo guardado se consultan miles de
+ * veces.
+ */
 function load(app, userId) {
   return app.findRecordsByFilter("rules", "owner = {:u} && paused = false", "created", 500, 0, { u: userId }).map(function (r) {
     var tags = [];
@@ -110,7 +114,7 @@ function load(app, userId) {
     } catch (_) {
       tags = [];
     }
-    return {
+    var rule = {
       id: r.id,
       match: r.getString("match"),
       amount: r.getFloat("amount"),
@@ -119,6 +123,8 @@ function load(app, userId) {
       description: r.getString("description"),
       to_notes: r.getBool("to_notes"),
     };
+    rule.keys = keysOf(rule);
+    return rule;
   });
 }
 
@@ -165,7 +171,8 @@ function applyExisting(app, userId, ruleId) {
     r.set("category", after.category);
     r.set("tags", after.tags);
     r.set("description", after.description.slice(0, 200));
-    r.set("notes", after.notes.slice(0, 2000));
+    // El largo del campo (5000): cortar antes borraba el final de notas largas.
+    r.set("notes", after.notes.slice(0, 5000));
     app.save(r);
     changed++;
   }

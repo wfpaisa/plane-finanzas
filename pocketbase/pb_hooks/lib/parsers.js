@@ -153,9 +153,13 @@ function parseDate(text) {
   return null;
 }
 
+/**
+ * Hoy en Colombia (UTC-5), como el programador y la fecha de los correos. El
+ * servidor suele correr en UTC: con su hora local, lo pegado después de las
+ * 7 de la noche caería al día siguiente.
+ */
 function today() {
-  var now = new Date();
-  return now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+  return new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 // Todos los "*1234", "**1234", "cuenta 1234", "terminada en 1234".
@@ -171,6 +175,18 @@ function findLast4(text) {
   return out;
 }
 
+/**
+ * La terminación de la cuenta que paga, si la frase la dice con "desde":
+ * "pagaste $X a la tarjeta *5678 desde tu cuenta *1234" nombra primero el
+ * destino, pero sale de la *1234.
+ */
+function sourceLast4(sentence) {
+  var m = /\bdesde\b/i.exec(sentence);
+  if (!m) return null;
+  var after = findLast4(sentence.slice(m.index, m.index + 60));
+  return after.length ? after[0] : null;
+}
+
 var STOP = /\s(?:con\s|desde\s|el\s\d|el dia|a las|por\s\$|por valor|t\.?\s?(?:cred|deb)|tarjeta|cuenta|en su|en tu|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})|[,.;]\s|[,.;]$|\n/i;
 
 function cut(s) {
@@ -184,7 +200,11 @@ function findMerchant(sentence, type) {
   var patterns =
     type === "income"
       ? [/\s(?:de|desde)\s+(?!tu\b|su\b|la cuenta|cuenta|nomina|pago)(.{2,60})/i, /\sen\s+(.{2,60})/i]
-      : [/\sen\s+(?!tu\b|su\b|la cuenta|cuenta)(.{2,60})/i, /\s(?:a|al)\s+(?!la cuenta|tu\b|su\b|las\s\d)(.{2,60})/i];
+      : [
+          // "en la tarjeta de credito *1234" es un producto, no un comercio.
+          /\sen\s+(?!tu\b|su\b|la cuenta|cuenta|la tarjeta|tarjeta)(.{2,60})/i,
+          /\s(?:a|al)\s+(?!la cuenta|tu\b|su\b|las\s\d|la tarjeta|tarjeta)(.{2,60})/i,
+        ];
   for (var i = 0; i < patterns.length; i++) {
     var m = patterns[i].exec(sentence);
     if (m) {
@@ -230,22 +250,40 @@ function parseMessage(mail) {
   var desc = merchant || (verb ? verb.charAt(0).toUpperCase() + verb.slice(1) : type === "income" ? "Ingreso" : "Gasto");
   if (/retir/.test(verb) && !merchant) desc = "Retiro en cajero";
 
+  // En orden de aparición, con la cuenta de origen de primera: el importador
+  // toma la primera como la cuenta del movimiento y las demás como destino.
+  var last4 = findLast4(flat);
+  var source = sourceLast4(sentence);
+  var at = source ? last4.indexOf(source) : -1;
+  if (at > 0) last4 = [source].concat(last4.slice(0, at), last4.slice(at + 1));
+
   return {
     amount: amount,
     type: type,
     merchant: merchant,
     description: desc,
-    last4: findLast4(flat),
+    last4: last4,
     date: parseDate(sentence) || parseDate(flat) || (mail.date ? String(mail.date).slice(0, 10) : today()),
     bank: bank ? bank.name : null,
     verb: verb,
   };
 }
 
+/** Las palabras clave de una categoría, ya comparables. */
+function keywordsOf(category) {
+  return String(category.keywords || "")
+    .split(",")
+    .map(function (k) {
+      return norm(k);
+    })
+    .filter(Boolean);
+}
+
 /**
  * La categoría por palabras clave: la primera cuya lista contenga algo que
  * aparezca en el texto. `categories` son registros con `keywords` separados
- * por coma y `kind` (income/expense).
+ * por coma y `kind` (income/expense); si traen `keys` (lo que da
+ * `keywordsOf`), no se vuelven a partir en cada mensaje.
  */
 function categorize(text, type, categories) {
   var hay = " " + norm(text) + " ";
@@ -254,12 +292,7 @@ function categorize(text, type, categories) {
   for (var i = 0; i < categories.length; i++) {
     var c = categories[i];
     if (c.kind && c.kind !== type) continue;
-    var keys = String(c.keywords || "")
-      .split(",")
-      .map(function (k) {
-        return norm(k);
-      })
-      .filter(Boolean);
+    var keys = c.keys || keywordsOf(c);
     for (var j = 0; j < keys.length; j++) {
       // La coincidencia más larga gana: "pago tarjeta" antes que "pago".
       if (hay.indexOf(keys[j]) >= 0 && keys[j].length > bestLen) {
@@ -271,27 +304,36 @@ function categorize(text, type, categories) {
   return best;
 }
 
+function keysOf(account) {
+  return String(account.match_keys || "")
+    .split(",")
+    .map(function (k) {
+      return norm(k);
+    })
+    .filter(Boolean);
+}
+
 /**
  * La cuenta propia por sus pistas: `match_keys` (coma) contra los cuatro
- * últimos y el nombre del banco.
+ * últimos y el nombre del banco. Las terminaciones se miran en su orden:
+ * con dos cuentas propias en el mensaje gana la primera (la de origen), no
+ * la que esté primero en la lista de cuentas.
  */
 function matchAccount(parsed, accounts) {
   var digits = parsed.last4 || [];
   var bank = norm(parsed.bank || "");
-  var byBank = null;
-  for (var i = 0; i < accounts.length; i++) {
-    var keys = String(accounts[i].match_keys || "")
-      .split(",")
-      .map(function (k) {
-        return norm(k);
-      })
-      .filter(Boolean);
-    for (var j = 0; j < keys.length; j++) {
-      if (digits.indexOf(keys[j]) >= 0) return { account: accounts[i], key: keys[j] };
-      if (!byBank && bank && keys[j] === bank) byBank = accounts[i];
+  var keys = accounts.map(keysOf);
+  for (var d = 0; d < digits.length; d++) {
+    for (var i = 0; i < accounts.length; i++) {
+      if (keys[i].indexOf(digits[d]) >= 0) return { account: accounts[i], key: digits[d] };
     }
   }
-  return byBank ? { account: byBank, key: bank } : null;
+  if (bank) {
+    for (var j = 0; j < accounts.length; j++) {
+      if (keys[j].indexOf(bank) >= 0) return { account: accounts[j], key: bank };
+    }
+  }
+  return null;
 }
 
 function isBankName(key) {
@@ -353,6 +395,7 @@ module.exports = {
   parseAmount: parseAmount,
   parseDate: parseDate,
   parseMessage: parseMessage,
+  keywordsOf: keywordsOf,
   categorize: categorize,
   matchAccount: matchAccount,
   matchKeyInText: matchKeyInText,

@@ -5,7 +5,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
 
-  import { today } from "../../lib/finance";
+  import { splitByPercent, today } from "../../lib/finance";
   import { notify } from "../../lib/notify.svelte";
   import { pb, session } from "../../lib/pb.svelte";
   import { reload, store } from "../../lib/store.svelte";
@@ -30,6 +30,9 @@
 
   // Solo las cuentas propias: en un ahorro compartido cada quien aporta desde las suyas.
   const myAllocs = $derived((saving?.allocations ?? []).filter((a) => store.account(a.account)));
+  const myPct = $derived(myAllocs.reduce((s, a) => s + (Number(a.percent) || 0), 0));
+  /** La parte de cada cuenta mía en lo que yo aporto (en uno compartido, sobre lo mío). */
+  const pctOf = (percent: number) => (myPct ? Math.round((percent / myPct) * 100) : 0);
 
   // Se llena al abrir o al cambiar de saving, y solo entonces: lo demás que
   // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
@@ -39,7 +42,9 @@
     void saving;
     untrack(() => {
       dir = "in";
-      amount = saving.monthly_amount || 0;
+      // En un ahorro compartido, de partida lo que me toca a mí del aporte.
+      const share = store.savingShare(saving);
+      amount = Math.round((saving.monthly_amount || 0) * (share || 1));
       account = myAllocs[0]?.account ?? store.activeAccounts[0]?.id ?? "";
       date = today();
       note = "";
@@ -52,10 +57,11 @@
     busy = true;
     try {
       const sign = dir === "in" ? 1 : -1;
-      const parts =
-        splitAll && dir === "in"
-          ? myAllocs.map((a) => ({ account: a.account, amount: Math.round((amount * a.percent) / 100) }))
-          : [{ account, amount }];
+      // Repartido entre mis cuentas en la proporción del plan, sin que los
+      // redondeos cambien el total que escribí.
+      const split = splitAll && dir === "in" ? splitByPercent(amount, myAllocs.map((a) => a.percent)) : [];
+      const shares = myAllocs.map((a, i) => ({ account: a.account, amount: split[i] ?? 0 })).filter((p) => p.amount);
+      const parts = shares.length ? shares : [{ account, amount }];
       for (const p of parts) {
         await pb.collection("saving_movements").create({
           saving: saving.id,
@@ -94,7 +100,7 @@
     {#if dir === "in" && myAllocs.length > 1}
       <label class="choice">
         <input type="checkbox" bind:checked={splitAll} />
-        Repartir según el plan ({myAllocs.map((a) => `${store.account(a.account)?.name} ${a.percent}%`).join(", ")})
+        Repartir según el plan ({myAllocs.map((a) => `${store.account(a.account)?.name} ${pctOf(a.percent)}%`).join(", ")})
       </label>
     {/if}
     {#if !(splitAll && dir === "in")}

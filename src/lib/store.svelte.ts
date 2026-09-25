@@ -7,6 +7,7 @@
  * Una copia queda en el teléfono: al entrar sin internet la app abre con
  * ella, y los saldos suman lo que falta por enviar (ver offline.svelte.ts).
  */
+import { planSummary } from "./finance";
 import { readSnap, writeSnap } from "./local";
 import { notify } from "./notify.svelte";
 import { isNetworkError, offline, seen, startOffline, stopOffline } from "./offline.svelte";
@@ -31,6 +32,54 @@ let gmail = $state<GmailConnection | null>(null);
 let loaded = $state(false);
 /** Sube con cada cambio en transacciones: las pantallas lo leen para recargar. */
 let txVersion = $state(0);
+
+// Lo que las pantallas leen a cada rato (a veces una vez por fila) se
+// calcula una sola vez por cambio.
+const activeAccounts = $derived(accounts.filter((a) => !a.archived));
+const activeSavings = $derived(savings.filter((s) => !s.archived));
+const accountIds = $derived(new Set(accounts.map((a) => a.id)));
+const total = $derived(
+  accounts
+    .filter((a) => !a.archived && !a.exclude_from_total)
+    .reduce((s, a) => s + (balances[a.id] ?? 0) + offline.delta(a.id), 0),
+);
+
+/** Los aportes sumados: por ahorro, por cuenta y lo de cada ahorro en las cuentas propias. */
+const saved = $derived.by(() => {
+  const bySaving = new Map<string, number>();
+  const byAccount = new Map<string, number>();
+  const mine = new Map<string, number>();
+  const add = (map: Map<string, number>, key: string, v: number) => map.set(key, (map.get(key) ?? 0) + v);
+  for (const m of movements) {
+    add(bySaving, m.saving, m.amount);
+    add(byAccount, m.account, m.amount);
+    // Sin cuenta, es de quien lo anotó.
+    if (m.account ? accountIds.has(m.account) : m.created_by === session.id) add(mine, m.saving, m.amount);
+  }
+  return { bySaving, byAccount, mine };
+});
+
+/**
+ * La parte del aporte mensual de un ahorro que sale de las cuentas propias:
+ * la suma de los porcentajes del reparto que caen en ellas. Sin reparto, el
+ * aporte automático lo hace el dueño (ver pb_hooks/lib/scheduler.js).
+ */
+function shareOf(s: Saving): number {
+  const alloc = s.allocations ?? [];
+  if (!alloc.length) return s.owner === session.id ? 1 : 0;
+  const pct = alloc.reduce((a, x) => a + (accountIds.has(x.account) ? Number(x.percent) || 0 : 0), 0);
+  return Math.min(1, Math.max(0, pct / 100));
+}
+
+/**
+ * Ingresos − fijos − ahorros de un mes ("AAAA-MM", por defecto el actual): lo
+ * que se puede gastar. De los ahorros cuenta solo la parte propia.
+ */
+function planFor(ym?: string) {
+  return planSummary(recurring, activeSavings.map((s) => ({ ...s, share: shareOf(s) })), ym);
+}
+
+const plan = $derived(planFor());
 
 async function loadAccounts() {
   const [a, b] = await Promise.all([
@@ -184,6 +233,7 @@ export async function stop() {
   unsub = [];
   loaded = false;
   accounts = [];
+  balances = {};
   categories = [];
   savings = [];
   movements = [];
@@ -208,7 +258,7 @@ export const store = {
     return accounts;
   },
   get activeAccounts() {
-    return accounts.filter((a) => !a.archived);
+    return activeAccounts;
   },
   get categories() {
     return categories;
@@ -217,7 +267,7 @@ export const store = {
     return savings;
   },
   get activeSavings() {
-    return savings.filter((s) => !s.archived);
+    return activeSavings;
   },
   get movements() {
     return movements;
@@ -234,10 +284,14 @@ export const store = {
   },
   /** Todo lo que cuenta: cuentas activas que no están excluidas del total. */
   get total() {
-    return accounts
-      .filter((a) => !a.archived && !a.exclude_from_total)
-      .reduce((s, a) => s + (balances[a.id] ?? 0) + offline.delta(a.id), 0);
+    return total;
   },
+  /** El plan del mes: ingresos, fijos, la parte propia de los ahorros y lo que queda libre. */
+  get plan() {
+    return plan;
+  },
+  /** El plan de otro mes ("AAAA-MM"): los fijos que ya terminaron o aún no empiezan no cuentan. */
+  planFor,
   account(id: string) {
     return accounts.find((a) => a.id === id);
   },
@@ -247,13 +301,21 @@ export const store = {
   saving(id: string) {
     return savings.find((s) => s.id === id);
   },
-  /** Lo que lleva un ahorro: la suma de sus movimientos. */
+  /** Lo que lleva un ahorro: la suma de sus movimientos, de todos los que aportan. */
   savingCurrent(id: string) {
-    return movements.filter((m) => m.saving === id).reduce((s, m) => s + m.amount, 0);
+    return saved.bySaving.get(id) ?? 0;
+  },
+  /** Lo que lleva un ahorro en las cuentas propias (en uno compartido, lo mío). */
+  savingMine(id: string) {
+    return saved.mine.get(id) ?? 0;
+  },
+  /** La parte del aporte mensual de un ahorro que sale de las cuentas propias (0..1). */
+  savingShare(s: Saving) {
+    return shareOf(s);
   },
   /** Cuánto de cada cuenta está apartado en ahorros. */
   earmarked(accountId: string) {
-    return movements.filter((m) => m.account === accountId).reduce((s, m) => s + m.amount, 0);
+    return saved.byAccount.get(accountId) ?? 0;
   },
   isMine(ownerId: string) {
     return ownerId === session.id;

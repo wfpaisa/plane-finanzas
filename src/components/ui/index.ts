@@ -20,6 +20,7 @@ export { default as MenuLabel } from "./MenuLabel.svelte";
 export { default as MenuSeparator } from "./MenuSeparator.svelte";
 export { default as Modal } from "./Modal.svelte";
 export { default as ModeToggle } from "./ModeToggle.svelte";
+export { default as MonthPicker } from "./MonthPicker.svelte";
 export { default as Note } from "./Note.svelte";
 export { default as Select } from "./Select.svelte";
 export { default as Spinner } from "./Spinner.svelte";
