@@ -49,7 +49,7 @@ function plan(mail, ctx, defaultAccount) {
 
   var type = parsed.type;
   var toAccount = null;
-  // "Transferiste ... desde *1234 a la cuenta *5678", o "a la llave @wua109":
+  // "Transferiste ... desde *1234 a la cuenta *5678", o "a la llave @ana123":
   // si el destino también es mío, es un movimiento entre cuentas y no un gasto.
   if (type === "expense" && account) {
     var other = parsed.last4.length >= 2 ? parsers.matchAccount({ last4: parsed.last4.slice(1), bank: null }, ctx.accounts) : null;

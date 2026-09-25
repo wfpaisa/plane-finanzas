@@ -11,14 +11,15 @@
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button } from "../components/ui";
-  import { alpha, colorsFor, token } from "../lib/colors";
+  import { alpha, colorsFor, tintColor, token } from "../lib/colors";
   import { addMonths, bucketize, byCategory, monthRange, planSummary, today } from "../lib/finance";
   import { money, monthLabel } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
-  import { colorOf } from "../lib/palettes";
+  import { colorOf, tintFor } from "../lib/palettes";
     import { pb, session } from "../lib/pb.svelte";
   import { go } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
+  import { byTag, hasTag, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
   import { txModal } from "../lib/ui.svelte";
 
@@ -53,7 +54,18 @@
 
   const months = Array.from({ length: 6 }, (_, i) => addMonths(ym, i - 5));
   const buckets = $derived(bucketize(txs, "month", months));
-  const cats = $derived(byCategory(month, "expense"));
+  // "¿En qué gastaste?": primero por etiqueta de la categoría; al elegir una,
+  // sus categorías. `null` es arriba; "" es "sin etiqueta".
+  let catTag = $state<string | null>(null);
+  const monthExpenses = $derived(month.filter((t) => t.type === "expense"));
+  const tagRows = $derived(byTag(monthExpenses));
+  const showTags = $derived(catTag === null && tagRows.some((r) => r.tag));
+  const cats = $derived(
+    byCategory(
+      catTag === null ? month : monthExpenses.filter((t) => (catTag ? hasTag(t, catTag) : !tagsOf(t).length)),
+      "expense",
+    ),
+  );
 
   const firstName = $derived((session.user?.name || "").split(" ")[0]);
 
@@ -128,6 +140,42 @@
     } as ChartConfiguration;
   };
 
+  // Las etiquetas también en dona. Tocar una parte, o su nombre en la
+  // leyenda, abre sus categorías.
+  const tagDoughnutConfig = (): ChartConfiguration => {
+    const rows = tagRows;
+    const open = (i: number | undefined) => {
+      if (i !== undefined && rows[i]) catTag = rows[i].tag;
+    };
+    return {
+      type: "doughnut",
+      data: {
+        labels: rows.map((r) => (r.tag ? `#${r.tag}` : "Sin etiqueta")),
+        datasets: [
+          {
+            data: rows.map((r) => r.total),
+            backgroundColor: rows.map((r) => (r.tag ? tintColor(tintFor(r.tag)) : token("--viz-muted"))),
+            borderColor: token("--bg-level2"),
+            borderWidth: 2,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        cutout: "68%",
+        onClick: (_e, els) => open(els[0]?.index),
+        onHover: (e, els) => {
+          const el = e.native?.target as HTMLElement | undefined;
+          if (el) el.style.cursor = els.length ? "pointer" : "default";
+        },
+        plugins: {
+          legend: { position: "right", onClick: (_e, item) => open(item.index) },
+          tooltip: { callbacks: { label: (c) => ` ${c.label}: ${money(Number(c.raw))}` } },
+        },
+      },
+    } as ChartConfiguration;
+  };
+
   const savingsList = $derived(
     store.activeSavings.slice(0, 5).map((s) => ({ s, current: store.savingCurrent(s.id) })),
   );
@@ -190,15 +238,27 @@
       </div>
       <div class="card dash-cats">
         <div class="card-head">
-          <div>
-            <h3 class="card-title">¿En qué gastaste?</h3>
-            <p class="card-sub">Gastos de {monthLabel(ym, true)}</p>
+          {#if catTag !== null}
+            <button type="button" class="btn-icon sm btn-rounded" aria-label="Volver a las etiquetas" onclick={() => (catTag = null)}>
+              <Icon name="arrow-left-01" />
+            </button>
+          {/if}
+          <div class="flex-1">
+            <h3 class="card-title">{catTag === null ? "¿En qué gastaste?" : catTag ? `#${catTag}` : "Sin etiqueta"}</h3>
+            <p class="card-sub">
+              {catTag === null ? `Gastos de ${monthLabel(ym, true)}` : "Sus categorías este mes"}
+            </p>
           </div>
           <div class="card-head-actions"><a class="link small" href="#/estados">Ver análisis</a></div>
         </div>
         <div class="card-body">
-          {#if cats.length}
-            <Chart config={doughnutConfig} height={240} label="Gastos del mes por categoría" />
+          {#if showTags}
+            <Chart config={tagDoughnutConfig} height={240} label="Gastos del mes por etiqueta" />
+            <p class="small muted tag-note">Toca una etiqueta para ver sus categorías. Un gasto con varias etiquetas suma en cada una.</p>
+          {:else if cats.length}
+            {#key catTag}
+              <Chart config={doughnutConfig} height={240} label="Gastos del mes por categoría" />
+            {/key}
           {:else}
             <div class="empty-card">Todavía no hay gastos este mes.</div>
           {/if}
@@ -255,13 +315,13 @@
     container-type: inline-size;
   }
 
-  /* Angosto: una columna. Mediano: las gráficas arriba y los movimientos
-     abajo, con su compañera al lado. Ancho: tres columnas, con los ahorros
-     a lo alto a la derecha. */
+  /* Angosto: una columna. Mediano: el flujo a todo el ancho y debajo los
+     movimientos, con "¿En qué gastaste?" sobre los ahorros al lado. Ancho:
+     tres columnas; el flujo ocupa dos y los gastos van encima de los ahorros. */
   .dash-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "flow" "cats" "txs" "savings";
+    grid-template-areas: "flow" "txs" "cats" "savings";
     gap: var(--card-gap);
 
     & > .dash-flow {
@@ -283,16 +343,22 @@
     @container (min-width: 44rem) {
       grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
       grid-template-areas:
-        "flow cats"
+        "flow flow"
+        "txs cats"
         "txs savings";
+      align-items: start;
     }
 
     @container (min-width: 96rem) {
       grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
       grid-template-areas:
-        "flow cats savings"
+        "flow flow cats"
         "txs txs savings";
     }
+  }
+
+  .tag-note {
+    margin: var(--sp-8) 0 0;
   }
 
   .kpi .progress {

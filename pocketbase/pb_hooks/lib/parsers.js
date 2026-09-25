@@ -303,9 +303,9 @@ function isBankName(key) {
 }
 
 /**
- * La cuenta propia cuya pista de texto --una llave como "@wua109", un
+ * La cuenta propia cuya pista de texto --una llave como "@ana123", un
  * celular, un número de cuenta completo-- aparece en el mensaje. Sirve para
- * ver que un "transferiste a la llave @wua109" va a otra cuenta mía. No
+ * ver que un "transferiste a la llave @ana123" va a otra cuenta mía. No
  * cuentan las terminaciones de cuatro dígitos ni los nombres de banco, que
  * salen en casi cualquier correo; tampoco la cuenta `exceptId` (el origen).
  */

@@ -105,10 +105,10 @@ describe("categorize y matchAccount", () => {
 
   test("pista de texto: una llave propia en el mensaje", () => {
     const text =
-      "Bancolombia: WILLIAM, transferiste $150,000.00 a la llave @wua109 desde tu cuenta *6855 a William Felipe Uribe Aristizabal el 20/09/26 a las 13:33.";
+      "Bancolombia: ANA, transferiste $150,000.00 a la llave @ana123 desde tu cuenta *4321 a Ana Maria Perez Gomez el 20/09/26 a las 13:33.";
     const accounts = [
-      { id: "a", match_keys: "6855, @otra, bancolombia" },
-      { id: "b", match_keys: "@WUA109, Bancolombia" },
+      { id: "a", match_keys: "4321, @otra, bancolombia" },
+      { id: "b", match_keys: "@ANA123, Bancolombia" },
       { id: "c", match_keys: "nequi, 3001234567" },
     ];
     expect(p.matchKeyInText(text, accounts, "a").account.id).toBe("b");
