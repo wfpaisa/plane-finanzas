@@ -1,0 +1,8 @@
+.git
+node_modules
+dist
+.env
+deploy
+pocketbase/pocketbase
+pocketbase/pb_data
+pocketbase/pb_public

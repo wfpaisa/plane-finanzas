@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pocketbase",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "pb"],
+      "port": 8093
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": ["vite"],
+      "port": 3434
+    }
+  ]
+}

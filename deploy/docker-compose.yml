@@ -1,0 +1,13 @@
+# Vive en el servidor en /opt/plane-finanzas, junto a su .env y pb_data/.
+# Lo copia ./desplegar.sh.
+services:
+  finanzas:
+    image: plane-finanzas:latest
+    container_name: plane-finanzas
+    restart: unless-stopped
+    ports:
+      - "3434:8090"
+    env_file: .env
+    volumes:
+      - ./pb_data:/pb/pb_data
+    # Sin mem_limit: el LXC de Proxmox no expone memory.max a Docker.

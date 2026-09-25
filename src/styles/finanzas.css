@@ -1,0 +1,133 @@
+/*
+ * Lo que es solo de Finanzas encima del sistema de Planer.
+ *
+ * Los diez tintes de categorías y etiquetas son los fijos de `theme.css`;
+ * el acento y las superficies los pone `glass.css`. Aquí solo se nombran
+ * los usos propios de la app: las letras, los colores de las gráficas y
+ * diez tintes más para las categorías.
+ */
+
+:root,
+[data-theme] {
+  /* Dos letras. Urbanist para el texto: geométrica, redonda y abierta, la
+     de las referencias. Y Geist Mono para las cifras: Urbanist no trae
+     números tabulares (su "1" es la mitad de ancho que su "0") y los montos
+     no se alinearían en columna. La mono va en peso fino, que es lo que da
+     el aire ligero de las cifras grandes de la referencia. */
+  --font-family: "Urbanist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "Geist Mono", ui-monospace, "SF Mono", monospace;
+  --font-mono: var(--font-num);
+
+  /* Lo que pasa entre cuentas: ni entra ni sale. En oscuro, un azul cielo
+     más claro: el azul del tinte se perdía contra el fondo. */
+  --transfer: light-dark(var(--tinte-1), oklch(0.78 0.12 250));
+
+  /* Las gráficas, en tonos de bruma: los mismos significados de siempre
+     (ingresos verdes, gastos rojos) pero apagados hacia el gris azulado del
+     lienzo, para que convivan con él. La línea de tendencia va en la tinta
+     azul marino. En oscuro, un punto más de luz. */
+  --viz-income: light-dark(oklch(0.6 0.1 172), oklch(0.8 0.09 172));
+  --viz-expense: light-dark(oklch(0.63 0.14 22), oklch(0.75 0.12 22));
+  --viz-saving: light-dark(oklch(0.64 0.09 268), oklch(0.79 0.075 268));
+  --viz-free: light-dark(oklch(0.55 calc(0.06 * var(--tint-k, 1)) var(--tint-h, 232)), oklch(0.8 calc(0.05 * var(--tint-k, 1)) var(--tint-h, 212)));
+  --viz-line: light-dark(oklch(0.29 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 240)), oklch(0.93 calc(0.035 * var(--tint-k, 1)) var(--tint-h, 178)));
+  /* Lo que no tiene color propio ("Otras", una meta de referencia). */
+  --viz-muted: light-dark(oklch(0.78 calc(0.015 * var(--tint-k, 1)) var(--tint-h, 230)), oklch(0.46 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 235)));
+}
+
+/* ---------- Texto ---------- */
+
+/* Urbanist es de trazo fino: el texto corriente va en 450 para que no se
+   pierda sobre el vidrio; los títulos, en 500 y no en negrita, como en las
+   referencias: la jerarquía la marca el tamaño, no el peso. */
+body {
+  font-weight: 450;
+  font-feature-settings: normal;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.card-title {
+  letter-spacing: -0.015em;
+}
+
+/* ---------- Números ---------- */
+
+.money,
+.kpi-val,
+.number,
+input[type="number"],
+input[type="date"],
+input[type="month"] {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.04em;
+}
+
+/* La cifra de un indicador no se parte en dos líneas: se achica con el
+   ancho de su tarjeta. En el peso fino y grande, como la cifra protagonista
+   de las referencias. */
+.kpi {
+  container-type: inline-size;
+}
+
+.kpi.card .kpi-val {
+  font-size: clamp(1.125rem, 11cqi, 1.875rem);
+  white-space: nowrap;
+}
+
+.kpi-val,
+.kpi-val .money {
+  font-weight: 300;
+  letter-spacing: -0.05em;
+}
+
+/* Los tooltips de ayuda llevan frases enteras: se leen mejor alineados a la
+   izquierda que centrados. */
+.plane-tip {
+  max-width: 20rem;
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  text-wrap: pretty;
+}
+
+/* ---------- Diez tintes más para las categorías ----------
+ * Los diez de `theme.css` no alcanzan para que cada categoría tenga el suyo
+ * (las de partida ya son más de veinte). Estos diez caen entre los matices de
+ * aquellos, con la misma luz y croma contenido, y usan la misma mezcla de
+ * `components.css`: cada clase solo elige su `--tinte`. */
+:root {
+  --tinte-11: oklch(64% 0.14 232); /* cielo */
+  --tinte-12: oklch(56% 0.24 305); /* púrpura */
+  --tinte-13: oklch(62% 0.21 355); /* rosa */
+  --tinte-14: oklch(70% 0.17 58); /* naranja */
+  --tinte-15: oklch(80% 0.15 97); /* mostaza */
+  --tinte-16: oklch(76% 0.19 137); /* lima */
+  --tinte-17: oklch(66% 0.15 172); /* esmeralda */
+  --tinte-18: oklch(52% 0.2 272); /* índigo */
+  --tinte-19: oklch(54% 0.09 55); /* café */
+  --tinte-20: oklch(54% 0.08 320); /* malva */
+}
+
+.tint-11 { --tinte: var(--tinte-11); }
+.tint-12 { --tinte: var(--tinte-12); }
+.tint-13 { --tinte: var(--tinte-13); }
+.tint-14 { --tinte: var(--tinte-14); }
+.tint-15 { --tinte: var(--tinte-15); }
+.tint-16 { --tinte: var(--tinte-16); }
+.tint-17 { --tinte: var(--tinte-17); }
+.tint-18 { --tinte: var(--tinte-18); }
+.tint-19 { --tinte: var(--tinte-19); }
+.tint-20 { --tinte: var(--tinte-20); }
+
+/* La mezcla de `components.css`, para estos diez. `.tag` va delante para
+   ganarle a la regla de la pastilla apagada, que no los conoce. */
+:is(.tint-11, .tint-12, .tint-13, .tint-14, .tint-15, .tint-16, .tint-17, .tint-18, .tint-19, .tint-20),
+.tag:is(.tint-11, .tint-12, .tint-13, .tint-14, .tint-15, .tint-16, .tint-17, .tint-18, .tint-19, .tint-20) {
+  background: color-mix(in oklab, var(--tinte) 14%, transparent);
+  box-shadow: inset 0 0 0 var(--border-width) color-mix(in oklab, var(--tinte) 30%, transparent);
+  --tinta: color-mix(in oklab, var(--tinte) 72%, var(--text-primary));
+  color: light-dark(oklch(from var(--tinta) min(l, 0.48) c h), oklch(from var(--tinta) max(l, 0.72) c h));
+}

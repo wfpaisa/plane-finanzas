@@ -1,0 +1,168 @@
+/*
+ * Piezas propias de Finanzas que se repiten entre pantallas. Lo demás viene
+ * del catálogo (`components.css`) y de las utilidades (`layout.css`).
+ */
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-20);
+
+  & h1 {
+    margin: 0;
+    font-size: 1.625rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+
+  & p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.page {
+  max-width: 76rem;
+  margin: 0 auto;
+}
+
+/* Pantallas que aprovechan todo el ancho, como el resumen. */
+.page.page-wide {
+  max-width: none;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--sp-14);
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--card-gap);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--card-gap);
+
+  @media (max-width: 64rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.split-even {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--card-gap);
+
+  @media (max-width: 64rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.kpis-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--card-gap);
+
+  @media (max-width: 40rem) {
+    gap: var(--sp-10);
+
+    & .kpi {
+      padding: var(--sp-12);
+      gap: var(--sp-8);
+    }
+
+    & .kpi-label {
+      font-size: var(--text-xs);
+    }
+
+    & .kpi.card .kpi-val {
+      font-size: 1.05rem;
+    }
+  }
+}
+
+.kpi.card .kpi-val {
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+}
+
+.kpi-ico.tone-income {
+  color: var(--success);
+}
+
+.kpi-ico.tone-expense {
+  color: var(--danger);
+}
+
+.kpi-ico.tone-warn {
+  color: var(--warning);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: var(--text-xs);
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem var(--sp-10);
+  align-items: center;
+  padding: var(--sp-8) 0;
+
+  & + .bar-row {
+    border-top: var(--border-width) solid var(--border);
+  }
+}
+
+.bar-track {
+  grid-column: 1 / -1;
+  height: 0.5rem;
+  border-radius: 99rem;
+  background: var(--bg-field);
+  overflow: hidden;
+
+  & > span {
+    display: block;
+    height: 100%;
+    border-radius: 99rem;
+    background: var(--tinte, var(--chart-1));
+    transition: width 0.4s;
+  }
+}
+
+.bar-track.over > span {
+  background: var(--danger);
+}
+
+.empty-card {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}

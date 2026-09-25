@@ -1,0 +1,30 @@
+{
+  "name": "plane-finanzas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "web": "vite",
+    "pb": "./pocketbase/pocketbase serve --dir pocketbase/pb_data --hooksDir pocketbase/pb_hooks --migrationsDir pocketbase/pb_migrations --publicDir pocketbase/pb_public --http ${PB_HTTP:-127.0.0.1:8093}",
+    "pb:download": "bash scripts/pb-download.sh",
+    "pb:admin": "./pocketbase/pocketbase superuser upsert --dir pocketbase/pb_data --migrationsDir pocketbase/pb_migrations",
+    "build": "vite build",
+    "preview": "vite preview",
+    "seed": "bun scripts/seed.ts",
+    "test": "bun test tests/",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "pocketbase": "^0.28.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6",
+    "@types/node": "^24",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}

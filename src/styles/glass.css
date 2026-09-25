@@ -1,0 +1,804 @@
+/*
+ * BRUMA — la capa que le da a Finanzas su aspecto.
+ *
+ * Se importa la última (`main.ts`) y repinta encima del sistema de Planer sin
+ * tocar las piezas por dentro. La idea, sacada de las referencias:
+ *
+ *   - Un lienzo atmosférico: azul acero arriba que se aclara a un verde menta
+ *     y termina en gris niebla. Es el único degradado, y es de luz, no de
+ *     color: tonos vecinos y apagados, como cielo. Un grano finísimo encima
+ *     evita las bandas.
+ *   - Vidrio blanco lechoso encima: la hoja de contenido, el menú lateral y
+ *     lo que flota. Bordes casi invisibles (un filo blanco), sombras anchas y
+ *     muy suaves, y radios grandes.
+ *   - Controles en píldora que parecen almohadas: blancos, con una sombra
+ *     interior abajo, sin contorno.
+ *   - Una sola tinta de acento: azul marino (#163144) en claro y menta
+ *     (#DFF3EB) en oscuro. La acción principal es una píldora de tinta llena.
+ *     El color de verdad queda para lo que significa algo: ingresos y gastos,
+ *     categorías, ahorros.
+ *
+ * Tres grosores de vidrio:
+ *   --glass-0  la hoja de contenido y el menú lateral, sobre el lienzo
+ *   --glass-1  las tarjetas, sobre la hoja
+ *   --glass-2  lo que se abre encima (menú, lista, barra de marcados)
+ *   --glass-3  lo que pide toda la atención (modal, cajón)
+ */
+
+/* ---------- Tokens: claro ----------
+ * `:root` a secas empataría con `[data-theme="dark"]` y, por venir después,
+ * le pisaría el oscuro: por eso se excluye. */
+:root:not([data-theme="dark"]),
+[data-theme="light"] {
+  --brand-ink: oklch(0.29 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 240)); /* #163144 */
+  --canvas: oklch(0.93 calc(0.015 * var(--tint-k, 1)) var(--tint-h, 205));
+  --canvas-wash: linear-gradient(
+    180deg,
+    oklch(0.6 calc(0.05 * var(--tint-k, 1)) var(--tint-h, 238)) 0%,
+    oklch(0.74 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 222)) 24%,
+    oklch(0.88 calc(0.03 * var(--tint-k, 1)) var(--tint-h, 190)) 52%,
+    oklch(0.93 calc(0.012 * var(--tint-k, 1)) var(--tint-h, 205)) 78%,
+    oklch(0.92 calc(0.006 * var(--tint-k, 1)) var(--tint-h, 230)) 100%
+  );
+  --grain-opacity: 0.045;
+
+  --glass-0: oklch(0.99 calc(0.004 * var(--tint-k, 1)) var(--tint-h, 200) / 0.42);
+  --glass-1: oklch(1 0 0 / 0.55);
+  --glass-2: oklch(0.985 calc(0.004 * var(--tint-k, 1)) var(--tint-h, 210) / 0.82);
+  --glass-3: oklch(0.955 calc(0.005 * var(--tint-k, 1)) var(--tint-h, 220) / 0.9);
+  --glass-edge: oklch(1 0 0 / 0.85);
+  --glass-rim: oklch(1 0 0 / 0.55);
+  --glass-line: oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.09);
+  --glass-line-strong: oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.16);
+  --glass-shadow:
+    0 1px 1px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.03),
+    0 12px 32px -12px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.14);
+  --glass-shadow-float:
+    0 2px 6px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.06),
+    0 32px 64px -16px oklch(0.25 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.3);
+  --pillow:
+    inset 0 1px 0 oklch(1 0 0 / 0.9),
+    inset 0 -3px 6px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.05),
+    0 1px 2px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.06),
+    0 6px 16px -8px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.14);
+  /* Los campos, un nivel por debajo de la tarjeta: un filo de brillo de
+     1px alrededor y la sombra por dentro, cayendo desde arriba, como algo
+     hundido. Los botones, al revés, sobresalen. */
+  --field-bg: oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.05);
+  --field-bg-focus: oklch(1 0 0 / 0.45);
+  --field-shadow:
+    0 0 0 1px oklch(1 0 0 / 0.85),
+    inset 0 2px 5px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.12),
+    inset 0 1px 1px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.06);
+  --glass-blur: 28px;
+  --glass-sat: 160%;
+  /* El filo de luz del vidrio y su brillo de arriba: en claro basta la
+     línea blanca; el oscuro (abajo) le suma el vidrio líquido. */
+  --glass-spec: var(--glass-spec);
+  --glass-sheen: none;
+
+  --bg-level1: var(--canvas);
+  --bg-level2: var(--glass-2);
+  --bg-card: var(--glass-1);
+  --bg-field: oklch(1 0 0 / 0.78);
+  --bg-hover: oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.05);
+  --bg-sidebar: var(--glass-0);
+  --bg-float: var(--glass-2);
+  --border: var(--glass-line);
+  --border-strong: var(--glass-line-strong);
+  --border-float: oklch(1 0 0 / 0.9);
+  --chart-grid: oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.08);
+  --shadow-sm: 0 1px 2px oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.06);
+  --shadow-md: var(--glass-shadow);
+  --shadow-lg: var(--glass-shadow-float);
+  --shadow-xl: var(--glass-shadow-float);
+
+  --text-primary: oklch(0.22 calc(0.03 * var(--tint-k, 1)) var(--tint-h, 240));
+  --text-secondary: oklch(0.36 calc(0.025 * var(--tint-k, 1)) var(--tint-h, 238));
+  --text-muted: oklch(0.47 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 236));
+  --text-subtle: oklch(0.58 calc(0.015 * var(--tint-k, 1)) var(--tint-h, 236));
+
+  --success: oklch(0.52 0.1 172);
+  --success-bg: oklch(0.6 0.1 172 / 0.12);
+  --danger: oklch(0.55 0.16 22);
+  --danger-bg: oklch(0.63 0.14 22 / 0.12);
+}
+
+/* ---------- Tokens: oscuro ----------
+ * La misma atmósfera de noche: del azul acero profundo arriba a un azul
+ * casi negro abajo, con una bruma verdosa a media altura. */
+[data-theme="dark"] {
+  --brand-ink: oklch(0.93 calc(0.035 * var(--tint-k, 1)) var(--tint-h, 175)); /* #DFF3EB */
+  --canvas: oklch(0.17 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 232));
+  --canvas-wash: linear-gradient(
+    180deg,
+    oklch(0.34 calc(0.055 * var(--tint-k, 1)) var(--tint-h, 240)) 0%,
+    oklch(0.26 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 230)) 28%,
+    oklch(0.21 calc(0.03 * var(--tint-k, 1)) var(--tint-h, 205)) 55%,
+    oklch(0.17 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 225)) 82%,
+    oklch(0.15 calc(0.015 * var(--tint-k, 1)) var(--tint-h, 235)) 100%
+  );
+  --grain-opacity: 0.06;
+
+  --glass-0: oklch(0.21 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 235) / 0.36);
+  --glass-1: oklch(0.32 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.26);
+  --glass-2: oklch(0.25 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 232) / 0.78);
+  --glass-3: oklch(0.22 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 232) / 0.9);
+  --glass-edge: oklch(1 0 0 / 0.1);
+  --glass-rim: oklch(1 0 0 / 0.1);
+  --glass-line: oklch(1 0 0 / 0.08);
+  --glass-line-strong: oklch(1 0 0 / 0.14);
+  --glass-shadow:
+    0 1px 1px oklch(0 0 0 / 0.2),
+    0 14px 36px -14px oklch(0 0 0 / 0.5);
+  --glass-shadow-float:
+    0 2px 8px oklch(0 0 0 / 0.3),
+    0 32px 64px -16px oklch(0 0 0 / 0.65);
+  --pillow:
+    inset 0 1px 0 oklch(1 0 0 / 0.14),
+    inset 0 0 0 1px oklch(1 0 0 / 0.05),
+    0 1px 2px oklch(0 0 0 / 0.25),
+    0 6px 16px -8px oklch(0 0 0 / 0.4);
+  --field-bg: oklch(0 0 0 / 0.22);
+  --field-bg-focus: oklch(0 0 0 / 0.14);
+  --field-shadow:
+    0 0 0 1px oklch(1 0 0 / 0.09),
+    inset 0 2px 5px oklch(0 0 0 / 0.35),
+    inset 0 1px 1px oklch(0 0 0 / 0.2);
+  --glass-blur: 30px;
+  --glass-sat: 190%;
+  /* Vidrio líquido: la luz entra por arriba a la izquierda y se refracta en
+     el canto. Un filo brillante arriba, cantos laterales más tenues, un
+     reflejo leve abajo (la cáustica) y un resplandor interior que baja desde
+     el borde de arriba, todo con sombras interiores: no pesa y sigue la
+     forma de cualquier radio. */
+  --glass-spec:
+    inset 0 1px 0 oklch(1 0 0 / 0.16),
+    inset 1px 0 0 oklch(1 0 0 / 0.06),
+    inset -1px 0 0 oklch(1 0 0 / 0.03),
+    inset 0 -1px 0 oklch(1 0 0 / 0.05),
+    inset 0 14px 28px -20px oklch(1 0 0 / 0.14),
+    inset 0 -10px 24px -18px oklch(0.9 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 190) / 0.08);
+  /* El reflejo de la superficie: más luz arriba y en la esquina por donde
+     entra, que se apaga antes de la mitad. */
+  --glass-sheen:
+    radial-gradient(130% 70% at 0% 0%, oklch(1 0 0 / 0.07), transparent 55%),
+    linear-gradient(180deg, oklch(1 0 0 / 0.05), oklch(1 0 0 / 0.01) 40%, transparent 65%);
+
+  --bg-level1: var(--canvas);
+  --bg-level2: var(--glass-2);
+  --bg-card: var(--glass-1);
+  --bg-field: oklch(0.3 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.5);
+  --bg-hover: oklch(1 0 0 / 0.06);
+  --bg-sidebar: var(--glass-0);
+  --bg-float: var(--glass-2);
+  --border: var(--glass-line);
+  --border-strong: var(--glass-line-strong);
+  --border-float: oklch(1 0 0 / 0.12);
+  --chart-grid: oklch(1 0 0 / 0.07);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.25);
+  --shadow-md: var(--glass-shadow);
+  --shadow-lg: var(--glass-shadow-float);
+  --shadow-xl: var(--glass-shadow-float);
+
+  --text-primary: oklch(0.96 calc(0.012 * var(--tint-k, 1)) var(--tint-h, 190));
+  --text-secondary: oklch(0.84 calc(0.015 * var(--tint-k, 1)) var(--tint-h, 200));
+  --text-muted: oklch(0.7 calc(0.018 * var(--tint-k, 1)) var(--tint-h, 215));
+  --text-subtle: oklch(0.6 calc(0.018 * var(--tint-k, 1)) var(--tint-h, 220));
+
+  --success: oklch(0.8 0.09 172);
+  --success-bg: oklch(0.8 0.09 172 / 0.14);
+  --danger: oklch(0.75 0.12 22);
+  --danger-bg: oklch(0.75 0.12 22 / 0.14);
+}
+
+/* ---------- El tinte del fondo, elegido en Ajustes ----------
+ * Todo lo neutro de esta hoja —lienzo, vidrio, líneas, sombras, texto y la
+ * tinta del acento— se escribe con `var(--tint-h, <su tono>)` y un croma
+ * multiplicado por `var(--tint-k, 1)`. Sin tinte elegido cada uno conserva
+ * el tono de la bruma; con uno (`lib/tint.svelte.ts` pone en <html> el tono
+ * `--tint-h` y cuánto color tiene, `--tint-k`), todos toman ese tono y nada
+ * queda verdoso. Lo que significa algo (ingresos, gastos, avisos) no se
+ * toca. */
+
+/* ---------- Acento: la tinta ----------
+ * Marino en claro, menta en oscuro. `--brand-ink` y no `--ink`: ese nombre
+ * ya lo usa `compat.css` para el color del texto. */
+:root {
+  --accent: var(--brand-ink);
+  --accent-hover: light-dark(oklch(0.22 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240)), oklch(0.98 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 175)));
+  --accent-text: light-dark(oklch(0.98 calc(0.008 * var(--tint-k, 1)) var(--tint-h, 200)), oklch(0.25 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 240)));
+  --accent-soft: light-dark(oklch(0.29 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 240) / 0.08), oklch(0.93 calc(0.035 * var(--tint-k, 1)) var(--tint-h, 175) / 0.12));
+  --accent-soft-text: var(--brand-ink);
+  --focus-ring: light-dark(oklch(0.29 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 240) / 0.14), oklch(0.93 calc(0.035 * var(--tint-k, 1)) var(--tint-h, 175) / 0.2));
+  --chart-1: light-dark(oklch(0.42 calc(0.06 * var(--tint-k, 1)) var(--tint-h, 238)), oklch(0.82 calc(0.05 * var(--tint-k, 1)) var(--tint-h, 200)));
+  --chart-2: light-dark(oklch(0.64 0.09 268), oklch(0.79 0.075 268));
+  --chart-3: light-dark(oklch(0.6 calc(0.1 * var(--tint-k, 1)) var(--tint-h, 172)), oklch(0.8 calc(0.09 * var(--tint-k, 1)) var(--tint-h, 172)));
+  --chart-4: light-dark(oklch(0.8 calc(0.03 * var(--tint-k, 1)) var(--tint-h, 210)), oklch(0.5 calc(0.03 * var(--tint-k, 1)) var(--tint-h, 220)));
+}
+
+/* ---------- Radios ----------
+ * Grandes y redondos, como las referencias: tarjetas de 24px, la hoja y los
+ * modales de 32px, y todo control de una línea en píldora. */
+:root {
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-card: 2rem;
+  --radius-pill: 999px;
+}
+
+/* ---------- El lienzo ---------- */
+/* El lienzo va en <html>: si <body> tuviera fondo, taparía el grano. */
+html {
+  background: var(--canvas-wash), var(--canvas);
+  background-attachment: fixed;
+}
+
+body {
+  background: transparent;
+}
+
+/* Grano finísimo encima del degradado: se lee como papel y deshace las
+   bandas que un degradado largo deja en pantallas de 8 bits. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+#root {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+/* ---------- Tipografía ---------- */
+.page-head {
+  & h1 {
+    font-size: 1.875rem;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+  }
+
+  & p {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+}
+
+.card-title {
+  font-size: 1.0625rem;
+  font-weight: 550;
+}
+
+.card-sub {
+  color: var(--text-muted);
+}
+
+.field > label,
+.field > .field-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* ---------- Vidrio: la receta ----------
+ * Solo desenfoca lo que se posa sobre el lienzo o flota: dentro de la hoja
+ * de contenido las tarjetas ya tienen el vidrio de la hoja detrás, y
+ * desenfocar dos veces solo cuesta. */
+.card,
+.menu,
+.plane-card,
+.toast,
+.drawer,
+.modal {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+}
+
+.main .card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.card {
+  background: var(--glass-sheen), var(--glass-1);
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    var(--glass-spec),
+    var(--glass-shadow);
+}
+
+.card-solid {
+  background: var(--glass-sheen), var(--glass-2);
+}
+
+/* Una tarjeta dentro de otra es un panel hundido, sin sombra. */
+.card .card {
+  background: oklch(from var(--glass-1) l c h / calc(alpha * 0.8));
+  background-image: none;
+  box-shadow: var(--glass-spec);
+}
+
+.card-head {
+  padding: var(--sp-20) var(--sp-24) 0;
+}
+
+.card-body {
+  padding: var(--sp-16) var(--sp-24) var(--sp-20);
+}
+
+/* ---------- Lo que flota ---------- */
+.modal,
+.drawer,
+.plane-card {
+  background: var(--glass-sheen), var(--glass-3);
+  border: 1px solid var(--border-float);
+  box-shadow:
+    var(--glass-spec),
+    var(--glass-shadow-float);
+}
+
+.modal {
+  border-radius: var(--radius-card);
+
+  &::backdrop {
+    background: oklch(0.25 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.28);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    backdrop-filter: blur(14px) saturate(120%);
+  }
+}
+
+.plane-backdrop {
+  background: oklch(0.25 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.28);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+}
+
+/* La cabeza del modal: el título suelto y el cierre en un círculo de línea;
+   el filo de abajo no llega a los bordes, se queda dentro del margen. */
+.modal-head {
+  margin-inline: var(--sp-24);
+  padding: var(--sp-24) 0 var(--sp-18);
+
+  & h2,
+  & h3 {
+    font-size: 1.25rem;
+    font-weight: 550;
+    letter-spacing: -0.015em;
+  }
+
+  & .btn-close-modal {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-top: -0.375rem;
+    border: 1px solid var(--glass-line-strong);
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+
+    &:hover {
+      background: var(--bg-hover);
+    }
+  }
+}
+
+.modal-body {
+  padding: var(--sp-20) var(--sp-24);
+}
+
+.modal-foot {
+  padding: var(--sp-8) var(--sp-24) var(--sp-24);
+  border-top: 0;
+
+  & > .btn {
+    min-height: 3rem;
+    padding-inline: 1.5rem;
+  }
+
+  /* Cancelar y la acción, solos: se reparten el ancho a mitades. */
+  &:has(> .btn:first-child + .btn:last-child) > .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+.menu,
+.toast {
+  background: var(--glass-sheen), var(--glass-2);
+  border: 1px solid var(--border-float);
+  border-radius: 1.25rem;
+  box-shadow:
+    var(--glass-spec),
+    var(--glass-shadow-float);
+}
+
+@supports (appearance: base-select) {
+  select::picker(select) {
+    background: var(--glass-2);
+    border-radius: 1.25rem;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    box-shadow: var(--glass-shadow-float);
+  }
+}
+
+/* ---------- Botones: píldoras ---------- */
+.btn,
+.btn-icon,
+.mini-btn {
+  border: 0;
+  background: var(--bg-field);
+  box-shadow: var(--pillow);
+  color: var(--text-primary);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  &:hover {
+    border: 0;
+    background: light-dark(oklch(1 0 0), oklch(0.34 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.7));
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+.btn {
+  min-height: 2.5rem;
+  padding: 0.25rem 1.125rem;
+  border-radius: var(--radius-pill);
+  font-weight: 550;
+}
+
+.btn.sm {
+  min-height: 2rem;
+  padding-inline: 0.875rem;
+}
+
+.btn-icon,
+.mini-btn {
+  border-radius: 50%;
+}
+
+.btn-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+
+  &.sm {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* La acción principal: una píldora de tinta llena. */
+.btn-primary,
+.btn-icon.btn-primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.14),
+    0 10px 22px -10px oklch(from var(--accent) l c h / 0.7);
+
+  &:hover {
+    background: var(--accent-hover);
+  }
+}
+
+/* Sin fondo: solo el texto, y la píldora aparece al pasar. */
+.btn-ghost {
+  background: transparent;
+  box-shadow: none;
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+}
+
+/* Destructivo: la píldora llena, en el rojo apagado. */
+.btn-danger {
+  background: var(--danger);
+  color: light-dark(oklch(0.99 0 0), oklch(0.2 0.03 22));
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.16),
+    0 10px 22px -10px oklch(from var(--danger) l c h / 0.7);
+
+  &:hover {
+    background: oklch(from var(--danger) calc(l - 0.05) c h);
+  }
+}
+
+.btn-ghost.btn-danger {
+  background: transparent;
+  box-shadow: none;
+  color: var(--danger);
+
+  &:hover {
+    background: var(--danger-bg);
+  }
+}
+
+/* Pendiente: la almohada de siempre con la letra y un anillo del aviso. */
+.btn-warning {
+  color: var(--warning);
+  box-shadow:
+    var(--pillow),
+    inset 0 0 0 1px oklch(from var(--warning) l c h / 0.45);
+
+  &:hover {
+    background: var(--warning-bg);
+    color: var(--warning);
+  }
+}
+
+/* El botón mínimo de las filas no carga almohada: aparece al pasar. */
+.mini-btn {
+  background: transparent;
+  box-shadow: none;
+
+  &:hover {
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
+  }
+}
+
+/* ---------- Campos: hundidos ---------- */
+.field :is(input, select, textarea),
+.field-control {
+  height: 2.75rem;
+  padding: 0 1.125rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--field-bg);
+  font-weight: 500;
+
+  &:focus {
+    border: 0;
+    background: var(--field-bg-focus);
+  }
+
+  &::placeholder {
+    color: var(--text-subtle);
+    font-weight: 450;
+  }
+}
+
+.field.sm :is(input, select, textarea),
+.field-control.sm {
+  height: 2.125rem;
+  padding-inline: 0.875rem;
+}
+
+.field textarea,
+textarea.field-control {
+  height: auto;
+  min-height: 5rem;
+  padding: 0.875rem 1.125rem;
+  border-radius: 1.375rem;
+}
+
+.field select,
+select.field-control {
+  padding-right: 2.5rem;
+}
+
+.field [aria-invalid="true"],
+[aria-invalid="true"].field-control {
+  box-shadow:
+    var(--pillow),
+    inset 0 0 0 1px var(--danger);
+}
+
+/* Los campos no llevan sombra hacia fuera ni anillo de foco, para que no se
+   confundan con los botones: solo `--field-shadow`, el filo de brillo y la
+   sombra hundida. */
+.field :is(input, select, textarea),
+.field-control {
+  &,
+  &:focus {
+    box-shadow: var(--field-shadow);
+  }
+}
+
+.field [aria-invalid="true"],
+[aria-invalid="true"].field-control {
+  &,
+  &:focus {
+    box-shadow:
+      var(--field-shadow),
+      inset 0 0 0 1px var(--danger);
+  }
+}
+
+/* El select se pulsa como un botón: sobresale igual que ellos, con la
+   almohada, en vez de hundirse como los campos donde se escribe. */
+.field select,
+select.field-control {
+  &,
+  &:focus {
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
+  }
+
+  &:hover {
+    background: light-dark(oklch(1 0 0), oklch(0.34 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.7));
+  }
+}
+
+/* ---------- Pastillas de opciones ---------- */
+.chips,
+.tab-list {
+  padding: 0.25rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: light-dark(oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.06), oklch(0 0 0 / 0.2));
+  box-shadow: inset 0 1px 2px light-dark(oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.06), oklch(0 0 0 / 0.2));
+
+  &::before {
+    inset: 0.25rem auto 0.25rem 0.25rem;
+    border-radius: var(--radius-pill);
+    background: light-dark(oklch(1 0 0), oklch(0.34 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.85));
+    box-shadow:
+      var(--glass-spec),
+      0 2px 8px -2px oklch(0.25 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.2);
+  }
+}
+
+.chip,
+.tab {
+  border-radius: var(--radius-pill);
+  padding: 0.4375rem 0.875rem;
+  font-weight: 550;
+}
+
+/* ---------- Etiquetas ---------- */
+.tag {
+  font-weight: 550;
+}
+
+/* ---------- Tablas: aire y líneas casi invisibles ---------- */
+.table {
+  & th {
+    padding: var(--sp-12) var(--sp-20);
+    background: transparent;
+    border-block: 0;
+    border-bottom: 1px solid var(--glass-line);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--text-muted);
+  }
+
+  & td {
+    border-bottom-color: var(--glass-line);
+  }
+
+  & th + th,
+  & td + td {
+    border-left-color: transparent;
+  }
+
+  & tbody tr:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.table-foot {
+  background: transparent;
+  border-top-color: var(--glass-line);
+}
+
+/* ---------- Indicadores ----------
+ * La etiqueta pequeña y apagada arriba, la cifra grande y fina debajo. El
+ * icono va en una ficha blanca redonda; el tono solo lo tiñe a él. */
+.kpi {
+  gap: var(--sp-10);
+  padding: var(--sp-20) var(--sp-22) var(--sp-16);
+}
+
+.kpi-label {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.kpi-ico {
+  --kpi-tone: var(--text-primary);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--bg-field);
+  box-shadow: var(--pillow);
+  color: var(--kpi-tone);
+
+  & i {
+    font-size: var(--text-lg);
+  }
+
+  &.tone-income {
+    --kpi-tone: var(--viz-income);
+  }
+
+  &.tone-expense {
+    --kpi-tone: var(--viz-expense);
+  }
+
+  &.tone-warn {
+    --kpi-tone: var(--warning);
+  }
+}
+
+.kpi-foot {
+  color: var(--text-muted);
+}
+
+/* ---------- Barras de avance: finas y redondas ---------- */
+.bar-track {
+  border-radius: var(--radius-pill);
+  background: light-dark(oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.08), oklch(1 0 0 / 0.08));
+
+  & > span {
+    border-radius: var(--radius-pill);
+  }
+}
+
+.progress {
+  border-radius: var(--radius-pill);
+  background: light-dark(oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.08), oklch(1 0 0 / 0.08));
+
+  &::-webkit-progress-bar {
+    border-radius: var(--radius-pill);
+    background: light-dark(oklch(0.3 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 240) / 0.08), oklch(1 0 0 / 0.08));
+  }
+
+  &::-webkit-progress-value {
+    border-radius: var(--radius-pill);
+    background: var(--viz-saving);
+  }
+
+  &::-moz-progress-bar {
+    border-radius: var(--radius-pill);
+    background: var(--viz-saving);
+  }
+}
+
+/* ---------- Detalles ---------- */
+::-webkit-scrollbar-thumb {
+  background: oklch(from var(--text-primary) l c h / 0.14);
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+  background-clip: padding-box;
+}
+
+::selection {
+  background: oklch(from var(--viz-saving) l c h / 0.45);
+}
+
+/* ---------- Sin desenfoque: vidrio casi opaco ---------- */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root:not([data-theme="dark"]),
+  [data-theme="light"] {
+    --glass-0: oklch(0.97 calc(0.006 * var(--tint-k, 1)) var(--tint-h, 205) / 0.9);
+    --glass-1: oklch(1 0 0 / 0.9);
+    --glass-2: oklch(0.99 calc(0.004 * var(--tint-k, 1)) var(--tint-h, 210) / 0.97);
+    --glass-3: oklch(0.96 calc(0.005 * var(--tint-k, 1)) var(--tint-h, 220) / 0.98);
+  }
+
+  [data-theme="dark"] {
+    --glass-0: oklch(0.2 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 235) / 0.92);
+    --glass-1: oklch(0.25 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.92);
+    --glass-2: oklch(0.24 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 232) / 0.97);
+    --glass-3: oklch(0.22 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 232) / 0.98);
+  }
+}

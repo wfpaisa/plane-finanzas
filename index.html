@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Finanzas</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#040405" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/pwa/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Finanzas" />
+    <link rel="preload" as="font" type="font/woff2" href="/iconos/iconos.woff2" crossorigin />
+    <link rel="stylesheet" href="/iconos/iconos.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,100..900;1,100..900&family=Geist+Mono:wght@100..900&display=swap"
+    />
+    <script>
+      // Aplica el tema antes de pintar para que no haya parpadeo.
+      (() => {
+        const saved = localStorage.getItem("plane-theme");
+        const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        // Y el tinte del fondo elegido en Ajustes (lib/tint.svelte.ts).
+        try {
+          const t = localStorage.getItem("finanzas-tinte");
+          if (t && /^#[0-9a-f]{6}$/i.test(t)) {
+            // Tono y croma OKLCH del color (la misma cuenta que oklchOf).
+            const lin = (i) => {
+              const v = parseInt(t.slice(i, i + 2), 16) / 255;
+              return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+            };
+            const [r, g, b] = [lin(1), lin(3), lin(5)];
+            const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+            const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+            const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+            const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+            const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+            const root = document.documentElement;
+            root.dataset.tint = "";
+            root.style.setProperty("--tint-h", (((Math.atan2(B, A) * 180) / Math.PI + 360) % 360).toFixed(1));
+            root.style.setProperty("--tint-k", Math.min(1.4, Math.hypot(A, B) / 0.1).toFixed(2));
+          }
+        } catch {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
