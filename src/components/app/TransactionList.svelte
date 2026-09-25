@@ -286,6 +286,11 @@
               </td>
             {/if}
             <td class="tx-mail-col">
+              {#if t.dup_of}<span
+                  class="tx-dup-ico"
+                  data-tip="Posible repetido: en Movimientos puedes unirlo o dejar los dos"
+                  ><Icon name="copy-01" size={14} /></span
+                >{/if}
               {#if t.rule}<span
                   class="tx-rule-ico"
                   data-tip="Ajustado por la regla «{ruleOf(t)}»"
@@ -415,6 +420,11 @@
                       name="attachment-01"
                       size={14}
                     />{/if}
+                  {#if t.dup_of}<span
+                      class="tx-dup-ico"
+                      data-tip="Posible repetido: en Movimientos puedes unirlo o dejar los dos"
+                      ><Icon name="copy-01" size={14} /></span
+                    >{/if}
                   {#if t.rule}<span
                       class="tx-rule-ico"
                       data-tip="Ajustado por la regla «{ruleOf(t)}»"
@@ -775,6 +785,11 @@
     font-weight: 500;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  .tx-dup-ico {
+    display: inline-flex;
+    color: var(--warning, var(--accent));
   }
 
   .tx-rule-ico {

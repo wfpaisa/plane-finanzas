@@ -32,6 +32,13 @@ export const SOURCE_LABEL: Record<string, string> = {
   csv: "Registro CSV",
 };
 
+/** De dónde viene cada lado de un posible repetido. */
+export function dupeSide(t: { source?: string; type: string }): string {
+  if (!t.source || t.source === "manual") return "Anotaste";
+  const from = t.source === "gmail" ? "Correo" : t.source === "csv" ? "CSV" : "Texto pegado";
+  return t.type === "transfer" ? `${from}: transferencia` : `${from}: ${t.type === "income" ? "ingreso" : "gasto"}`;
+}
+
 export const FREQUENCIES = [
   { id: "monthly", label: "Mensual" },
   { id: "yearly", label: "Anual" },

@@ -93,6 +93,18 @@ describe("fijos automáticos", () => {
     expect(app.saved.length).toBe(1);
     expect(app.saved[0].fields).toMatchObject({ external_id: "rec:r:2026-09", tags: ["fijo"], source: "recurrente" });
   });
+
+  test("si la persona lo borró, no vuelve", () => {
+    at("2026-09-26");
+    const app = fakeApp({ recurring: [{ id: "r", owner: "u", account: "acc", kind: "expense", amount: 10, day_of_month: 5 }] });
+    const find = app.findFirstRecordByFilter;
+    app.findFirstRecordByFilter = (col: string, filter: string, params: { k: string }) => {
+      if (col === "ignored_imports" && params.k === "rec:r:2026-09") return new FakeRecord(col);
+      return find(col, filter, params);
+    };
+    s.runRecurring(app, "u");
+    expect(app.saved.length).toBe(0);
+  });
 });
 
 describe("aportes automáticos", () => {

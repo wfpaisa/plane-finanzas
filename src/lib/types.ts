@@ -148,7 +148,8 @@ export interface ImportItem {
   categoryName: string;
   tags: string[];
   bank: string | null;
-  status: "creado" | "nuevo" | "duplicado" | "sin cuenta";
+  /** "borrado": ya se importó y la persona lo borró; no vuelve. */
+  status: "creado" | "nuevo" | "duplicado" | "borrado" | "sin cuenta";
 }
 
 export interface ImportResult {

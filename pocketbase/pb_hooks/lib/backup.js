@@ -20,10 +20,11 @@ var FIELDS = {
   categories: ["name", "kind", "icon", "color", "keywords", "budget", "tags"],
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "match_keys", "exclude_from_total", "archived", "sort", "notes"],
   recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "paused", "auto_create"],
-  transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw"],
+  transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
   rules: ["match", "amount", "category", "tags", "description", "to_notes", "paused"],
+  ignored_imports: ["external_id"],
 };
 
 function plainOf(record, fields) {
@@ -39,7 +40,7 @@ function own(app, name, userId) {
 
 function exportData(app, userId) {
   var data = {};
-  var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules"];
+  var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     data[names[i]] = own(app, names[i], userId).map(function (r) {
       return plainOf(r, FIELDS[names[i]]);
@@ -94,7 +95,7 @@ function clean(app, userId) {
   var counts = {};
   // Primero lo que depende de otros, para que ningún borrado en cascada
   // descuadre la cuenta.
-  var names = ["rules", "transactions", "recurring", "savings", "accounts", "categories"];
+  var names = ["rules", "transactions", "recurring", "savings", "accounts", "categories", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     var list = own(app, names[i], userId);
     for (var j = 0; j < list.length; j++) app.delete(list[j]);
@@ -146,7 +147,7 @@ function restoreData(app, userId, data, counts) {
     clean(tx, userId);
 
     // viejo id -> nuevo id, por colección.
-    var ids = { categories: {}, accounts: {}, savings: {} };
+    var ids = { categories: {}, accounts: {}, savings: {}, rules: {} };
     function map(name, id) {
       return id ? ids[name][id] || "" : "";
     }
@@ -182,10 +183,16 @@ function restoreData(app, userId, data, counts) {
       r.set("category", map("categories", row.category));
       r.set("account", map("accounts", row.account));
     });
+    // Las reglas antes que los movimientos: cada uno dice qué regla lo ajustó.
+    // Los respaldos de antes de las reglas no las traen.
+    insert("rules", data.rules, function (r, row) {
+      r.set("category", map("categories", row.category));
+    });
     insert("transactions", data.transactions, function (r, row) {
       r.set("account", map("accounts", row.account));
       r.set("to_account", map("accounts", row.to_account));
       r.set("category", map("categories", row.category));
+      r.set("rule", map("rules", row.rule));
     });
     insert("savings", data.savings, function (r, row) {
       r.set(
@@ -201,10 +208,6 @@ function restoreData(app, userId, data, counts) {
         }),
       );
     });
-    // Los respaldos de antes de las reglas no las traen.
-    insert("rules", data.rules, function (r, row) {
-      r.set("category", map("categories", row.category));
-    });
     insert("saving_movements", data.saving_movements, function (r, row) {
       r.set("saving", map("savings", row.saving));
       // Los aportes de otros miembros siguen siendo suyos si esa persona
@@ -212,6 +215,9 @@ function restoreData(app, userId, data, counts) {
       r.set("created_by", userExists(tx, row.created_by) ? row.created_by : userId);
       r.set("account", map("accounts", row.account));
     });
+
+    // Lo borrado a propósito; los respaldos de antes no lo traen.
+    insert("ignored_imports", data.ignored_imports);
 
     if (data.gmail) {
       try {

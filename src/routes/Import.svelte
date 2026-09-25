@@ -118,7 +118,7 @@
   }
 
   const statusTone = (s: ImportItem["status"]) =>
-    s === "creado" ? "tag-success" : s === "nuevo" ? "tint-1" : s === "duplicado" ? "off" : "tag-warning";
+    s === "creado" ? "tag-success" : s === "nuevo" ? "tint-1" : s === "duplicado" || s === "borrado" ? "off" : "tag-warning";
 
   let csvPlan = $state<CsvPlan | null>(null);
   let csvName = $state("");
@@ -320,7 +320,7 @@
       <div>
         <h3 class="card-title">{title}</h3>
         <p class="card-sub">
-          {r.created} movimientos creados · {r.items.filter((i) => i.status === "nuevo").length} detectados por primera vez · {r.skipped} ya existían · {r.ignored} sin una cantidad reconocible
+          {r.created} movimientos creados · {r.items.filter((i) => i.status === "nuevo").length} detectados por primera vez · {r.skipped} ya existían o los borraste · {r.ignored} sin una cantidad reconocible
         </p>
       </div>
       <div class="card-head-actions">

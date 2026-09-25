@@ -6,6 +6,7 @@
 var gmail = require(__hooks + "/lib/gmail.js");
 var importer = require(__hooks + "/lib/importer.js");
 var parsers = require(__hooks + "/lib/parsers.js");
+var ignored = require(__hooks + "/lib/ignored.js");
 
 /** Cuántos mensajes se leen como máximo por pasada. */
 var MAX = 300;
@@ -31,12 +32,9 @@ function syncConnection(app, conn) {
 
     var ids = gmail.listIds(token, q, MAX);
     var fresh = [];
+    // Ni lo ya importado ni lo que la persona borró.
     for (var i = 0; i < ids.length; i++) {
-      try {
-        app.findFirstRecordByFilter("transactions", "owner = {:u} && external_id = {:e}", { u: owner, e: ids[i] });
-      } catch (_) {
-        fresh.push(ids[i]);
-      }
+      if (!ignored.known(app, owner, ids[i])) fresh.push(ids[i]);
     }
     var mails = fresh.map(function (id) {
       return gmail.getMessage(token, id, parsers.htmlToText);

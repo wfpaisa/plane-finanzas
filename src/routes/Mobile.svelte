@@ -25,6 +25,7 @@
   import { colorsFor } from "../lib/colors";
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
   import { dateLong, dateShort, monthLabel, parseMoney, plainNumber } from "../lib/format";
+  import { dupeSide } from "../lib/labels";
   import { matches, sumOf } from "../lib/mobile";
   import { categoryTags, hasTag } from "../lib/tags";
   import { notify } from "../lib/notify.svelte";
@@ -412,12 +413,12 @@
             </div>
             <div class="m-dupe-pair">
               <div>
-                <span class="m-label">Anotaste</span>
+                <span class="m-label">{dupeSide(pair.mine)}</span>
                 <span class="m-desc">{pair.mine.description || store.category(pair.mine.category)?.name || "Sin descripción"}</span>
                 <span class="m-sub">{dateShort(pair.mine.date.slice(0, 10))} · {store.account(pair.mine.account)?.name ?? ""}</span>
               </div>
               <div>
-                <span class="m-label">Llegó del banco</span>
+                <span class="m-label">{dupeSide(pair.bank)}</span>
                 <span class="m-desc">{pair.bank.description || "Sin descripción"}</span>
                 <span class="m-sub">{dateShort(pair.bank.date.slice(0, 10))} · {store.account(pair.bank.account)?.name ?? ""}</span>
               </div>

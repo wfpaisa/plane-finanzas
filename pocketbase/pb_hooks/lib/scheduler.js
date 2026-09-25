@@ -95,7 +95,10 @@ function runRecurring(app, userId) {
     if (date > today) continue;
     if (start && date < start && freq !== "once") continue;
     if (end && date > end) continue;
-    if (has(app, "transactions", "owner = {:u} && external_id = {:k}", { u: r.getString("owner"), k: key })) continue;
+    var who = { u: r.getString("owner"), k: key };
+    if (has(app, "transactions", "owner = {:u} && external_id = {:k}", who)) continue;
+    // Tampoco si la persona borró el de este mes (ver lib/ignored.js).
+    if (has(app, "ignored_imports", "owner = {:u} && external_id = {:k}", who)) continue;
 
     var tx = new Record(col);
     tx.set("owner", r.getString("owner"));

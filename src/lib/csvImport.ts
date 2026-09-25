@@ -341,14 +341,13 @@ export async function applyPlan(pb: PocketBase, owner: string, plan: CsvPlan, on
     out.categoriesCreated++;
   }
 
-  const existing = new Set(
-    (
-      await pb.collection("transactions").getFullList<{ external_id: string }>({
-        filter: pb.filter("owner = {:o} && external_id ~ 'csv:'", { o: owner }),
-        fields: "external_id",
-      })
-    ).map((t) => t.external_id),
-  );
+  // Lo ya importado y lo que se importó y luego se borró (ver pb_hooks/lib/ignored.js).
+  const filter = pb.filter("owner = {:o} && external_id ~ 'csv:'", { o: owner });
+  const [had, deleted] = await Promise.all([
+    pb.collection("transactions").getFullList<{ external_id: string }>({ filter, fields: "external_id" }),
+    pb.collection("ignored_imports").getFullList<{ external_id: string }>({ filter, fields: "external_id" }),
+  ]);
+  const existing = new Set([...had, ...deleted].map((t) => t.external_id));
 
   const todo = plan.transactions.filter((t) => {
     if (existing.has(t.key)) {

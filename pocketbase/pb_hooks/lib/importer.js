@@ -8,6 +8,7 @@
 
 var parsers = require(__hooks + "/lib/parsers.js");
 var rules = require(__hooks + "/lib/rules.js");
+var ignored = require(__hooks + "/lib/ignored.js");
 
 function load(app, userId) {
   var accounts = app.findRecordsByFilter("accounts", "owner = {:u} && archived = false", "sort,created", 500, 0, { u: userId });
@@ -143,6 +144,12 @@ function importMessages(app, userId, mails, opts) {
     var p = plan(mail, ctx, opts.account);
     if (!p) {
       out.ignored++;
+      continue;
+    }
+    if (ignored.ignored(app, userId, p.externalId)) {
+      out.skipped++;
+      p.status = "borrado";
+      out.items.push(p);
       continue;
     }
     if (exists(app, userId, p.externalId)) {

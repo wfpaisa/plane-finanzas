@@ -40,6 +40,21 @@ onRecordCreate((e) => {
   e.next();
 }, "transactions");
 
+// ---------- Lo importado que se borra no vuelve (ver lib/ignored.js) ----------
+onRecordDelete((e) => {
+  const ext = e.record.getString("external_id");
+  const owner = e.record.getString("owner");
+  e.next();
+  const dupes = require(`${__hooks}/lib/dupes.js`);
+  // Al cargar un respaldo o borrarlo todo no es la persona descartando algo.
+  if (!ext || dupes.restoring(e.app, owner)) return;
+  try {
+    require(`${__hooks}/lib/ignored.js`).remember(e.app, owner, ext);
+  } catch (err) {
+    console.log("[finanzas] borrados: " + err);
+  }
+}, "transactions");
+
 routerAdd(
   "POST",
   "/api/finanzas/tx/merge",
@@ -214,11 +229,18 @@ routerAdd(
   "/api/finanzas/clean",
   (e) => {
     const backup = require(`${__hooks}/lib/backup.js`);
+    const dupes = require(`${__hooks}/lib/dupes.js`);
     let counts;
-    e.app.runInTransaction((tx) => {
-      counts = backup.clean(tx, e.auth.id);
-      backup.seedCategories(tx, e.auth.id);
-    });
+    // Borrarlo todo es empezar de cero: tampoco se recuerda lo borrado.
+    dupes.setRestoring(e.app, e.auth.id, true);
+    try {
+      e.app.runInTransaction((tx) => {
+        counts = backup.clean(tx, e.auth.id);
+        backup.seedCategories(tx, e.auth.id);
+      });
+    } finally {
+      dupes.setRestoring(e.app, e.auth.id, false);
+    }
     return e.json(200, counts);
   },
   $apis.requireAuth("users"),
