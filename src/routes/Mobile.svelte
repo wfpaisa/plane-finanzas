@@ -212,6 +212,17 @@
   // --- Sin conexión: el aviso y lo pendiente ----------------------------
   let syncSheet = $state(false);
 
+  // Con una hoja abierta la página de atrás se queda quieta.
+  $effect(() => {
+    if (!sheet && !daySheet && !syncSheet) return;
+    const root = document.documentElement;
+    const prev = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = prev;
+    };
+  });
+
   const status = $derived.by(() => {
     const n = offline.pending;
     if (offline.authNeeded && n) return { icon: "alert-02", text: "Entra de nuevo para enviar", tone: "warn" };
@@ -986,7 +997,22 @@
     position: fixed;
     inset: 0;
     z-index: 40;
-    background: oklch(0 0 0 / 0.4);
+    background: oklch(0 0 0 / 0.35);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    backdrop-filter: blur(6px) saturate(120%);
+    /* El toque que arrastra sobre el velo no mueve la página de atrás. */
+    touch-action: none;
+    animation: veil 0.2s ease-out;
+  }
+
+  :global([data-theme="dark"]) .m-veil {
+    background: oklch(0 0 0 / 0.6);
+  }
+
+  @keyframes veil {
+    from {
+      opacity: 0;
+    }
   }
 
   .m-sheet {
@@ -1001,15 +1027,27 @@
     margin: 0 auto;
     padding: var(--sp-16) var(--sp-16) calc(var(--sp-16) + env(safe-area-inset-bottom));
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    background: var(--bg-level1, var(--bg-card));
+    background: var(--bg-level2, var(--bg-card));
     box-shadow: var(--shadow-xl);
     overflow-y: auto;
+    /* Al llegar al final de la hoja, el gesto no pasa a la página. */
+    overscroll-behavior: contain;
     animation: up 0.2s ease-out;
 
     &.flush {
       gap: 0;
       padding: 0 0 env(safe-area-inset-bottom);
     }
+  }
+
+  /* En oscuro el lienzo y la hoja son casi del mismo gris: un filo claro
+     arriba y una sombra más honda la separan de lo que tapa. */
+  :global([data-theme="dark"]) .m-sheet {
+    background: oklch(0.23 0 0);
+    border-top: 1px solid oklch(1 0 0 / 0.14);
+    box-shadow:
+      0 -1px 0 oklch(1 0 0 / 0.04),
+      0 -12px 40px oklch(0 0 0 / 0.6);
   }
 
   @keyframes up {
@@ -1036,7 +1074,6 @@
     z-index: 1;
     border-bottom: 1px solid var(--border);
     background: inherit;
-    background: var(--bg-level1, var(--bg-card));
   }
 
   .m-cap::first-letter {
