@@ -28,6 +28,7 @@
   import { notify } from "../lib/notify.svelte";
   import { pb } from "../lib/pb.svelte";
   import { go } from "../lib/router.svelte";
+  import { keys as shortcuts } from "../lib/keys";
   import { store } from "../lib/store.svelte";
   import { byTag, categoryTags, hasTag } from "../lib/tags";
   import { tintFor } from "../lib/palettes";
@@ -159,8 +160,26 @@
     },
   }) as ChartConfiguration;
 
+  const step = (d: number) => {
+    if (g === "week") ym = addMonths(ym, d);
+    else year += d;
+  };
+  const onKey = shortcuts({
+    s: () => (g = "week"),
+    m: () => (g = "month"),
+    a: () => (g = "year"),
+    ArrowLeft: () => step(-1),
+    ArrowRight: () => step(1),
+    h: () => {
+      ym = now.slice(0, 7);
+      year = Number(now.slice(0, 4));
+    },
+  });
+
   const title = $derived(g === "week" ? monthLabel(ym, true) : g === "month" ? String(year) : `${year - 5} – ${year}`);
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="page">
   <header class="page-head">
@@ -184,15 +203,15 @@
   <div class="toolbar card">
     {#if g === "week"}
       <div class="nav">
-        <button type="button" class="btn-icon sm" aria-label="Mes anterior" onclick={() => (ym = addMonths(ym, -1))}><Icon name="arrow-left-01" /></button>
+        <button type="button" class="btn-icon sm" aria-label="Mes anterior" data-tip="Mes anterior (←)" onclick={() => (ym = addMonths(ym, -1))}><Icon name="arrow-left-01" /></button>
         <input type="month" class="field-control sm" bind:value={ym} />
-        <button type="button" class="btn-icon sm" aria-label="Mes siguiente" onclick={() => (ym = addMonths(ym, 1))}><Icon name="arrow-right-01" /></button>
+        <button type="button" class="btn-icon sm" aria-label="Mes siguiente" data-tip="Mes siguiente (→)" onclick={() => (ym = addMonths(ym, 1))}><Icon name="arrow-right-01" /></button>
       </div>
     {:else}
       <div class="nav">
-        <button type="button" class="btn-icon sm" aria-label="Año anterior" onclick={() => year--}><Icon name="arrow-left-01" /></button>
+        <button type="button" class="btn-icon sm" aria-label="Año anterior" data-tip="Año anterior (←)" onclick={() => year--}><Icon name="arrow-left-01" /></button>
         <b class="nav-year">{g === "year" ? `hasta ${year}` : year}</b>
-        <button type="button" class="btn-icon sm" aria-label="Año siguiente" onclick={() => year++}><Icon name="arrow-right-01" /></button>
+        <button type="button" class="btn-icon sm" aria-label="Año siguiente" data-tip="Año siguiente (→)" onclick={() => year++}><Icon name="arrow-right-01" /></button>
       </div>
     {/if}
     <Segmented

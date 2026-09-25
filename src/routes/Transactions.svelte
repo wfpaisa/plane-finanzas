@@ -24,6 +24,7 @@
   import { store } from "../lib/store.svelte";
   import { categoryTags, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
+  import { keys } from "../lib/keys";
   import { txModal } from "../lib/ui.svelte";
 
   const q = route.query;
@@ -199,11 +200,30 @@
     };
   };
 
+  let searchBox = $state<HTMLDivElement>();
+
+  // Con algo marcado para sumar, las flechas no cambian de mes: se perdería
+  // de vista lo marcado.
+  const onKey = keys({
+    ArrowLeft: () => !all && !selected.size && (ym = addMonths(ym, -1)),
+    ArrowRight: () => !all && !selected.size && (ym = addMonths(ym, 1)),
+    h: () => {
+      all = false;
+      ym = today().slice(0, 7);
+    },
+    t: () => (all = !all),
+    g: () => setChart(!chartOn),
+    v: () => setCompact(!compact),
+    "/": () => searchBox?.querySelector("input")?.focus(),
+  });
+
   function clear() {
     account = category = type = tag = search = "";
     go("/movimientos");
   }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="page">
   <header class="page-head">
@@ -213,11 +233,11 @@
     </div>
     <div class="page-actions">
       <div class="month-nav">
-        <button type="button" class="btn-icon sm" aria-label="Mes anterior" disabled={all} onclick={() => (ym = addMonths(ym, -1))}>
+        <button type="button" class="btn-icon sm" aria-label="Mes anterior" data-tip="Mes anterior (←)" disabled={all} onclick={() => (ym = addMonths(ym, -1))}>
           <Icon name="arrow-left-01" />
         </button>
         <input type="month" class="field-control sm" bind:value={ym} disabled={all} />
-        <button type="button" class="btn-icon sm" aria-label="Mes siguiente" disabled={all} onclick={() => (ym = addMonths(ym, 1))}>
+        <button type="button" class="btn-icon sm" aria-label="Mes siguiente" data-tip="Mes siguiente (→)" disabled={all} onclick={() => (ym = addMonths(ym, 1))}>
           <Icon name="arrow-right-01" />
         </button>
         <Tag tone={all ? "tint-1" : "off"} onclick={() => (all = !all)} pressed={all}>Todo</Tag>
@@ -228,7 +248,7 @@
 
   <div class="filters card">
     <div class="filters-grid">
-      <Input bind:value={search} placeholder="Buscar…" />
+      <div bind:this={searchBox}><Input bind:value={search} placeholder="Buscar… ( / )" /></div>
       <Select bind:value={account}>
         <option value="">Todas las cuentas</option>
         {#each store.accounts as a (a.id)}<option value={a.id}>{a.name}</option>{/each}

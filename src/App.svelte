@@ -5,7 +5,7 @@
   import Logo from "./components/Logo.svelte";
   import TransactionForm from "./components/app/TransactionForm.svelte";
   import TooltipLayer from "./components/TooltipLayer.svelte";
-  import { ErrorNote, Loading, SuccessNote } from "./components/ui";
+  import { ErrorNote, Loading, Modal, SuccessNote } from "./components/ui";
   import ModeToggle from "./components/ui/ModeToggle.svelte";
   import { notify } from "./lib/notify.svelte";
   import { logout, session } from "./lib/pb.svelte";
@@ -13,6 +13,7 @@
   import { start, stop, store } from "./lib/store.svelte";
   import { categoryTags } from "./lib/tags";
   import { theme } from "./lib/theme.svelte";
+  import { keys, SHORTCUTS } from "./lib/keys";
   import { txModal } from "./lib/ui.svelte";
   import Accounts from "./routes/Accounts.svelte";
   import Dashboard from "./routes/Dashboard.svelte";
@@ -69,6 +70,15 @@
   });
 
   let moreOpen = $state(false);
+
+  // Atajos de toda la app; los de cada pantalla van en ella. Ver `lib/keys.ts`.
+  let helpOpen = $state(false);
+  const onKey = keys({
+    n: () => session.user && route.path !== "/m" && txModal.new(),
+    "?": () => session.user && (helpOpen = true),
+    // 1 … 8: las pantallas en el orden del menú.
+    ...Object.fromEntries(NAV.map((item, i) => [String(i + 1), () => session.user && route.path !== "/m" && go(item.path)])),
+  });
   const knownTags = $derived([...new Set(["fijo", "revisar", "viaje", "trabajo", "casa", "salud", "regalo", ...categoryTags()])]);
 </script>
 
@@ -115,6 +125,17 @@
       {/if}
     </main>
 
+    <button
+      type="button"
+      class="keys-fab"
+      aria-label="Atajos de teclado"
+      data-tip="Atajos de teclado (?)"
+      data-tip-side="left"
+      onclick={() => (helpOpen = true)}
+    >
+      <Icon name="keyboard" size={16} />
+    </button>
+
     <button type="button" class="fab" aria-label="Agregar movimiento" data-tip="Agregar movimiento" data-tip-side="left" onclick={() => txModal.new()}>
       <Icon name="add-01" size={24} />
     </button>
@@ -144,6 +165,25 @@
   </div>
 {/if}
 
+<svelte:window onkeydown={onKey} />
+
+<Modal open={helpOpen} onClose={() => (helpOpen = false)} title="Atajos de teclado" icon="keyboard">
+  <div class="keys-help">
+    {#each SHORTCUTS as group (group.where)}
+      <section>
+        <p class="eyebrow">{group.where}</p>
+        <dl>
+          {#each group.items as [key, what] (key)}
+            <dt><kbd>{key}</kbd></dt>
+            <dd>{what}</dd>
+          {/each}
+        </dl>
+      </section>
+    {/each}
+    <p class="small muted">No funcionan mientras escribes en un campo.</p>
+  </div>
+</Modal>
+
 {#if session.user}
   <TransactionForm open={txModal.open} tx={txModal.tx} preset={txModal.preset} onClose={() => txModal.close()} {knownTags} />
 {/if}
@@ -153,6 +193,45 @@
 <TooltipLayer />
 
 <style>
+  .keys-help {
+    display: grid;
+    gap: var(--sp-16);
+
+    & dl {
+      display: grid;
+      grid-template-columns: 5rem minmax(0, 1fr);
+      gap: var(--sp-8) var(--sp-12);
+      align-items: center;
+      margin: var(--sp-6) 0 0;
+    }
+
+    & dd {
+      margin: 0;
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+    }
+
+    & p {
+      margin: 0;
+    }
+  }
+
+  kbd {
+    display: inline-block;
+    min-width: 1.75rem;
+    padding: 0.125rem var(--sp-6);
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--bg-field);
+    font: inherit;
+    font-family: var(--font-num, inherit);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-primary);
+  }
+
   /* El marco de las referencias: el menú y la hoja de contenido son dos
      paneles de vidrio que flotan sobre el lienzo, con aire alrededor. */
   .shell {
@@ -360,6 +439,39 @@
     @media (max-width: 56rem) {
       bottom: 5.25rem;
       right: 1rem;
+    }
+  }
+
+  /* Encima del botón de agregar y centrado con él. Solo donde hay teclado:
+     en el teléfono y en lo táctil no tiene nada que explicar. */
+  .keys-fab {
+    position: fixed;
+    right: calc(1.5rem + 0.625rem);
+    bottom: calc(1.5rem + 3.5rem + 0.75rem);
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--border-float, var(--border));
+    border-radius: 50%;
+    background: var(--glass-sheen), var(--glass-2);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
+    box-shadow: var(--glass-spec), var(--glass-shadow-float, var(--shadow-xl));
+    color: var(--text-secondary, var(--text-primary));
+    cursor: pointer;
+    transition:
+      transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+      color 0.2s;
+
+    &:hover {
+      transform: scale(1.1);
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 56rem), (hover: none) {
+      display: none;
     }
   }
 
