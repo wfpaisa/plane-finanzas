@@ -148,7 +148,7 @@
   const title = $derived(tx ? "Editar movimiento" : "Nuevo movimiento");
 </script>
 
-<Modal {open} {onClose} {title} width="modal-panel-width-lg">
+<Modal {open} {onClose} {title}>
   <div class="tx-form">
     <Segmented bind:value={type} options={TX_TYPES} full label="Tipo" />
 
@@ -295,6 +295,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-16);
+  }
+
+  /* Una sola columna, siempre: un campo debajo del otro. */
+  .tx-form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .attach-list {

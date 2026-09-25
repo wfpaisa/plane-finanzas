@@ -261,6 +261,13 @@
     position: relative;
     z-index: 1;
     /*
+     * El ancho lo pone el `max-width` de cada modal (o la pantalla, si es
+     * menor), no lo que haya dentro. Centrada por la rejilla, la tarjeta
+     * medía lo que su contenido: al sumar una etiqueta o un adjunto crecía,
+     * y la rejilla del formulario (`auto-fit`) pasaba de una columna a dos.
+     */
+    width: 100%;
+    /*
      * `max-height: calc(100dvh - 2rem)` acota la altura al alto de la ventana
      * menos 1rem arriba y 1rem abajo: la tarjeta queda centrada por la rejilla
      * del modal y, cuando el contenido crece, se detiene antes de pegarse a
