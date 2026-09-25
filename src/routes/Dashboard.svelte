@@ -189,7 +189,12 @@
     </div>
     <div class="page-actions">
       {#if review > 0}
-        <Button variant="warning" onclick={() => go("/movimientos", { tag: "revisar" })}>
+        <Button
+          variant="warning"
+          tipSide="bottom"
+          tip="Llegaron de tus correos, pero la app no supo con certeza a qué cuenta o categoría van, y los marcó con #revisar. Ábrelos, corrige la cuenta o la categoría y quita la etiqueta #revisar para darlos por revisados."
+          onclick={() => go("/movimientos", { tag: "revisar" })}
+        >
           <Icon name="alert-02" />{review} {review === 1 ? "movimiento pendiente" : "movimientos pendientes"}
         </Button>
       {/if}
