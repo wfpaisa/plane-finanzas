@@ -340,6 +340,8 @@
 
   .tx-origin {
     display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4) var(--sp-12);
     justify-content: space-between;
     font-size: var(--text-xs);
     color: var(--text-muted);

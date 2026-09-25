@@ -398,6 +398,9 @@ body::before {
 .modal-foot {
   padding: var(--sp-8) var(--sp-24) var(--sp-24);
   border-top: 0;
+  /* Sin esto, en el teléfono cuatro botones en fila ensanchan la tarjeta
+     más que la pantalla y el modal se corta por los dos lados. */
+  flex-wrap: wrap;
 
   & > .btn {
     min-height: 3rem;
