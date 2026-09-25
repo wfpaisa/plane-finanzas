@@ -300,8 +300,7 @@
   }
 
   /* Los enlaces, sueltos: solo texto e icono. La pantalla actual va en una
-     píldora blanca con la rayita de tinta a la izquierda, como en la
-     referencia. */
+     píldora con relieve, como un botón. */
   .nav-item {
     display: flex;
     align-items: center;
@@ -328,18 +327,6 @@
       box-shadow: var(--pillow);
       color: var(--text-primary);
       font-weight: 600;
-
-      &::before {
-        content: "";
-        position: absolute;
-        left: 0.3125rem;
-        top: 50%;
-        width: 0.25rem;
-        height: 1rem;
-        translate: 0 -50%;
-        border-radius: var(--radius-pill);
-        background: var(--accent);
-      }
     }
   }
 

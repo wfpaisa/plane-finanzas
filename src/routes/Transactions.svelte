@@ -118,11 +118,16 @@
   const pickedExpense = $derived(sumOf("expense"));
   const pickedTransfer = $derived(sumOf("transfer"));
 
-  const tags = $derived(
-    [
-      ...new Set([...categoryTags(), ...items.flatMap((t) => t.tags ?? [])]),
-    ].sort(),
-  );
+  // Las etiquetas, en dos grupos: las que se ponen en las categorías (y
+  // heredan sus movimientos) y las puestas a mano en un movimiento. Una que
+  // esté en los dos lados va con las de categoría.
+  const catTagList = $derived(categoryTags());
+  const txTagList = $derived.by(() => {
+    const inCats = new Set(catTagList);
+    const own = new Set(items.flatMap((t) => t.tags ?? []));
+    if (tag && !inCats.has(tag)) own.add(tag);
+    return [...own].filter((t) => !inCats.has(t)).sort();
+  });
   const types: [string, string, Tone][] = [
     ["expense", "Gastos", "tag-error"],
     ["income", "Ingresos", "tag-success"],
@@ -347,26 +352,38 @@
       </Select>
     </div>
     <div class="filters-tags">
-      <!-- El tipo: uno a la vez; tocar el elegido lo quita. -->
-      {#each types as [value, label, tone] (value)}
-        <Tag
-          tone={type === value ? tone : "off"}
-          pressed={type === value}
-          onclick={() => (type = type === value ? "" : value)}>{label}</Tag
-        >
-      {/each}
-      {#if tags.length || tag}
+      <div class="filters-group">
+        <span class="filters-label">Tipo</span>
+        <div class="filters-chips">
+          <!-- El tipo: uno a la vez; tocar el elegido lo quita. -->
+          {#each types as [value, label, tone] (value)}
+            <Tag
+              tone={type === value ? tone : "off"}
+              pressed={type === value}
+              onclick={() => (type = type === value ? "" : value)}>{label}</Tag
+            >
+          {/each}
+        </div>
+      </div>
+      {#snippet tagGroup(label: string, list: string[])}
         <span class="filters-sep" aria-hidden="true"></span>
-        {#each [...new Set([tag, ...tags].filter(Boolean))] as t (t)}
-          <Tag
-            tone={tag === t
-              ? ((t === "revisar" ? "tag-warning" : tintFor(t)) as Tone)
-              : "off"}
-            pressed={tag === t}
-            onclick={() => (tag = tag === t ? "" : t)}>#{t}</Tag
-          >
-        {/each}
-      {/if}
+        <div class="filters-group">
+          <span class="filters-label">{label}</span>
+          <div class="filters-chips">
+            {#each list as t (t)}
+              <Tag
+                tone={tag === t
+                  ? ((t === "revisar" ? "tag-warning" : tintFor(t)) as Tone)
+                  : "off"}
+                pressed={tag === t}
+                onclick={() => (tag = tag === t ? "" : t)}>#{t}</Tag
+              >
+            {/each}
+          </div>
+        </div>
+      {/snippet}
+      {#if catTagList.length}{@render tagGroup("Etiquetas de categorías", catTagList)}{/if}
+      {#if txTagList.length}{@render tagGroup("Etiquetas de movimientos", txTagList)}{/if}
     </div>
     <div class="filters-foot">
       <span>Ingresos <Money value={income} tone="income" /></span>
@@ -578,15 +595,33 @@
   .filters-tags {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: stretch;
+    gap: var(--sp-10) var(--sp-12);
+  }
+
+  .filters-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .filters-label {
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .filters-chips {
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--sp-6);
   }
 
-  /* Entre los tipos y las etiquetas. */
+  /* Entre un grupo y el siguiente, del alto de las etiquetas. */
   .filters-sep {
+    align-self: flex-end;
     width: var(--border-width);
-    height: 1rem;
-    margin-inline: var(--sp-4);
+    height: 1.625rem;
     background: var(--border);
   }
 

@@ -252,8 +252,7 @@
                 }}>{titleCase(dateLong(t.date.slice(0, 10)))}</td
               >
             {/if}
-            <!-- El filo izquierdo lleva el color de la categoría. -->
-            <td class="tx-desc" style:--cat="var(--tinte-{tintOf(t).slice(5)})">
+            <td class="tx-desc">
               <button
                 type="button"
                 aria-pressed={selected ? selected.has(t.id) : undefined}
@@ -261,9 +260,11 @@
               >
             </td>
             <td class="tx-cell"
-              >{t.type === "transfer"
-                ? "Transferencia"
-                : (cat?.name ?? "Sin categoría")}</td
+              >{#if t.type === "transfer"}Transferencia{:else if cat}<span
+                  class="tx-cat"
+                  style:--tinte="var(--tinte-{tintOf(t).slice(5)})"
+                  >{cat.name}</span
+                >{:else}Sin categoría{/if}</td
             >
             {#if showAccount}
               <td class="tx-cell">
@@ -351,8 +352,11 @@
                     {#if t.type === "transfer"}
                       {acc?.name ?? "?"} → {to?.name ?? "?"}
                     {:else}
-                      {cat?.name ??
-                        "Sin categoría"}{#if showAccount && acc}{" · "}<span
+                      {#if cat}<span
+                          class="tx-cat"
+                          style:--tinte="var(--tinte-{tintOf(t).slice(5)})"
+                          >{cat.name}</span
+                        >{:else}Sin categoría{/if}{#if showAccount && acc}{" · "}<span
                           class="tx-acc"
                           ><i style:background={colorOf(acc.palette)}
                           ></i>{acc.name}</span
@@ -392,8 +396,11 @@
                   {/if}
                 </span>
                 <span class="tx-col tx-col-cat">
-                  {#if t.type === "transfer"}Transferencia{:else}{cat?.name ??
-                      "Sin categoría"}{/if}
+                  {#if t.type === "transfer"}Transferencia{:else if cat}<span
+                      class="tx-cat"
+                      style:--tinte="var(--tinte-{tintOf(t).slice(5)})"
+                      >{cat.name}</span
+                    >{:else}Sin categoría{/if}
                 </span>
                 {#if showAccount}
                   <span class="tx-col tx-col-acc">
@@ -536,13 +543,21 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* El nombre de la categoría en su color, con la misma tinta legible de las
+     pastillas `.tint-N` (components.css). */
+  .tx-cat {
+    --tinta: color-mix(in oklab, var(--tinte) 72%, var(--text-primary));
+    color: light-dark(oklch(from var(--tinta) min(l, 0.48) c h), oklch(from var(--tinta) max(l, 0.72) c h));
+    font-weight: 500;
+  }
+
   /* Toma el ancho sobrante y recorta con puntos suspensivos; en angosto no
      baja de 12rem y la tabla se desliza. */
   .tx-desc {
     width: 100%;
     min-width: 12rem;
     max-width: 0;
-    box-shadow: inset 4px 0 0 var(--cat, transparent);
+    border-left: var(--border-width) solid var(--border);
 
     & button {
       display: block;
