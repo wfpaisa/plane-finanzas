@@ -90,6 +90,7 @@
   const catKind = $derived<Kind>(kind === "income" ? "income" : "expense");
   const cats = $derived(byCategory(inRange, catKind));
   const catTotal = $derived(cats.reduce((s, c) => s + c.total, 0));
+  const catMax = $derived(cats[0]?.total ?? 0);
   const tagRows = $derived(byTag(inRange.filter((t) => t.type === catKind)));
   const tagMax = $derived(Math.max(0, ...tagRows.map((r) => r.total)));
   const tagOptions = $derived([...new Set([...categoryTags(), ...txs.flatMap((t) => t.tags ?? [])])].sort());
@@ -275,37 +276,74 @@
         <div class="card-head">
           <div>
             <h3 class="card-title">Por categoría</h3>
-            <p class="card-sub">{catKind === "income" ? "Ingresos" : "Gastos"} · <Money value={catTotal} /></p>
+            <p class="card-sub">
+              {catKind === "income" ? "Ingresos" : "Gastos"} · <Money value={catTotal} /> en {cats.length}
+              {cats.length === 1 ? "categoría" : "categorías"}
+            </p>
           </div>
+          {#if focus}
+            <div class="card-head-actions">
+              <button type="button" class="link small" onclick={() => (focus = "")}>Ver todas en la gráfica</button>
+            </div>
+          {/if}
         </div>
         <div class="card-body">
-          {#each cats as c (c.category)}
-            {@const cat = store.category(c.category)}
-            {@const budget = (cat?.budget ?? 0) * (g === "year" ? 72 : g === "month" ? 12 : 1)}
-            <div class="bar-row cat-row" class:dim={focus && focus !== (c.category || "none")}>
-              <span class="cat-name">
-                <CategoryPill id={c.category} onclick={() => (focus = focus === (c.category || "none") ? "" : c.category || "none")} />
-                <span class="muted small">{c.count} mov.</span>
-              </span>
-              <span class="cat-amount">
-                <Money value={c.total} />
-                <span class="muted small">{catTotal ? Math.round((c.total / catTotal) * 100) : 0}%</span>
-              </span>
-              <div class="bar-track {cat?.color ?? 'tint-10'}" class:over={budget > 0 && c.total > budget}>
-                <span style:width="{budget > 0 ? Math.min(100, (c.total / budget) * 100) : catTotal ? (c.total / catTotal) * 100 : 0}%"></span>
-              </div>
-              {#if budget > 0}
-                <span class="small muted budget-note">
-                  Límite mensual <Money value={budget} /> · {c.total > budget ? "exceso" : "disponible"} <Money value={Math.abs(budget - c.total)} />
-                </span>
-              {/if}
-              <button type="button" class="link small see" onclick={() => go("/movimientos", { cat: c.category || "none", mes: g === "week" ? ym : "todo", ...(tag ? { tag } : {}) })}>
-                Ver
-              </button>
-            </div>
+          {#if cats.length}
+            <!--
+              Tocar la fila aísla la categoría en la gráfica de arriba; la
+              flecha abre sus movimientos. La barra se mide contra la más
+              grande, o contra el límite mensual si la categoría tiene uno.
+            -->
+            <ul class="cr-list">
+              {#each cats as c (c.category)}
+                {@const cat = store.category(c.category)}
+                {@const key = c.category || "none"}
+                {@const tint = cat?.color || "tint-10"}
+                {@const budget = (cat?.budget ?? 0) * (g === "year" ? 72 : g === "month" ? 12 : 1)}
+                {@const over = budget > 0 && c.total > budget}
+                {@const share = catTotal ? (c.total / catTotal) * 100 : 0}
+                <li class="cr" class:dim={focus && focus !== key} class:on={focus === key}>
+                  <button
+                    type="button"
+                    class="cr-main"
+                    aria-pressed={focus === key}
+                    data-tip={focus === key ? "Quitar de la gráfica" : "Ver solo esta en la gráfica"}
+                    onclick={() => (focus = focus === key ? "" : key)}
+                  >
+                    <span class="cr-ico {tint}"><Icon name={cat?.icon || "tag-01"} size={16} /></span>
+                    <span class="cr-text">
+                      <span class="cr-name">{cat?.name ?? "Sin categoría"}</span>
+                      <span class="cr-meta">{c.count} {c.count === 1 ? "movimiento" : "movimientos"}</span>
+                    </span>
+                    <span class="cr-amount">
+                      <Money value={c.total} />
+                      <span class="cr-meta">{share >= 10 || share === 0 ? Math.round(share) : share.toFixed(1)}%</span>
+                    </span>
+                    <span class="cr-bar {tint}" class:over>
+                      <span style:width="{budget > 0 ? Math.min(100, (c.total / budget) * 100) : catMax ? (c.total / catMax) * 100 : 0}%"></span>
+                    </span>
+                    {#if budget > 0}
+                      <span class="cr-budget" class:over>
+                        {#if over}Te pasaste <Money value={c.total - budget} /> del límite de <Money value={budget} />
+                        {:else}Quedan <Money value={budget - c.total} /> de <Money value={budget} />{/if}
+                      </span>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-icon sm cr-go"
+                    aria-label="Ver movimientos de {cat?.name ?? 'Sin categoría'}"
+                    data-tip="Ver movimientos"
+                    onclick={() => go("/movimientos", { cat: key, mes: g === "week" ? ym : "todo", ...(tag ? { tag } : {}) })}
+                  >
+                    <Icon name="arrow-right-01" size={14} />
+                  </button>
+                </li>
+              {/each}
+            </ul>
           {:else}
             <div class="empty-card">Nada en este periodo.</div>
-          {/each}
+          {/if}
         </div>
       </div>
       <div class="card">
@@ -414,28 +452,6 @@
   .nav-year {
     min-width: 5rem;
     text-align: center;
-  }
-
-  .cat-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    transition: opacity 0.2s;
-
-    &.dim {
-      opacity: 0.4;
-    }
-
-    & .bar-track {
-      grid-column: 1 / 3;
-    }
-
-    & .see {
-      grid-row: 1;
-      grid-column: 3;
-    }
-
-    & .budget-note {
-      grid-column: 1 / -1;
-    }
   }
 
   .cat-name {

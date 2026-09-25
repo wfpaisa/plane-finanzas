@@ -82,6 +82,21 @@
         ? `Una vez · ${r.start_date?.slice(0, 10) ?? ""}`
         : `Día ${r.day_of_month || 1}`;
 
+  /** $2,5 M · $800 mil: para los ejes, donde el número entero no cabe. */
+  const short = (n: number) => {
+    const a = Math.abs(n);
+    const sign = n < 0 ? "−" : "";
+    if (a >= 1e6) return `${sign}$${(a / 1e6).toLocaleString("es-CO", { maximumFractionDigits: 1 })} M`;
+    if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)} mil`;
+    return money(n);
+  };
+
+  /*
+   * Cada columna es el ingreso del mes repartido: gastos frecuentes, ahorros y
+   * lo que queda libre, uno encima del otro y sin redondear, para que se lea
+   * como un solo bloque. La línea punteada marca el ingreso: si la columna la
+   * pasa, ese mes lo planeado no alcanza.
+   */
   const nextConfig = (): ChartConfiguration => {
     const labels: string[] = [];
     const fixed: number[] = [];
@@ -103,14 +118,28 @@
       saving.push(plan.savings);
       free.push(Math.max(0, inc - exp - plan.savings));
     }
+    const paper = token("--bg-level2");
+    const bar = (label: string, data: number[], color: string) => ({
+      type: "bar" as const,
+      label,
+      data,
+      backgroundColor: color,
+      hoverBackgroundColor: color,
+      // Una raya del color de la tarjeta entre tramos, para que se distingan.
+      borderColor: paper,
+      borderWidth: { top: 1.5 },
+      stack: "s",
+      barPercentage: 0.72,
+      categoryPercentage: 0.86,
+    });
     return {
       type: "bar",
       data: {
         labels,
         datasets: [
-          { type: "bar", label: "Gastos frecuentes", data: fixed, backgroundColor: token("--viz-expense"), borderRadius: 3, stack: "s", maxBarThickness: 26 },
-          { type: "bar", label: "Ahorros", data: saving, backgroundColor: token("--viz-saving"), borderRadius: 3, stack: "s", maxBarThickness: 26 },
-          { type: "bar", label: "Disponible", data: free, backgroundColor: token("--viz-free"), borderRadius: 3, stack: "s", maxBarThickness: 26 },
+          bar("Gastos frecuentes", fixed, token("--viz-expense")),
+          bar("Ahorros", saving, token("--viz-saving")),
+          bar("Disponible", free, token("--viz-free")),
           {
             type: "line",
             label: "Ingresos",
@@ -118,8 +147,10 @@
             borderColor: token("--viz-income"),
             backgroundColor: token("--viz-income"),
             borderWidth: 2,
-            pointRadius: 3,
-            tension: 0.2,
+            borderDash: [5, 4],
+            pointRadius: 0,
+            stepped: "middle",
+            order: -1,
           },
         ],
       },
@@ -127,11 +158,27 @@
         interaction: { mode: "index", intersect: false },
         scales: {
           x: { stacked: true, grid: { display: false } },
-          y: { stacked: true, ticks: { callback: (v) => money(Number(v)) }, border: { display: false } },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: { maxTicksLimit: 5, callback: (v) => short(Number(v)) },
+            border: { display: false },
+          },
         },
         plugins: {
-          legend: { position: "top", align: "end" },
-          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${money(Number(c.raw))}` } },
+          legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "rectRounded", boxHeight: 8, padding: 16 } },
+          tooltip: {
+            filter: (item) => item.dataset.type !== "line",
+            itemSort: (a, b) => b.datasetIndex - a.datasetIndex,
+            callbacks: {
+              label: (c) => ` ${c.dataset.label}: ${money(Number(c.raw))}`,
+              footer: (items) => {
+                const i = items[0]?.dataIndex ?? 0;
+                const lack = fixed[i] + saving[i] - income[i];
+                return lack > 0 ? [`Ingresos: ${money(income[i])}`, `Faltan: ${money(lack)}`] : [`Ingresos: ${money(income[i])}`];
+              },
+            },
+          },
         },
       },
     } as ChartConfiguration;
@@ -287,9 +334,12 @@
 
     <div class="card">
       <div class="card-head">
-        <div><h3 class="card-title">Próximos 12 meses</h3><p class="card-sub">Cómo se reparten los ingresos según el plan</p></div>
+        <div>
+          <h3 class="card-title">Próximos 12 meses</h3>
+          <p class="card-sub">En qué se va el ingreso de cada mes según el plan. La línea punteada es el ingreso: si una columna la pasa, ese mes no alcanza.</p>
+        </div>
       </div>
-      <div class="card-body"><Chart config={nextConfig} height={260} label="Plan de los próximos 12 meses" /></div>
+      <div class="card-body"><Chart config={nextConfig} height={280} square label="Plan de los próximos 12 meses" /></div>
     </div>
 
     <div class="card">

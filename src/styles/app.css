@@ -166,3 +166,147 @@
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
+
+/* ---------------------------------------------------------------------------
+   Filas con icono, nombre, monto y barra: "Por categoría" en Análisis y los
+   ahorros del Resumen. La fila entera es el botón o el enlace (`.cr-main`);
+   la flecha del final (`.cr-go`) lleva al detalle.
+   --------------------------------------------------------------------------- */
+.cr-list {
+  display: grid;
+  gap: var(--sp-2, 2px);
+  margin: 0 calc(-1 * var(--sp-8));
+  padding: 0;
+  list-style: none;
+}
+
+.cr {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: var(--radius-md, 10px);
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+
+  &:hover,
+  &.on {
+    background: var(--bg-hover);
+  }
+
+  &.dim {
+    opacity: 0.45;
+  }
+
+  /* Con ratón, la flecha aparece al pasar por la fila (o al enfocarla con
+     el teclado); en lo táctil se queda siempre a la vista. */
+  @media (hover: hover) {
+    &:not(:hover) .cr-go:not(:focus-visible) {
+      opacity: 0;
+    }
+  }
+}
+
+.cr-main {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  column-gap: var(--sp-12);
+  row-gap: var(--sp-6);
+  align-items: center;
+  min-width: 0;
+  padding: var(--sp-10) var(--sp-4) var(--sp-10) var(--sp-8);
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cr-ico {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm, 8px);
+}
+
+.cr-text,
+.cr-amount {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.cr-amount {
+  align-items: flex-end;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-name {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.cr-meta {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* El icono y la pista en el tinte claro; el relleno, en el tinte. El tinte
+   lo pone una clase `tint-N` o un `--tinte` en línea (los ahorros, que
+   guardan un color y no una clase). */
+.cr .cr-ico,
+.cr .cr-bar {
+  background: color-mix(in oklab, var(--tinte, var(--chart-1)) 14%, transparent);
+}
+
+.cr .cr-ico {
+  box-shadow: none;
+  color: color-mix(in oklab, var(--tinte, var(--chart-1)) 72%, var(--text-primary));
+}
+
+.cr .cr-bar {
+  grid-column: 2 / -1;
+  height: 0.375rem;
+  border-radius: 99rem;
+  box-shadow: none;
+  overflow: hidden;
+
+  & > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--tinte);
+    transition: width 0.4s;
+  }
+
+  &.over > span {
+    background: var(--danger);
+  }
+}
+
+.cr-budget {
+  grid-column: 2 / -1;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+
+  &.over {
+    color: var(--danger);
+  }
+}
+
+.cr-go {
+  margin-right: var(--sp-4);
+  transition: opacity 0.15s;
+}
+

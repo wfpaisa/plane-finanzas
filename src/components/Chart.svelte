@@ -24,9 +24,12 @@
     config,
     height = 260,
     label,
+    square = false,
   }: {
     config: () => ChartConfiguration;
     height?: number;
+    /** Barras rectas, sin cápsula: para columnas apiladas que deben leerse como un todo. */
+    square?: boolean;
     /** Lo que dice la gráfica en voz alta. */
     label: string;
   } = $props();
@@ -114,9 +117,9 @@
         // Cápsulas delgadas; apiladas, cada tramo solo se redondea un poco
         // para que la columna se lea entera.
         const stacked = stackedX || ds.stack != null;
-        ds.borderRadius = stacked ? 6 : 999;
+        ds.borderRadius = square ? 0 : stacked ? 6 : 999;
         ds.borderSkipped = false;
-        ds.maxBarThickness = Math.min(Number(ds.maxBarThickness ?? 18), stacked ? 22 : 18);
+        if (!square) ds.maxBarThickness = Math.min(Number(ds.maxBarThickness ?? 18), stacked ? 22 : 18);
       } else if (type === "doughnut" || type === "pie") {
         ds.borderWidth = 0;
         ds.spacing = 4;

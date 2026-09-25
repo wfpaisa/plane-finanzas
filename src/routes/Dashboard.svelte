@@ -179,6 +179,8 @@
   const savingsList = $derived(
     store.activeSavings.slice(0, 5).map((s) => ({ s, current: store.savingCurrent(s.id) })),
   );
+  /** Sin meta, la barra se mide contra el ahorro más grande. */
+  const savingsMax = $derived(Math.max(0, ...savingsList.map((x) => x.current)));
 </script>
 
 <div class="page page-wide">
@@ -295,18 +297,45 @@
           <div class="card-head-actions"><a class="link small" href="#/ahorros">Ver</a></div>
         </div>
         <div class="card-body">
-          {#each savingsList as { s, current } (s.id)}
-            {@const target = s.target_amount || 0}
-            <div class="bar-row saving-row">
-              <span class="saving-name"><ColorDot color={s.palette} />{s.name}</span>
-              <span class="small"><Money value={current} />{#if target}<span class="muted"> / <Money value={target} /></span>{/if}</span>
-              <div class="bar-track">
-                <span style:width="{target ? Math.min(100, (current / target) * 100) : 100}%" style:background={colorOf(s.palette)}></span>
-              </div>
-            </div>
+          {#if savingsList.length}
+            <!-- Como "Por categoría" en Análisis: ver `.cr` en styles/app.css. -->
+            <ul class="cr-list">
+              {#each savingsList as { s, current } (s.id)}
+                {@const target = s.target_amount || 0}
+                {@const pct = target ? (current / target) * 100 : 0}
+                <li class="cr" style:--tinte={colorOf(s.palette)}>
+                  <a class="cr-main" href="#/ahorros">
+                    <span class="cr-ico"><Icon name={s.icon || "piggy-bank"} size={16} /></span>
+                    <span class="cr-text">
+                      <span class="cr-name">{s.name}</span>
+                      <span class="cr-meta">
+                        {#if s.monthly_amount}<Money value={s.monthly_amount} /> al mes{:else}Sin aporte mensual{/if}{#if s.target_date}
+                          · meta en {monthLabel(s.target_date.slice(0, 7), true)}{/if}
+                      </span>
+                    </span>
+                    <span class="cr-amount">
+                      <Money value={current} />
+                      <span class="cr-meta">{target ? `${Math.floor(pct)}%` : "Sin meta"}</span>
+                    </span>
+                    <span class="cr-bar">
+                      <span style:width="{target ? Math.min(100, pct) : savingsMax ? (current / savingsMax) * 100 : 0}%"></span>
+                    </span>
+                    {#if target}
+                      <span class="cr-budget">
+                        {#if current >= target}Meta cumplida: <Money value={target} />
+                        {:else}Faltan <Money value={target - current} /> de <Money value={target} />{/if}
+                      </span>
+                    {/if}
+                  </a>
+                  <a class="btn-icon sm cr-go" href="#/ahorros" aria-label="Ver {s.name}" data-tip="Ver ahorro">
+                    <Icon name="arrow-right-01" size={14} />
+                  </a>
+                </li>
+              {/each}
+            </ul>
           {:else}
             <div class="empty-card">No hay ahorros registrados. Crea uno para consultar su avance.</div>
-          {/each}
+          {/if}
         </div>
       </div>
     </div>
@@ -368,17 +397,5 @@
 
   .kpi .progress {
     height: 0.375rem;
-  }
-
-  .saving-name {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-6);
-    font-weight: 600;
-    color: var(--text-primary);
-
-    & :global(i) {
-      color: var(--chart-1);
-    }
   }
 </style>
