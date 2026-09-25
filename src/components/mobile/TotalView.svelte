@@ -7,7 +7,8 @@
   import Money from "../app/Money.svelte";
   import { planSummary } from "../../lib/finance";
   import { percent } from "../../lib/format";
-  import { groupOf, sumOf } from "../../lib/mobile";
+  import { sumOf } from "../../lib/mobile";
+  import { FIXED_TAG, hasTag } from "../../lib/tags";
   import { store } from "../../lib/store.svelte";
   import type { Transaction } from "../../lib/types";
 
@@ -15,12 +16,14 @@
 
   const plan = $derived(planSummary(store.recurring, store.activeSavings));
   const expenses = $derived(txs.filter((t) => t.type === "expense"));
-  const fixed = $derived(expenses.filter((t) => groupOf(t.category) === "fijo").reduce((s, t) => s + t.amount, 0));
+  // Fijo es lo etiquetado #fijo: en su categoría o en el propio movimiento
+  // (los que crea un gasto frecuente la llevan).
+  const fixed = $derived(expenses.filter((t) => hasTag(t, FIXED_TAG)).reduce((s, t) => s + t.amount, 0));
   const variable = $derived(sumOf(txs, "expense") - fixed);
   const budget = $derived(Math.max(0, plan.free));
 
   const bars = $derived([
-    { label: "Presupuesto libre", hint: "Gastos que no son fijos", spent: variable, of: budget },
+    { label: "Presupuesto libre", hint: "Gastos sin la etiqueta #fijo", spent: variable, of: budget },
     { label: "Fijos", hint: "Pagados de lo planeado", spent: fixed, of: plan.fixed },
   ]);
 

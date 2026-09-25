@@ -11,6 +11,7 @@
   import { logout, session } from "./lib/pb.svelte";
   import { go, route } from "./lib/router.svelte";
   import { start, stop, store } from "./lib/store.svelte";
+  import { categoryTags } from "./lib/tags";
   import { theme } from "./lib/theme.svelte";
   import { txModal } from "./lib/ui.svelte";
   import Accounts from "./routes/Accounts.svelte";
@@ -68,7 +69,7 @@
   });
 
   let moreOpen = $state(false);
-  const knownTags = $derived([...new Set(["fijo", "revisar", "viaje", "trabajo", "casa", "salud", "regalo"])]);
+  const knownTags = $derived([...new Set(["fijo", "revisar", "viaje", "trabajo", "casa", "salud", "regalo", ...categoryTags()])]);
 </script>
 
 {#if !session.user}

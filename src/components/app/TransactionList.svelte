@@ -12,6 +12,7 @@
   import { dateLong } from "../../lib/format";
   import { colorOf, tintFor } from "../../lib/palettes";
   import { store } from "../../lib/store.svelte";
+  import { tagsOf } from "../../lib/tags";
   import type { SvelteSet } from "svelte/reactivity";
 
   import type { Transaction } from "../../lib/types";
@@ -278,13 +279,18 @@
                   </span>
                   <!-- Ancho: la nota va debajo del título; lo demás, en columnas. -->
                   {#if t.notes}<span class="tx-notes">{t.notes}</span>{/if}
-                  {#if t.tags?.length}
+                  {#if tagsOf(t).length}
+                    <!-- Las propias y, sin fondo, las que hereda de su categoría. -->
                     <span class="tx-tags">
-                      {#each t.tags as tag (tag)}
+                      {#each tagsOf(t) as tag (tag)}
+                        {@const own = t.tags?.includes(tag)}
                         <Tag
-                          tone={(tag === "revisar"
-                            ? "tag-warning"
-                            : tintFor(tag)) as Tone}>#{tag}</Tag
+                          tip={own ? undefined : "De la categoría"}
+                          tone={(!own
+                            ? "off"
+                            : tag === "revisar"
+                              ? "tag-warning"
+                              : tintFor(tag)) as Tone}>#{tag}</Tag
                         >
                       {/each}
                     </span>

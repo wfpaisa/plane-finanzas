@@ -26,6 +26,7 @@
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
   import { dateLong, dateShort, monthLabel, parseMoney, plainNumber } from "../lib/format";
   import { matches, sumOf } from "../lib/mobile";
+  import { categoryTags, hasTag } from "../lib/tags";
   import { notify } from "../lib/notify.svelte";
   import { cachedList, offline } from "../lib/offline.svelte";
   import { overlay, type OutboxItem, type Pending } from "../lib/outbox";
@@ -59,6 +60,7 @@
   let view = $state<View>("diario");
   let ym = $state(thisMonth);
   let accountFilter = $state("");
+  let tagFilter = $state("");
   let search = $state("");
   let searchOpen = $state(false);
 
@@ -110,9 +112,14 @@
 
   const shown = $derived(
     txs.filter(
-      (t) => (!accountFilter || t.account === accountFilter || t.to_account === accountFilter) && matches(t, search),
+      (t) =>
+        (!accountFilter || t.account === accountFilter || t.to_account === accountFilter) &&
+        (!tagFilter || hasTag(t, tagFilter)) &&
+        matches(t, search),
     ),
   );
+  // Las etiquetas para filtrar: las de las categorías y las que traen los movimientos.
+  const tagOptions = $derived([...new Set([...categoryTags(), ...txs.flatMap((t) => t.tags ?? [])])].sort());
   const monthTxs = $derived(shown.filter((t) => t.date.slice(0, 7) === ym));
   // Arriba: el año en Mensual, el mes en lo demás.
   const headTxs = $derived(view === "mensual" ? shown : monthTxs);
@@ -223,6 +230,28 @@
     };
   });
 
+  // El teclado del teléfono tapa la parte de abajo sin mover lo fijo: la hoja
+  // se sube lo que ocupa el teclado y se acorta al alto que queda a la vista.
+  let kb = $state(0);
+  let viewH = $state(0);
+  $effect(() => {
+    const vv = window.visualViewport;
+    if (!sheet || !vv) return;
+    const fit = () => {
+      kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      viewH = Math.round(vv.height);
+    };
+    fit();
+    vv.addEventListener("resize", fit);
+    vv.addEventListener("scroll", fit);
+    return () => {
+      vv.removeEventListener("resize", fit);
+      vv.removeEventListener("scroll", fit);
+      kb = 0;
+      viewH = 0;
+    };
+  });
+
   const status = $derived.by(() => {
     const n = offline.pending;
     if (offline.authNeeded && n) return { icon: "alert-02", text: "Entra de nuevo para enviar", tone: "warn" };
@@ -308,11 +337,14 @@
         <button
           type="button"
           class="btn-icon sm"
-          class:on={searchOpen || !!search}
+          class:on={searchOpen || !!search || !!tagFilter}
           aria-label="Buscar"
           onclick={() => {
             searchOpen = !searchOpen;
-            if (!searchOpen) search = "";
+            if (!searchOpen) {
+              search = "";
+              tagFilter = "";
+            }
           }}
         >
           <Icon name="search-01" size={20} />
@@ -326,6 +358,15 @@
         <!-- svelte-ignore a11y_autofocus -->
         <input type="search" placeholder="Buscar en {view === 'mensual' ? 'el año' : 'el mes'}…" bind:value={search} autofocus />
       </div>
+      {#if tagOptions.length}
+        <div class="m-tags" aria-label="Etiqueta">
+          {#each tagOptions as t (t)}
+            <button type="button" class="m-filter" class:on={tagFilter === t} aria-pressed={tagFilter === t} onclick={() => (tagFilter = tagFilter === t ? "" : t)}>
+              #{t}
+            </button>
+          {/each}
+        </div>
+      {/if}
     {/if}
 
     <div class="m-views" role="tablist">
@@ -342,11 +383,18 @@
       <div><span>Balance</span><Money value={income - expense} /></div>
     </div>
 
-    {#if accountFilter}
+    {#if accountFilter || (tagFilter && !searchOpen)}
       <div class="m-filters">
-        <button type="button" class="m-filter" onclick={() => (accountFilter = "")}>
-          {store.account(accountFilter)?.name}<Icon name="cancel-01" size={12} />
-        </button>
+        {#if accountFilter}
+          <button type="button" class="m-filter" onclick={() => (accountFilter = "")}>
+            {store.account(accountFilter)?.name}<Icon name="cancel-01" size={12} />
+          </button>
+        {/if}
+        {#if tagFilter && !searchOpen}
+          <button type="button" class="m-filter" onclick={() => (tagFilter = "")}>
+            #{tagFilter}<Icon name="cancel-01" size={12} />
+          </button>
+        {/if}
       </div>
     {/if}
 
@@ -384,7 +432,7 @@
       <DayList
         txs={monthTxs}
         onOpen={(t) => txModal.edit(t)}
-        empty={loading ? "" : search ? `Nada con “${search}” en ${monthLabel(ym, true)}.` : `Sin movimientos en ${monthLabel(ym, true)}.`}
+        empty={loading ? "" : search || tagFilter ? `Nada con “${search || `#${tagFilter}`}” en ${monthLabel(ym, true)}.` : `Sin movimientos en ${monthLabel(ym, true)}.`}
       />
     {:else if view === "calendario"}
       <CalendarView {ym} txs={shown} onPick={(d) => (daySheet = d)} />
@@ -541,7 +589,10 @@
 {#if sheet}
   <div class="m-veil" role="presentation" onclick={() => (sheet = null)}></div>
   <form
-    class="m-sheet"
+    class="m-sheet m-quick"
+    class:kb={kb > 0}
+    style:--kb="{kb}px"
+    style:--view-h={viewH ? `${viewH}px` : null}
     onsubmit={(e) => {
       e.preventDefault();
       void save();
@@ -565,6 +616,7 @@
       </button>
     </div>
 
+    <div class="m-quick-body">
     <label class="m-amount" class:out={sheet === "expense"}>
       <span>$</span>
       <input
@@ -612,6 +664,7 @@
           {a.name}
         </button>
       {/each}
+    </div>
     </div>
 
     <div class="m-sheet-foot">
@@ -707,7 +760,19 @@
   }
 
   .m-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-6);
     padding: var(--sp-8) var(--sp-16) 0;
+  }
+
+  .m-tags {
+    display: flex;
+    gap: var(--sp-6);
+    padding: var(--sp-8) var(--sp-16);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
   .m-filter {
@@ -721,6 +786,14 @@
     font: inherit;
     font-size: var(--text-xs);
     color: var(--text-primary);
+    white-space: nowrap;
+    cursor: pointer;
+
+    &.on {
+      border-color: var(--accent);
+      background: color-mix(in oklch, var(--accent) 18%, var(--bg-field));
+      font-weight: 600;
+    }
   }
 
   .m-sync {
@@ -1054,6 +1127,30 @@
     from {
       translate: 0 100%;
     }
+  }
+
+  /* Anotar rápido: la cabeza y los botones siempre a la vista; lo del medio
+     se desplaza si no cabe, por ejemplo con el teclado abierto. */
+  .m-quick {
+    bottom: var(--kb, 0px);
+    max-height: calc(var(--view-h, 100dvh) * 0.9);
+    overflow: hidden;
+
+    /* Con el teclado abierto no hace falta dejar el hueco del borde inferior. */
+    &.kb {
+      max-height: calc(var(--view-h, 100dvh) - var(--sp-8));
+      padding-bottom: var(--sp-12);
+    }
+  }
+
+  .m-quick-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--sp-12);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .m-sheet-head,

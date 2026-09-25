@@ -46,8 +46,8 @@ export interface Category extends RecordModel {
   owner: string;
   name: string;
   kind: Kind;
-  /** Fijos o variables (solo gastos): ver la migración `category_group`. */
-  group: "fijo" | "variable" | "";
+  /** Las heredan sus movimientos: ver `lib/tags.ts`. */
+  tags: string[] | null;
   icon: string;
   color: string;
   keywords: string;

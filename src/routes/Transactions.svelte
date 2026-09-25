@@ -22,6 +22,7 @@
   import { pb } from "../lib/pb.svelte";
   import { go, route } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
+  import { categoryTags, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
   import { txModal } from "../lib/ui.svelte";
 
@@ -60,7 +61,8 @@
       params.type = type;
     }
     if (tag) {
-      parts.push("tags ~ {:tag}");
+      // La etiqueta puede venir del movimiento o de su categoría.
+      parts.push("(tags ~ {:tag} || category.tags ~ {:tag})");
       params.tag = `"${tag}"`;
     }
     loading = true;
@@ -75,7 +77,7 @@
     const s = search.trim().toLowerCase();
     if (!s) return items;
     return items.filter((t) =>
-      [t.description, t.notes, store.category(t.category)?.name, ...(t.tags ?? [])].some((x) => x?.toLowerCase().includes(s)),
+      [t.description, t.notes, store.category(t.category)?.name, ...tagsOf(t)].some((x) => x?.toLowerCase().includes(s)),
     );
   });
 
@@ -90,7 +92,7 @@
   const pickedExpense = $derived(sumOf("expense"));
   const pickedTransfer = $derived(sumOf("transfer"));
 
-  const tags = $derived([...new Set(items.flatMap((t) => t.tags ?? []))].sort());
+  const tags = $derived([...new Set([...categoryTags(), ...items.flatMap((t) => t.tags ?? [])])].sort());
   const filtered = $derived(!!(account || category || type || tag || search));
 
   // Ampliado (por días, con etiquetas y notas) o compacto (tabla). Se

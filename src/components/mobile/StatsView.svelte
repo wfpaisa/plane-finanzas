@@ -1,9 +1,9 @@
 <!--
-  Estadísticas del celular. Arriba, el mes (o el año) repartido en un
-  pastel: los gastos por grupo (fijos / variables) y los ingresos por
-  categoría. Tocar una parte la abre: sus categorías con su porcentaje, cómo
-  vino en los últimos meses y sus movimientos. Y de una categoría, lo mismo
-  pero solo de ella.
+  Estadísticas del celular. Arriba, el mes (o el año) por categoría, en un
+  pastel, o por etiqueta, en lista: un movimiento con varias etiquetas suma
+  en cada una y ahí un pastel mentiría. Tocar una parte la abre: sus
+  categorías con su porcentaje, cómo vino en los últimos meses y sus
+  movimientos. Y de una categoría, lo mismo pero solo de ella.
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
@@ -11,18 +11,20 @@
   import Chart from "../Chart.svelte";
   import Icon from "../Icon.svelte";
   import Money from "../app/Money.svelte";
+  import Segmented from "../app/Segmented.svelte";
   import DayList from "./DayList.svelte";
   import MonthNav from "./MonthNav.svelte";
   import TopBar from "./TopBar.svelte";
   import { resolveColor } from "../../lib/colors";
   import { addMonths, today } from "../../lib/finance";
   import { money, monthName } from "../../lib/format";
-  import { groupOf, GROUP_LABEL, hasGroups } from "../../lib/mobile";
   import { notify } from "../../lib/notify.svelte";
   import { cachedList, offline } from "../../lib/offline.svelte";
   import { overlay, type Pending } from "../../lib/outbox";
   import { pb } from "../../lib/pb.svelte";
   import { store } from "../../lib/store.svelte";
+  import { byTag, hasTag, tagsOf } from "../../lib/tags";
+  import { tintFor } from "../../lib/palettes";
   import type { Transaction } from "../../lib/types";
 
   type Tx = Pending<Transaction>;
@@ -32,8 +34,10 @@
   let ym = $state(today().slice(0, 7));
   let yearly = $state(false);
   let kind = $state<"expense" | "income">("expense");
-  /** Dónde se está: arriba, en un grupo o en una categoría. */
-  let path = $state<{ group?: string; category?: string }>({});
+  /** Dónde se está: arriba, en una etiqueta o en una categoría. */
+  let path = $state<{ tag?: string; category?: string }>({});
+  /** Arriba, por categoría o por etiqueta. Por etiqueta si alguna categoría la tiene. */
+  let by = $state<"category" | "tag">(store.categories.some((c) => c.tags?.length) ? "tag" : "category");
 
   const year = $derived(Number(ym.slice(0, 4)));
   // Lo del periodo y lo de antes, para la línea: ocho meses o cinco años.
@@ -79,22 +83,23 @@
   const incomeTotal = $derived(totalOf("income"));
   const expenseTotal = $derived(totalOf("expense"));
 
+  /** "" es "sin etiqueta". */
+  const inTag = (t: Tx, tag: string) => (tag ? hasTag(t, tag) : !tagsOf(t).length);
+
   const onPath = (t: Tx) =>
     t.type === kind &&
-    (path.category !== undefined
-      ? (t.category || "") === path.category
-      : path.group !== undefined
-        ? groupOf(t.category) === path.group
-        : true);
+    (path.tag === undefined || inTag(t, path.tag)) &&
+    (path.category === undefined || (t.category || "") === path.category);
 
   const filtered = $derived(period.filter(onPath));
   const filteredTotal = $derived(filtered.reduce((s, t) => s + t.amount, 0));
 
-  /** Por grupo solo arriba y en gastos; si no, por categoría. */
-  const byGroup = $derived(path.group === undefined && path.category === undefined && kind === "expense" && hasGroups());
+  const top = $derived(path.tag === undefined && path.category === undefined);
+  /** Por etiqueta solo arriba; dentro de una etiqueta, por categoría. */
+  const byTags = $derived(top && by === "tag");
 
   // Colores de las partes como CSS; la gráfica los resuelve al dibujar.
-  const GROUP_TINT: Record<string, string> = { fijo: "var(--tinte-4)", variable: "var(--tinte-6)", "": "var(--tinte-10)" };
+  const tagColor = (tag: string) => (tag ? `var(--tinte-${tintFor(tag).slice(5)})` : "var(--tinte-10)");
   const RAMP = [1, 4, 8, 6, 2, 9, 14, 12, 17, 13, 5, 11, 16, 3, 18, 15, 7, 20, 19, 10];
 
   function catColor(id: string, i: number) {
@@ -106,9 +111,17 @@
 
   const slices = $derived.by(() => {
     if (path.category !== undefined) return [];
+    if (byTags)
+      return byTag(filtered).map((row) => ({
+        key: row.tag,
+        total: row.total,
+        pct: filteredTotal ? (row.total / filteredTotal) * 100 : 0,
+        label: row.tag ? `#${row.tag}` : "Sin etiqueta",
+        color: tagColor(row.tag),
+      }));
     const map = new Map<string, number>();
     for (const t of filtered) {
-      const k = byGroup ? groupOf(t.category) : t.category || "";
+      const k = t.category || "";
       map.set(k, (map.get(k) ?? 0) + t.amount);
     }
     return [...map.entries()]
@@ -117,27 +130,29 @@
         key,
         total,
         pct: filteredTotal ? (total / filteredTotal) * 100 : 0,
-        label: byGroup ? (GROUP_LABEL[key] ?? key) : (store.category(key)?.name ?? "Sin categoría"),
-        color: byGroup ? (GROUP_TINT[key] ?? GROUP_TINT[""]) : catColor(key, i),
+        label: store.category(key)?.name ?? "Sin categoría",
+        color: catColor(key, i),
       }));
   });
 
   function pick(key: string) {
-    if (byGroup) path = { group: key };
+    if (byTags) path = { tag: key };
     else path = { ...path, category: key };
   }
 
   function back() {
-    // De una categoría se vuelve a su grupo si se llegó por él.
-    if (path.category !== undefined && path.group !== undefined) path = { group: path.group };
+    // De una categoría se vuelve a su etiqueta si se llegó por ella.
+    if (path.category !== undefined && path.tag !== undefined) path = { tag: path.tag };
     else path = {};
   }
 
   const title = $derived(
     path.category !== undefined
       ? (store.category(path.category)?.name ?? "Sin categoría")
-      : path.group !== undefined
-        ? (GROUP_LABEL[path.group] ?? path.group)
+      : path.tag !== undefined
+        ? path.tag
+          ? `#${path.tag}`
+          : "Sin etiqueta"
         : "",
   );
 
@@ -203,7 +218,7 @@
     }) as ChartConfiguration;
 </script>
 
-{#if path.group === undefined && path.category === undefined}
+{#if top}
   <TopBar>
     <MonthNav bind:ym {yearly} />
     {#snippet actions()}
@@ -223,9 +238,22 @@
     </button>
   </div>
 
-  {#if slices.length}
+  <div class="st-by">
+    <Segmented
+      bind:value={by}
+      full
+      label="Repartir por"
+      options={[
+        { id: "category", label: "Por categoría" },
+        { id: "tag", label: "Por etiqueta" },
+      ]}
+    />
+    {#if byTags}<p>Un movimiento con varias etiquetas suma en cada una.</p>{/if}
+  </div>
+
+  {#if slices.length && !byTags}
     <div class="st-pie">
-      {#key `${kind}${ym}${yearly}`}
+      {#key `${kind}${ym}${yearly}${by}`}
         <Chart config={pieConfig} height={240} label="Reparto del periodo" />
       {/key}
     </div>
@@ -315,6 +343,18 @@
         color: var(--text-primary);
         font-weight: 600;
       }
+    }
+  }
+
+  .st-by {
+    display: grid;
+    gap: var(--sp-6);
+    padding: var(--sp-12) var(--sp-16) 0;
+
+    & p {
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
     }
   }
 

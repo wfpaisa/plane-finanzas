@@ -17,7 +17,7 @@ var VERSION = 1;
 
 // Los campos que se guardan de cada colección, sin id, dueño ni fechas de registro.
 var FIELDS = {
-  categories: ["name", "kind", "icon", "color", "keywords", "budget", "group"],
+  categories: ["name", "kind", "icon", "color", "keywords", "budget", "tags"],
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "match_keys", "exclude_from_total", "archived", "sort", "notes"],
   recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw"],
@@ -81,7 +81,7 @@ function seedCategories(app, userId) {
     r.set("icon", c.icon);
     if (c.color) r.set("color", c.color);
     r.set("keywords", c.keywords);
-    if (c.group) r.set("group", c.group);
+    if (c.tags) r.set("tags", c.tags);
     app.save(r);
   }
 }
@@ -173,7 +173,10 @@ function restoreData(app, userId, data, counts) {
       counts[name] = rows.length;
     }
 
-    insert("categories", data.categories);
+    // Los respaldos de antes traen el grupo (fijo/variable) y no etiquetas.
+    insert("categories", data.categories, function (r, row) {
+      if (!row.tags && row.group) r.set("tags", [row.group]);
+    });
     insert("accounts", data.accounts);
     insert("recurring", data.recurring, function (r, row) {
       r.set("category", map("categories", row.category));

@@ -1,7 +1,7 @@
 <!--
   Estados: ingresos y gastos por semana (dentro de un mes), por mes (dentro
-  de un año) o por año, y el reparto por categoría. Tocar una categoría la
-  aísla en la gráfica.
+  de un año) o por año, y el reparto por categoría y por etiqueta. Tocar una
+  categoría la aísla en la gráfica; elegir una etiqueta filtra toda la página.
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
@@ -29,6 +29,9 @@
   import { pb } from "../lib/pb.svelte";
   import { go } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
+  import { byTag, categoryTags, hasTag } from "../lib/tags";
+  import { tintFor } from "../lib/palettes";
+  import Tag, { type Tone } from "../components/ui/Tag.svelte";
   import type { Transaction } from "../lib/types";
 
   const now = today();
@@ -37,6 +40,7 @@
   let year = $state(Number(now.slice(0, 4)));
   let kind = $state<Kind | "both">("expense");
   let account = $state("");
+  let tag = $state("");
   let focus = $state("");
 
   let txs = $state<Transaction[]>([]);
@@ -59,7 +63,7 @@
           b,
           acc: account,
         }),
-        fields: "id,type,date,amount,category,account",
+        fields: "id,type,date,amount,category,account,tags",
         batch: 1000,
       })
       .then((r) => (txs = r))
@@ -74,7 +78,9 @@
   });
 
   // En semanal, la semana que empieza el mes anterior solo trae los días del mes.
-  const inRange = $derived(txs.filter((t) => t.date.slice(0, 10) >= range[0] && t.date.slice(0, 10) < range[1]));
+  const inRange = $derived(
+    txs.filter((t) => t.date.slice(0, 10) >= range[0] && t.date.slice(0, 10) < range[1] && (!tag || hasTag(t, tag))),
+  );
   const focused = $derived(focus ? inRange.filter((t) => (t.category || "none") === focus) : inRange);
   const buckets = $derived(bucketize(focused, g, keys));
   const income = $derived(inRange.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0));
@@ -83,6 +89,9 @@
   const catKind = $derived<Kind>(kind === "income" ? "income" : "expense");
   const cats = $derived(byCategory(inRange, catKind));
   const catTotal = $derived(cats.reduce((s, c) => s + c.total, 0));
+  const tagRows = $derived(byTag(inRange.filter((t) => t.type === catKind)));
+  const tagMax = $derived(Math.max(0, ...tagRows.map((r) => r.total)));
+  const tagOptions = $derived([...new Set([...categoryTags(), ...txs.flatMap((t) => t.tags ?? [])])].sort());
   const periods = $derived(g === "week" ? 1 : g === "month" ? 12 : 6);
 
   const label = (k: string) => (g === "week" ? weekLabel(k) : g === "month" ? monthLabel(k) : k);
@@ -196,6 +205,12 @@
       label="Qué ver"
     />
     <div class="toolbar-account">
+      {#if tagOptions.length || tag}
+        <Select bind:value={tag} class="sm" aria-label="Etiqueta">
+          <option value="">Todas las etiquetas</option>
+          {#each tagOptions as t (t)}<option value={t}>#{t}</option>{/each}
+        </Select>
+      {/if}
       <Select bind:value={account} class="sm">
         <option value="">Todas las cuentas</option>
         {#each store.accounts as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
@@ -265,7 +280,7 @@
                   Límite mensual <Money value={budget} /> · {c.total > budget ? "exceso" : "disponible"} <Money value={Math.abs(budget - c.total)} />
                 </span>
               {/if}
-              <button type="button" class="link small see" onclick={() => go("/movimientos", { cat: c.category || "none", mes: g === "week" ? ym : "todo" })}>
+              <button type="button" class="link small see" onclick={() => go("/movimientos", { cat: c.category || "none", mes: g === "week" ? ym : "todo", ...(tag ? { tag } : {}) })}>
                 Ver
               </button>
             </div>
@@ -295,6 +310,40 @@
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3 class="card-title">Por etiqueta</h3>
+          <p class="card-sub">
+            {catKind === "income" ? "Ingresos" : "Gastos"} por etiqueta, propia o de la categoría. Un movimiento con varias suma en cada una.
+          </p>
+        </div>
+      </div>
+      <div class="card-body">
+        {#each tagRows as row (row.tag)}
+          <div class="bar-row tag-row" class:dim={tag && tag !== row.tag}>
+            <span class="cat-name">
+              {#if row.tag}
+                <Tag tone={tintFor(row.tag) as Tone} pressed={tag === row.tag} onclick={() => (tag = tag === row.tag ? "" : row.tag)}>#{row.tag}</Tag>
+              {:else}
+                <span class="muted">Sin etiqueta</span>
+              {/if}
+              <span class="muted small">{row.count} mov.</span>
+            </span>
+            <span class="cat-amount">
+              <Money value={row.total} />
+              <span class="muted small">{catTotal ? Math.round((row.total / catTotal) * 100) : 0}%</span>
+            </span>
+            <div class="bar-track {row.tag ? tintFor(row.tag) : 'tint-10'}">
+              <span style:width="{tagMax ? (row.total / tagMax) * 100 : 0}%"></span>
+            </div>
+          </div>
+        {:else}
+          <div class="empty-card">Nada en este periodo.</div>
+        {/each}
+      </div>
+    </div>
   </div>
 </div>
 
@@ -310,8 +359,27 @@
   }
 
   .toolbar-account {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-8);
     margin-left: auto;
-    min-width: 12rem;
+
+    /* Cada select con su ancho: si se reparten el de la caja, el texto se
+       parte en dos renglones. */
+    & :global(select) {
+      flex: 1 0 auto;
+      width: auto;
+      min-width: 11rem;
+      white-space: nowrap;
+    }
+  }
+
+  .tag-row {
+    transition: opacity 0.2s;
+
+    &.dim {
+      opacity: 0.4;
+    }
   }
 
   .nav {

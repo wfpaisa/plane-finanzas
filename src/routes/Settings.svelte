@@ -13,6 +13,7 @@
   import Money from "../components/app/Money.svelte";
   import RulesCard from "../components/app/RulesCard.svelte";
   import Segmented from "../components/app/Segmented.svelte";
+  import TagInput from "../components/app/TagInput.svelte";
   import TintPicker from "../components/app/TintPicker.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button, ConfirmDialog, Field, Input, Modal, Textarea } from "../components/ui";
@@ -20,9 +21,10 @@
   import type { Kind } from "../lib/finance";
   import { notify } from "../lib/notify.svelte";
   import { pb, session } from "../lib/pb.svelte";
-  import { CATEGORY_TINT_NAMES, CATEGORY_TINTS, nextCategoryTint } from "../lib/palettes";
+  import { CATEGORY_TINT_NAMES, CATEGORY_TINTS, nextCategoryTint, tintFor } from "../lib/palettes";
   import { go, route } from "../lib/router.svelte";
   import { reload, store, touchTransactions } from "../lib/store.svelte";
+  import { categoryTags } from "../lib/tags";
   import type { Category } from "../lib/types";
 
   const SECTIONS = [
@@ -41,12 +43,18 @@
 
   let catKind = $state<Kind>("expense");
   let catQuery = $state("");
+  let catTag = $state("");
   const cats = $derived.by(() => {
     const q = catQuery.trim().toLowerCase();
     return store.categories.filter(
-      (c) => c.kind === catKind && (!q || c.name.toLowerCase().includes(q) || c.keywords?.toLowerCase().includes(q)),
+      (c) =>
+        c.kind === catKind &&
+        (!catTag || c.tags?.includes(catTag)) &&
+        (!q || [c.name, c.keywords, ...(c.tags ?? [])].some((x) => x?.toLowerCase().includes(q))),
     );
   });
+  /** Las etiquetas de las categorías de este tipo, para filtrar la lista. */
+  const kindTags = $derived([...new Set(store.categories.filter((c) => c.kind === catKind).flatMap((c) => c.tags ?? []))].sort());
   const kindCount = (k: Kind) => store.categories.filter((c) => c.kind === k).length;
 
   let name = $state(session.user?.name ?? "");
@@ -63,6 +71,7 @@
   const shownColor = $derived(cColor || autoColor);
   let cKeywords = $state("");
   let cBudget = $state(0);
+  let cTags = $state<string[]>([]);
   let busy = $state(false);
   let confirmDelete = $state(false);
   let running = $state(false);
@@ -82,6 +91,7 @@
     cColor = c?.color ?? "";
     cKeywords = c?.keywords ?? "";
     cBudget = c?.budget ?? 0;
+    cTags = [...(c?.tags ?? [])];
     open = true;
   }
 
@@ -97,6 +107,7 @@
         color: shownColor,
         keywords: cKeywords,
         budget: cKind === "expense" ? cBudget : 0,
+        tags: cTags,
       };
       if (editing) await pb.collection("categories").update(editing.id, data);
       else await pb.collection("categories").create(data);
@@ -250,6 +261,7 @@
         <div class="cat-toolbar">
           <Segmented
             bind:value={catKind}
+            onchange={() => (catTag = "")}
             options={[
               { id: "expense", label: `Gasto · ${kindCount("expense")}` },
               { id: "income", label: `Ingreso · ${kindCount("income")}` },
@@ -257,6 +269,13 @@
           />
           <input class="field-control sm cat-search" type="search" placeholder="Buscar" bind:value={catQuery} aria-label="Buscar categoría" />
         </div>
+        {#if kindTags.length || catTag}
+          <div class="cat-tag-filter" aria-label="Filtrar por etiqueta">
+            {#each [...new Set([catTag, ...kindTags].filter(Boolean))] as t (t)}
+              <Tag tone={catTag === t ? (tintFor(t) as Tone) : "off"} pressed={catTag === t} onclick={() => (catTag = catTag === t ? "" : t)}>#{t}</Tag>
+            {/each}
+          </div>
+        {/if}
         {#if cats.length}
           <div class="cat-grid">
             {#each cats as c (c.id)}
@@ -265,6 +284,11 @@
                 <span class="cat-main">
                   <span class="cat-name">{c.name}</span>
                   <span class="cat-keys">{c.keywords || "Sin palabras clave"}</span>
+                  {#if c.tags?.length}
+                    <span class="cat-tags">
+                      {#each c.tags as t (t)}<Tag tone={tintFor(t) as Tone}>#{t}</Tag>{/each}
+                    </span>
+                  {/if}
                 </span>
                 {#if c.budget}<span class="small muted"><Money value={c.budget} />/mes</span>{/if}
               </button>
@@ -360,6 +384,11 @@
         {/each}
       </div>
     </div>
+    <div>
+      <p class="eyebrow">Etiquetas</p>
+      <TagInput bind:value={cTags} suggestions={categoryTags()} />
+      <p class="small muted cat-tag-hint">Los movimientos de esta categoría las heredan: sirven para filtrar y sumar en Movimientos, Análisis y el móvil. Con <b>#fijo</b>, el móvil la cuenta en los gastos fijos.</p>
+    </div>
     <Field label="Palabras clave" hint="Escribe términos separados por comas, como exito, carulla, d1. No importa si usas mayúsculas o tildes.">
       <Textarea bind:value={cKeywords} rows={3} />
     </Field>
@@ -441,6 +470,21 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-8);
+  }
+
+  .cat-tag-filter,
+  .cat-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+  }
+
+  .cat-tags {
+    margin-top: var(--sp-4);
+  }
+
+  .cat-tag-hint {
+    margin-top: var(--sp-6);
   }
 
   .cat-grid {

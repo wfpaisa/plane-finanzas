@@ -20,10 +20,10 @@ describe("registro contable", () => {
     expect(t).toMatchObject({ type: "transfer", account: "Banco Principal", toAccount: "Tarjeta Visa" });
   });
 
-  test("gasto: subcategoría como categoría y grupo fijo/variable", () => {
-    expect(plan.categories).toContainEqual({ name: "Comer afuera", kind: "expense" });
-    expect(plan.categories).toContainEqual({ name: "Arriendo", kind: "expense" });
-    expect(plan.categories).toContainEqual({ name: "Salario", kind: "income" });
+  test("gasto: subcategoría como categoría y Fijos/Variables como etiqueta", () => {
+    expect(plan.categories).toContainEqual({ name: "Comer afuera", kind: "expense", tags: ["variable"] });
+    expect(plan.categories).toContainEqual({ name: "Arriendo", kind: "expense", tags: ["fijo"] });
+    expect(plan.categories).toContainEqual({ name: "Salario", kind: "income", tags: [] });
   });
 
   test("modificar saldo es el saldo inicial", () => {

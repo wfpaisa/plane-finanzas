@@ -179,20 +179,9 @@
         <Field label="Categoría">
           <Select bind:value={category}>
             <option value="">Sin categoría</option>
-            {#if type === "expense"}
-              {#each [["fijo", "Gastos frecuentes"], ["variable", "Otros gastos del mes"], ["", "Otras"]] as [g, label] (g)}
-                {@const list = cats.filter((c) => (c.group || "") === g)}
-                {#if list.length}
-                  <optgroup {label}>
-                    {#each list as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
-                  </optgroup>
-                {/if}
-              {/each}
-            {:else}
-              {#each cats as c (c.id)}
-                <option value={c.id}>{c.name}</option>
-              {/each}
-            {/if}
+            {#each cats as c (c.id)}
+              <option value={c.id}>{c.name}{c.tags?.length ? ` · ${c.tags.map((t) => `#${t}`).join(" ")}` : ""}</option>
+            {/each}
           </Select>
         </Field>
       {/if}

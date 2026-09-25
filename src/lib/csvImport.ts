@@ -6,7 +6,8 @@
  *
  * Cómo se lee cada fila:
  *   Gasto           gasto en `Cuenta`; la categoría es la subcategoría y
- *                   `Categoría` (Fijos/Variables) es su grupo.
+ *                   `Categoría` (Fijos/Variables) queda como su etiqueta
+ *                   ("fijo", "variable").
  *   Ingreso         ingreso en `Cuenta`, categoría = `Categoría`.
  *   Dinero gastado  transferencia de `Cuenta` a la cuenta que viene en
  *                   `Categoría` (pagar la tarjeta, mandar a ahorros…).
@@ -28,7 +29,15 @@ export interface CsvAccount {
 export interface CsvCategory {
   name: string;
   kind: "income" | "expense";
+  tags: string[];
 }
+
+/** "Fijos" -> "fijo", "Variables" -> "variable"; lo demás, en minúsculas. */
+const TAG_OF: Record<string, string> = { fijos: "fijo", variables: "variable" };
+const tagOf = (raw: string) => {
+  const t = norm(raw).replace(/,/g, "");
+  return TAG_OF[t] ?? t;
+};
 
 export interface CsvTx {
   key: string;
@@ -150,10 +159,12 @@ export function planFromCsv(text: string): CsvPlan {
     if (!accounts.has(k)) accounts.set(k, { name: clean(name), type: guessAccountType(name), initial: 0 });
     return accounts.get(k)!.name;
   };
-  const category = (name: string, kind: "income" | "expense") => {
+  const category = (name: string, kind: "income" | "expense", tag = "") => {
     const k = `${kind}:${norm(name)}`;
-    if (!categories.has(k)) categories.set(k, { name: clean(name), kind });
-    return categories.get(k)!.name;
+    if (!categories.has(k)) categories.set(k, { name: clean(name), kind, tags: [] });
+    const c = categories.get(k)!;
+    if (tag && !c.tags.includes(tag)) c.tags.push(tag);
+    return c.name;
   };
 
   for (const r of rows.slice(1)) {
@@ -208,7 +219,8 @@ export function planFromCsv(text: string): CsvPlan {
         date,
         account: account(acc),
         toAccount: "",
-        category: category(sub || cat || "Otros gastos", "expense"),
+        // Con subcategoría, la de arriba (Fijos/Variables) va como etiqueta.
+        category: category(sub || cat || "Otros gastos", "expense", sub && cat ? tagOf(cat) : ""),
         amount,
         description: note,
         notes: desc,
@@ -290,16 +302,25 @@ export async function applyPlan(pb: PocketBase, owner: string, plan: CsvPlan, on
     out.accountsCreated++;
   }
 
-  const cats = await pb.collection("categories").getFullList<{ id: string; name: string; kind: string }>({ filter: pb.filter("owner = {:o}", { o: owner }) });
+  const cats = await pb
+    .collection("categories")
+    .getFullList<{ id: string; name: string; kind: string; tags: string[] | null }>({ filter: pb.filter("owner = {:o}", { o: owner }) });
   const catId = new Map(cats.map((c) => [`${c.kind}:${norm(c.name)}`, c.id]));
   for (const c of plan.categories) {
     const k = `${c.kind}:${norm(c.name)}`;
-    if (catId.has(k)) continue;
+    if (catId.has(k)) {
+      // Ya existe: solo se le suman las etiquetas que le falten.
+      const had = cats.find((x) => x.id === catId.get(k))?.tags ?? [];
+      const missing = c.tags.filter((t) => !had.includes(t));
+      if (missing.length) await pb.collection("categories").update(catId.get(k)!, { tags: [...had, ...missing] });
+      continue;
+    }
     const r = await pb.collection("categories").create({
       owner,
       name: c.name,
       kind: c.kind,
       icon: CATEGORY_ICONS[norm(c.name)] ?? (c.kind === "income" ? "money-add-01" : "tag-01"),
+      tags: c.tags,
       // Sin color: el servidor le pone uno que no tenga otra (pb_hooks/lib/tints.js).
     });
     catId.set(k, r.id);
