@@ -29,7 +29,7 @@
 
   const SECTIONS = [
     { id: "categorias", label: "Categorías", icon: "tag-01" },
-    { id: "reglas", label: "Reglas", icon: "magic-wand-01" },
+    { id: "reglas", label: "Reglas", icon: "flash" },
     { id: "apariencia", label: "Apariencia", icon: "paint-board" },
     { id: "cuenta", label: "Cuenta y datos", icon: "user-circle" },
   ] as const;

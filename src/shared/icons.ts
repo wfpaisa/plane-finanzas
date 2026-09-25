@@ -445,7 +445,7 @@ export const PAGE_ICONS: readonly { group: string; names: readonly string[] }[] 
       "connect",
       "rocket-01",
       "ai-magic",
-      "magic-wand-01",
+      "flash",
       "artificial-intelligence-04",
       "robotic",
       "ai-brain-01",

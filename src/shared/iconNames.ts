@@ -3309,7 +3309,7 @@ export const ICON_NAMES: readonly string[] = [
   "machine-robot",
   "magic-book",
   "magic-book-2",
-  "magic-wand-01",
+  "flash",
   "magic-wand-02",
   "magic-wand-03",
   "magic-wand-04",

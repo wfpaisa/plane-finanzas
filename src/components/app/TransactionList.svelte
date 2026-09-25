@@ -294,7 +294,7 @@
               {#if t.rule}<span
                   class="tx-rule-ico"
                   data-tip="Ajustado por la regla «{ruleOf(t)}»"
-                  ><Icon name="magic-wand-01" size={14} /></span
+                  ><Icon name="flash" size={14} /></span
                 >{/if}
               {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
                   ><Icon name="mail-01" size={14} /></span
@@ -372,7 +372,7 @@
                         <span
                           class="tx-rule"
                           data-tip="Categoría, etiquetas o descripción puestas por esta regla"
-                          ><Icon name="magic-wand-01" size={11} />Regla: {ruleOf(
+                          ><Icon name="flash" size={11} />Regla: {ruleOf(
                             t,
                           )}</span
                         >
@@ -428,7 +428,7 @@
                   {#if t.rule}<span
                       class="tx-rule-ico"
                       data-tip="Ajustado por la regla «{ruleOf(t)}»"
-                      ><Icon name="magic-wand-01" size={14} /></span
+                      ><Icon name="flash" size={14} /></span
                     >{/if}
                   {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
                       ><Icon name="mail-01" size={14} /></span

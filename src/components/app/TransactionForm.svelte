@@ -249,7 +249,7 @@
         <span>
           {#if tx.source && tx.source !== "manual"}Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b>{/if}
           {#if tx.rule}
-            <span class="tx-origin-rule"><Icon name="magic-wand-01" size={12} />Ajustado por la regla <b>«{tx.expand?.rule?.match ?? "…"}»</b></span>
+            <span class="tx-origin-rule"><Icon name="flash" size={12} />Ajustado por la regla <b>«{tx.expand?.rule?.match ?? "…"}»</b></span>
           {/if}
         </span>
         {#if tx.raw}
@@ -288,7 +288,7 @@
             go("/ajustes", { regla: tx.description });
           }}
         >
-          <Icon name="magic-wand-01" size={18} />
+          <Icon name="flash" size={18} />
         </button>
       {/if}
       <span class="flex-1 foot-break"></span>
