@@ -1,6 +1,6 @@
 <!--
-  Crear o editar un ahorro: cuánto al mes, en qué cuentas se guarda (y en
-  qué proporción), la meta, el rendimiento y con quién se comparte.
+  Crear o editar un ahorro: cuánto al mes, la meta, el rendimiento y con
+  quién se comparte. En qué cuenta está el dinero lo dice cada movimiento.
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -10,9 +10,9 @@
   import { colorOf } from "../../lib/palettes";
   import { pb, session } from "../../lib/pb.svelte";
   import { reload, store } from "../../lib/store.svelte";
-  import type { Allocation, Saving, User } from "../../lib/types";
+  import type { Saving, User } from "../../lib/types";
   import Icon from "../Icon.svelte";
-  import { Button, ConfirmDialog, Field, InfoTip, Input, Modal, Select, Switch, Textarea } from "../ui";
+  import { Button, ConfirmDialog, Field, InfoTip, Input, Modal, Switch, Textarea } from "../ui";
   import IconSelect from "./IconSelect.svelte";
   import Money from "./Money.svelte";
   import MoneyInput from "./MoneyInput.svelte";
@@ -28,7 +28,6 @@
   let rate = $state(0);
   let target = $state(0);
   let targetDate = $state("");
-  let allocations = $state<Allocation[]>([]);
   let auto = $state(false);
   let archived = $state(false);
   let notes = $state("");
@@ -54,8 +53,6 @@
       rate = saving?.annual_rate ?? 0;
       target = saving?.target_amount ?? 0;
       targetDate = saving?.target_date?.slice(0, 10) ?? "";
-      allocations = (saving?.allocations ?? []).map((a) => ({ ...a }));
-      if (!allocations.length && store.activeAccounts[0]) allocations = [{ account: store.activeAccounts[0].id, percent: 100 }];
       auto = saving?.auto ?? false;
       archived = saving?.archived ?? false;
       notes = saving?.notes ?? "";
@@ -64,7 +61,6 @@
     });
   });
 
-  const pctSum = $derived(allocations.reduce((s, a) => s + (Number(a.percent) || 0), 0));
   const current = $derived(saving ? store.savingCurrent(saving.id) : 0);
   const monthsLeft = $derived.by(() => {
     if (!targetDate) return 0;
@@ -87,26 +83,8 @@
     }
   }
 
-  /**
-   * El reparto que se guarda: sin filas vacías y una sola por cuenta. Dos
-   * filas con la misma cuenta se suman; si no, el aporte automático, que
-   * lleva una marca por cuenta y mes, solo haría la primera.
-   */
-  function cleanAllocations(): Allocation[] {
-    const byAccount = new Map<string, number>();
-    for (const a of allocations) {
-      const pct = Number(a.percent) || 0;
-      if (a.account && pct > 0) byAccount.set(a.account, (byAccount.get(a.account) ?? 0) + pct);
-    }
-    return [...byAccount].map(([account, percent]) => ({ account, percent }));
-  }
-
   async function save() {
     if (!name.trim()) return notify.fail(new Error("Ponle nombre al ahorro."));
-    if (allocations.some((a) => !a.account && (Number(a.percent) || 0) > 0))
-      return notify.fail(new Error("Elige la cuenta de cada parte del reparto, o quita la que sobra."));
-    if (allocations.length && Math.round(pctSum) !== 100)
-      return notify.fail(new Error(`El reparto entre cuentas suma ${pctSum}%, debe sumar 100%.`));
     busy = true;
     try {
       const data = {
@@ -118,7 +96,8 @@
         annual_rate: rate,
         target_amount: target,
         target_date: targetDate ? `${targetDate} 12:00:00.000Z` : "",
-        allocations: cleanAllocations(),
+        // Ya no se usa: la cuenta la dice cada movimiento.
+        allocations: [],
         auto,
         archived,
         notes,
@@ -170,34 +149,6 @@
       </p>
     {/if}
 
-    <div>
-      <p class="eyebrow label-tip">Cuentas donde guardarás el dinero<InfoTip text="Indica qué parte del ahorro está en cada cuenta. Por ejemplo, puedes guardar 70 % en una cuenta y 30 % en otra. Los porcentajes deben sumar 100 %." /></p>
-      <div class="alloc-list">
-        {#each allocations as a, i (i)}
-          <div class="alloc-row">
-            <Select bind:value={a.account}>
-              <option value="">Elige cuenta…</option>
-              {#each store.activeAccounts as acc (acc.id)}<option value={acc.id}>{acc.name}</option>{/each}
-            </Select>
-            <div class="alloc-pct">
-              <input type="number" class="field-control" min="0" max="100" bind:value={a.percent} />
-              <span>%</span>
-            </div>
-            <span class="alloc-amount muted small"><Money value={(monthly * (a.percent || 0)) / 100} /></span>
-            <button type="button" class="btn-icon sm" aria-label="Quitar" onclick={() => (allocations = allocations.filter((_, j) => j !== i))}>
-              <Icon name="cancel-01" size={12} />
-            </button>
-          </div>
-        {/each}
-      </div>
-      <div class="alloc-foot">
-        <button type="button" class="link small" onclick={() => (allocations = [...allocations, { account: "", percent: Math.max(0, 100 - pctSum) }])}>
-          + Repartir en otra cuenta
-        </button>
-        <span class="small" class:bad={allocations.length > 0 && Math.round(pctSum) !== 100}>Suma {pctSum}%</span>
-      </div>
-    </div>
-
     {#if mine}
       <div>
         <p class="eyebrow label-tip">Compartir con otras personas<InfoTip text="Escribe el correo de alguien que ya tenga usuario en la app. Verá este ahorro y podrá aportar desde sus propias cuentas." /></p>
@@ -224,7 +175,7 @@
     <div class="flex flex-wrap gap-5">
       <span class="label-tip">
         <Switch bind:checked={auto} label="Aportar automáticamente" />
-        <InfoTip text="En el día elegido, la aplicación registrará esta cantidad como ahorro. El proceso se ejecuta diariamente a las 6:00 a. m. y no mueve dinero en el banco." />
+        <InfoTip text="En el día elegido, la aplicación registrará esta cantidad como ahorro, en la cuenta de tu último aporte. El proceso se ejecuta diariamente a las 6:00 a. m. y no mueve dinero en el banco." />
       </span>
       {#if saving}
         <span class="label-tip">
@@ -278,52 +229,6 @@
     background: var(--accent-soft);
     color: var(--accent-soft-text);
     font-size: var(--text-sm);
-  }
-
-  .alloc-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-6);
-  }
-
-  .alloc-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 5.5rem auto auto;
-    align-items: center;
-    gap: var(--sp-8);
-
-    /* El select no se encoge por debajo de su texto si no se le dice: en el
-       celular tapaba el porcentaje. */
-    & :global(select),
-    & :global(.field) {
-      min-width: 0;
-      width: 100%;
-    }
-  }
-
-  .alloc-pct {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-
-    & input {
-      width: 100%;
-    }
-  }
-
-  .alloc-amount {
-    text-align: right;
-  }
-
-  .alloc-foot {
-    display: flex;
-    justify-content: space-between;
-    margin-top: var(--sp-8);
-
-    & .bad {
-      color: var(--danger);
-      font-weight: 600;
-    }
   }
 
   .members {

@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
+  import { tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
 
   import Money from "../components/app/Money.svelte";
@@ -29,7 +30,10 @@
   import { txModal } from "../lib/ui.svelte";
 
   const q = route.query;
-  let ym = $state(q.get("mes") ?? today().slice(0, 7));
+  // "mes" es un mes (aaaa-mm) o "todo"; lo demás, el mes de hoy.
+  const MONTH = /^\d{4}-\d{2}$/;
+  const mes = q.get("mes") ?? "";
+  let ym = $state(MONTH.test(mes) ? mes : today().slice(0, 7));
   let all = $state(
     q.get("mes") === "todo" || (!!q.get("tag") && !q.get("mes")),
   );
@@ -125,7 +129,8 @@
     ["transfer", "Transferencias", "tint-10"],
   ];
 
-  const filtered = $derived(!!(account || category || type || tag || search));
+  const filterCount = $derived([account, category, type, tag, search.trim()].filter(Boolean).length);
+  const filtered = $derived(filterCount > 0);
 
   // Ampliado (por días, con etiquetas y notas) o compacto (tabla). Se
   // recuerda en este navegador.
@@ -147,24 +152,14 @@
     }
   }
 
-  // La gráfica de abajo: lo marcado con clic derecho o, si no hay nada
-  // marcado, todo lo que está a la vista. Abierta o cerrada se recuerda.
-  const CHART_KEY = "finanzas-movimientos-grafica";
-  let chartOn = $state(readChart());
-  function readChart() {
-    try {
-      return localStorage.getItem(CHART_KEY) === "1";
-    } catch {
-      return false;
-    }
-  }
-  function setChart(on: boolean) {
-    chartOn = on;
-    try {
-      localStorage.setItem(CHART_KEY, on ? "1" : "0");
-    } catch {
-      // Sin almacenamiento, vale para esta visita.
-    }
+  // La gráfica de abajo, siempre: lo marcado con clic derecho o, si no hay
+  // nada marcado, todo lo que está a la vista.
+  let chartBox = $state<HTMLElement | null>(null);
+
+  // Va debajo de la lista: desde lo seleccionado se lleva la vista hasta ella.
+  async function showChart() {
+    await tick();
+    chartBox?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   const charted = $derived(picked.length ? picked : shown);
@@ -269,13 +264,15 @@
       ym = today().slice(0, 7);
     },
     t: () => (all = !all),
-    g: () => setChart(!chartOn),
+    g: () => showChart(),
     v: () => setCompact(!compact),
     "/": () => searchBox?.querySelector("input")?.focus(),
   });
 
   function clear() {
     account = category = type = tag = search = "";
+    all = false;
+    ym = today().slice(0, 7);
     go("/movimientos");
   }
 </script>
@@ -324,17 +321,17 @@
     </div>
   </header>
 
-  <div class="filters card">
+  <div class="filters card" class:is-filtered={filtered}>
     <div class="filters-grid">
       <div bind:this={searchBox}>
-        <Input bind:value={search} placeholder="Buscar… ( / )" />
+        <Input bind:value={search} class={search.trim() ? "is-on" : ""} placeholder="Buscar… ( / )" />
       </div>
-      <Select bind:value={account}>
+      <Select bind:value={account} class={account ? "is-on" : ""}>
         <option value="">Todas las cuentas</option>
         {#each store.accounts as a (a.id)}<option value={a.id}>{a.name}</option
           >{/each}
       </Select>
-      <Select bind:value={category}>
+      <Select bind:value={category} class={category ? "is-on" : ""}>
         <option value="">Todas las categorías</option>
         <option value="none">Sin categoría</option>
         <optgroup label="Gastos">
@@ -384,22 +381,13 @@
         ><Icon name="mouse-right-click-01" size={14} />Clic derecho en un
         movimiento para sumarlo</span
       >
-      {#if filtered}<button type="button" class="link small" onclick={clear}
-          >Quitar filtros</button
+      {#if filtered}<button type="button" class="filters-clear" onclick={clear}
+          ><Icon name="filter-remove" size={14} />Quitar {filterCount === 1 ? "filtro" : `${filterCount} filtros`}</button
         >{/if}
     </div>
   </div>
 
   <div class="list-bar">
-    <button
-      type="button"
-      class="chip chart-toggle"
-      class:active={chartOn}
-      aria-pressed={chartOn}
-      onclick={() => setChart(!chartOn)}
-    >
-      <Icon name="chart-line-data-01" size={14} />Gráfica
-    </button>
     <div class="chips view-tabs" role="tablist" aria-label="Vista de la lista">
       <button
         type="button"
@@ -440,8 +428,8 @@
       No hay movimientos {filtered ? "con esos filtros" : "este mes"}.
     </div>
   {/if}
-  {#if chartOn && charted.length}
-    <div class="card tx-chart">
+  {#if charted.length}
+    <div class="card tx-chart" bind:this={chartBox}>
       <div class="card-head">
         <div>
           <h3 class="card-title">
@@ -459,14 +447,6 @@
             {#if !picked.length}
               · clic derecho en la lista para graficar solo algunos{/if}
           </p>
-        </div>
-        <div class="card-head-actions">
-          <button
-            type="button"
-            class="btn-icon sm"
-            aria-label="Cerrar gráfica"
-            onclick={() => setChart(false)}><Icon name="cancel-01" /></button
-          >
         </div>
       </div>
       <div class="card-body">
@@ -490,9 +470,8 @@
         <button
           type="button"
           class="pick-extra"
-          aria-pressed={chartOn}
           data-tip="Ver lo seleccionado en la gráfica"
-          onclick={() => setChart(!chartOn)}
+          onclick={showChart}
         >
           <Icon name="chart-line-data-01" size={14} />Gráfica
         </button>
@@ -529,7 +508,7 @@
     }
 
     @media (min-width: 56.01rem) {
-      & ~ .link {
+      & ~ .filters-clear {
         margin-left: 0;
       }
     }
@@ -554,6 +533,36 @@
     gap: var(--sp-12);
     margin-bottom: var(--sp-20);
     padding: var(--sp-14);
+  }
+
+  /* Con filtros puestos, que se note: la tarjeta y cada control encendido. */
+  .filters.is-filtered {
+    --on-blue: light-dark(oklch(0.55 0.22 258), oklch(0.7 0.2 255));
+    box-shadow: inset 0 0 0 1px var(--on-blue);
+
+    & :global(.field-control.is-on) {
+      border-color: var(--on-blue);
+      background: color-mix(in oklab, var(--on-blue) 16%, var(--bg-field));
+      box-shadow: 0 0 0 1px var(--on-blue);
+    }
+  }
+
+  .filters-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: var(--sp-4) var(--sp-12);
+    border: 0;
+    border-radius: 999px;
+    background: var(--on-blue);
+    color: light-dark(oklch(0.99 0 0), oklch(0.18 0.04 255));
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      filter: brightness(1.1);
+    }
   }
 
   .filters-grid {
@@ -584,15 +593,9 @@
   .list-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: var(--sp-8);
     margin-bottom: var(--sp-12);
-  }
-
-  .chart-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
   }
 
   .tx-chart {
@@ -612,7 +615,7 @@
       font-weight: 600;
     }
 
-    & .link {
+    & .filters-clear {
       margin-left: auto;
     }
   }

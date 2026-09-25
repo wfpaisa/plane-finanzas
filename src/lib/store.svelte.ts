@@ -44,31 +44,36 @@ const total = $derived(
     .reduce((s, a) => s + (balances[a.id] ?? 0) + offline.delta(a.id), 0),
 );
 
-/** Los aportes sumados: por ahorro, por cuenta y lo de cada ahorro en las cuentas propias. */
+/**
+ * Los aportes sumados: por ahorro, por cuenta, lo de cada ahorro en las
+ * cuentas propias y, de cada cuenta, cuánto es de cada ahorro. La cuenta la
+ * dice cada movimiento: el ahorro no tiene una fija.
+ */
 const saved = $derived.by(() => {
   const bySaving = new Map<string, number>();
   const byAccount = new Map<string, number>();
   const mine = new Map<string, number>();
+  const split = new Map<string, Map<string, number>>();
   const add = (map: Map<string, number>, key: string, v: number) => map.set(key, (map.get(key) ?? 0) + v);
   for (const m of movements) {
     add(bySaving, m.saving, m.amount);
     add(byAccount, m.account, m.amount);
+    let per = split.get(m.account);
+    if (!per) split.set(m.account, (per = new Map()));
+    add(per, m.saving, m.amount);
     // Sin cuenta, es de quien lo anotó.
     if (m.account ? accountIds.has(m.account) : m.created_by === session.id) add(mine, m.saving, m.amount);
   }
-  return { bySaving, byAccount, mine };
+  return { bySaving, byAccount, mine, split };
 });
 
 /**
- * La parte del aporte mensual de un ahorro que sale de las cuentas propias:
- * la suma de los porcentajes del reparto que caen en ellas. Sin reparto, el
- * aporte automático lo hace el dueño (ver pb_hooks/lib/scheduler.js).
+ * La parte del aporte mensual de un ahorro que le toca a esta persona: el
+ * aporte del mes lo hace el dueño (ver pb_hooks/lib/scheduler.js); en uno
+ * compartido, los demás aportan cuando quieren, desde sus cuentas.
  */
 function shareOf(s: Saving): number {
-  const alloc = s.allocations ?? [];
-  if (!alloc.length) return s.owner === session.id ? 1 : 0;
-  const pct = alloc.reduce((a, x) => a + (accountIds.has(x.account) ? Number(x.percent) || 0 : 0), 0);
-  return Math.min(1, Math.max(0, pct / 100));
+  return s.owner === session.id ? 1 : 0;
 }
 
 /**
@@ -316,6 +321,26 @@ export const store = {
   /** Cuánto de cada cuenta está apartado en ahorros. */
   earmarked(accountId: string) {
     return saved.byAccount.get(accountId) ?? 0;
+  },
+  /** Lo apartado en una cuenta, ahorro por ahorro, de mayor a menor (sin los que quedaron en cero). */
+  earmarkedBySaving(accountId: string): { saving: string; amount: number }[] {
+    return [...(saved.split.get(accountId) ?? [])]
+      .filter(([, amount]) => Math.abs(amount) >= 0.5)
+      .map(([saving, amount]) => ({ saving, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  },
+  /** En qué cuentas está un ahorro y cuánto en cada una, según sus movimientos. */
+  savingAccounts(savingId: string): { account: string; amount: number }[] {
+    const out: { account: string; amount: number }[] = [];
+    for (const [account, per] of saved.split) {
+      const amount = per.get(savingId) ?? 0;
+      if (Math.abs(amount) >= 0.5) out.push({ account, amount });
+    }
+    return out.sort((a, b) => b.amount - a.amount);
+  },
+  /** La cuenta del último aporte propio a un ahorro: la de partida para el siguiente. */
+  lastSavingAccount(savingId: string): string {
+    return movements.find((m) => m.saving === savingId && m.account && accountIds.has(m.account))?.account ?? "";
   },
   isMine(ownerId: string) {
     return ownerId === session.id;

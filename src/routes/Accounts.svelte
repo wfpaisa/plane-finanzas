@@ -9,6 +9,7 @@
 
   import AccountForm from "../components/app/AccountForm.svelte";
   import ColorDot from "../components/app/ColorDot.svelte";
+  import EarmarkedModal from "../components/app/EarmarkedModal.svelte";
   import Money from "../components/app/Money.svelte";
   import PickBar from "../components/app/PickBar.svelte";
   import Chart from "../components/Chart.svelte";
@@ -25,6 +26,14 @@
   let editing = $state<Account | null>(null);
   let formOpen = $state(false);
   let showArchived = $state(false);
+  // El desglose de "Para ahorros": una cuenta, o todas (`all`).
+  let earmarkOpen = $state(false);
+  let earmarkAccount = $state<Account | null>(null);
+
+  function showEarmarked(a: Account | null) {
+    earmarkAccount = a;
+    earmarkOpen = true;
+  }
 
   const list = $derived(store.accounts.filter((a) => showArchived || !a.archived));
   const counted = $derived(store.activeAccounts.filter((a) => !a.exclude_from_total));
@@ -113,6 +122,7 @@
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Reservado para ahorros</span></div>
         <div class="kpi-val"><Money value={earmarked} /></div>
+        {#if earmarked > 0}<button type="button" class="link small kpi-link" onclick={() => showEarmarked(null)}>Ver por ahorro →</button>{/if}
       </div>
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="coins-01" /></span><span class="kpi-label">Sin reservar</span></div>
@@ -136,6 +146,7 @@
               <th>Banco</th>
               <th class="num">Para ahorros</th>
               <th class="num">Saldo</th>
+              <th class="num"><span data-tip="El saldo menos lo apartado para ahorros: lo que puedes usar">Sin reservar</span></th>
               <th><span class="sr-only">Movimientos</span></th>
             </tr>
           </thead>
@@ -160,8 +171,24 @@
                 </td>
                 <td class="acc-cell">{accountTypeLabel(a.type)}</td>
                 <td class="acc-cell">{a.bank || "—"}</td>
-                <td class="num acc-cell">{#if saved > 0}<Money value={saved} />{:else}—{/if}</td>
+                <td class="num acc-cell">
+                  {#if saved > 0}
+                    <button
+                      type="button"
+                      class="acc-saved"
+                      data-tip="Ver de qué ahorros es"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        showEarmarked(a);
+                      }}><Money value={saved} /></button
+                    >
+                  {:else}—{/if}
+                </td>
                 <td class="num"><Money value={balance} tone={balance < 0 ? "expense" : undefined} /></td>
+                <!-- Sin ahorros es el mismo saldo: se ve más suave para no repetirlo. -->
+                <td class="num acc-free" class:same={!saved}>
+                  <Money value={balance - saved} tone={balance - saved < 0 ? "expense" : undefined} />
+                </td>
                 <td class="acc-go">
                   <button
                     type="button"
@@ -178,8 +205,15 @@
           <tfoot>
             <tr>
               <td colspan="3">{list.length} {list.length === 1 ? "cuenta" : "cuentas"}</td>
-              <td class="num"><Money value={earmarked} /></td>
+              <td class="num">
+                {#if earmarked > 0}
+                  <button type="button" class="acc-saved" data-tip="Ver de qué ahorros es" onclick={() => showEarmarked(null)}
+                    ><Money value={earmarked} /></button
+                  >
+                {:else}<Money value={earmarked} />{/if}
+              </td>
               <td class="num"><Money value={store.total} /></td>
+              <td class="num"><Money value={store.total - earmarked} tone={store.total - earmarked < 0 ? "expense" : undefined} /></td>
               <td></td>
             </tr>
           </tfoot>
@@ -218,8 +252,37 @@
 </div>
 
 <AccountForm open={formOpen} account={editing} onClose={() => (formOpen = false)} />
+<EarmarkedModal open={earmarkOpen} account={earmarkAccount} accounts={counted} onClose={() => (earmarkOpen = false)} />
 
 <style>
+  .acc-free :global(.money) {
+    font-weight: 600;
+  }
+
+  .acc-free.same {
+    opacity: 0.55;
+  }
+
+  .kpi-link {
+    align-self: flex-start;
+  }
+
+  /* El total para ahorros se abre en su desglose: se ve como enlace. */
+  .acc-saved {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+
+    &:hover {
+      color: var(--accent);
+    }
+  }
+
   /* En angosto la tabla se desliza de lado dentro de su tarjeta. */
   .acc-table-wrap {
     padding: 0;

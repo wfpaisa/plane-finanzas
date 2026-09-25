@@ -27,20 +27,23 @@ function record(id: string, fields: Fields) {
   };
 }
 
-function fakeApp(rows: { recurring?: Fields[]; savings?: Fields[]; accounts?: Fields[] }) {
+function fakeApp(rows: { recurring?: Fields[]; savings?: Fields[]; accounts?: Fields[]; saving_movements?: Fields[] }) {
   const saved: FakeRecord[] = [];
   return {
     saved,
-    findRecordsByFilter: (col: "recurring" | "savings") => (rows[col] ?? []).map((f, i) => record(String(f.id ?? `${col}${i}`), f)),
+    findRecordsByFilter: (col: "recurring" | "savings" | "saving_movements") =>
+      (rows[col] ?? []).map((f, i) => record(String(f.id ?? `${col}${i}`), f)),
     findCollectionByNameOrId: (name: string) => name,
     findRecordById: (_col: string, id: string) => {
       const a = (rows.accounts ?? []).find((x) => x.id === id);
       if (!a) throw new Error("no está");
       return record(id, a);
     },
-    // "¿Ya existe esta marca?": se busca entre lo guardado en esta corrida.
-    findFirstRecordByFilter: (_col: string, _filter: string, params: { k: string }) => {
-      const hit = saved.find((r) => r.fields.external_id === params.k);
+    // "¿Ya existe esta marca?": se busca entre lo guardado en esta corrida y
+    // los aportes de antes. Con `~`, la marca empieza así.
+    findFirstRecordByFilter: (_col: string, filter: string, params: { k: string }) => {
+      const same = (ext: unknown) => (filter.includes("~") ? String(ext ?? "").startsWith(params.k) : ext === params.k);
+      const hit = saved.find((r) => same(r.fields.external_id)) ?? (rows.saving_movements ?? []).find((m) => same(m.external_id));
       if (!hit) throw new Error("no está");
       return hit;
     },
@@ -108,58 +111,35 @@ describe("fijos automáticos", () => {
 });
 
 describe("aportes automáticos", () => {
-  test("el reparto suma justo el aporte", () => {
+  test("va a la cuenta del último aporte del dueño", () => {
     at("2026-09-26");
     const app = fakeApp({
-      savings: [
-        {
-          id: "s",
-          owner: "u",
-          monthly_amount: 100000,
-          day_of_month: 15,
-          allocations: [
-            { account: "a", percent: 33 },
-            { account: "b", percent: 33 },
-            { account: "c", percent: 34 },
-          ],
-        },
-      ],
-      accounts: ["a", "b", "c"].map((id) => ({ id, owner: "u" })),
+      savings: [{ id: "s", owner: "u", monthly_amount: 100000, day_of_month: 15 }],
+      saving_movements: [{ saving: "s", account: "b", created_by: "u", amount: 50000, external_id: "" }],
     });
     s.runSavings(app, "u");
-    expect(app.saved.map((r) => r.fields.amount)).toEqual([33000, 33000, 34000]);
-    const odd = fakeApp({
-      savings: [{ id: "s", owner: "u", monthly_amount: 100001, day_of_month: 1, allocations: [{ account: "a", percent: 50 }, { account: "b", percent: 50 }] }],
-      accounts: ["a", "b"].map((id) => ({ id, owner: "u" })),
-    });
-    s.runSavings(odd, "u");
-    expect(odd.saved.reduce((a, r) => a + Number(r.fields.amount), 0)).toBe(100001);
-  });
-
-  test("un reparto viejo con la cuenta repetida se suma en una parte", () => {
-    at("2026-09-26");
-    const app = fakeApp({
-      savings: [{ id: "s", owner: "u", monthly_amount: 1000, day_of_month: 1, allocations: [{ account: "a", percent: 60 }, { account: "a", percent: 40 }] }],
-      accounts: [{ id: "a", owner: "u" }],
-    });
-    s.runSavings(app, "u");
-    expect(app.saved.map((r) => r.fields.amount)).toEqual([1000]);
-  });
-
-  test("en un compartido, cada parte la aporta el dueño de su cuenta", () => {
-    at("2026-09-26");
-    const app = fakeApp({
-      savings: [{ id: "s", owner: "u", monthly_amount: 1000, day_of_month: 1, allocations: [{ account: "mia", percent: 50 }, { account: "suya", percent: 50 }] }],
-      accounts: [
-        { id: "mia", owner: "u" },
-        { id: "suya", owner: "otra" },
-      ],
-    });
-    s.runSavings(app, "u");
-    expect(app.saved.map((r) => [r.fields.account, r.fields.created_by, r.fields.amount])).toEqual([
-      ["mia", "u", 500],
-      ["suya", "otra", 500],
+    expect(app.saved.map((r) => r.fields)).toEqual([
+      expect.objectContaining({ account: "b", created_by: "u", amount: 100000, external_id: "auto:2026-09:b" }),
     ]);
+  });
+
+  test("sin aportes antes, queda sin cuenta", () => {
+    at("2026-09-26");
+    const app = fakeApp({ savings: [{ id: "s", owner: "u", monthly_amount: 1000, day_of_month: 1 }] });
+    s.runSavings(app, "u");
+    expect(app.saved[0].fields.account).toBeUndefined();
+    expect(app.saved[0].fields.external_id).toBe("auto:2026-09:sin-cuenta");
+  });
+
+  test("uno por mes, también si el de este mes se hizo con el reparto de antes", () => {
+    at("2026-09-26");
+    const app = fakeApp({
+      savings: [{ id: "s", owner: "u", monthly_amount: 1000, day_of_month: 1 }],
+      saving_movements: [{ saving: "s", account: "a", created_by: "u", amount: 500, external_id: "auto:2026-09:a" }],
+    });
+    s.runSavings(app, "u");
+    s.runSavings(app, "u");
+    expect(app.saved.length).toBe(0);
   });
 
   test("antes de su día no aporta", () => {

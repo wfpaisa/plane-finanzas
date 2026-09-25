@@ -1,7 +1,8 @@
 <!--
-  Ahorros: bolsillos con aporte mensual, repartidos entre cuentas y, si se
-  quiere, compartidos con otras personas. Cada uno con su simulador: cuánto
-  habrá en N meses y cuándo se llega a la meta.
+  Ahorros: bolsillos con aporte mensual y, si se quiere, compartidos con
+  otras personas. Arriba la tabla, y cada ahorro se abre en sus abonos y
+  retiros; debajo, la gráfica de lo marcado: lo que ha tenido y cuánto habrá
+  en N meses.
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
@@ -21,33 +22,68 @@
   import { colorOf } from "../lib/palettes";
   import { pb, session } from "../lib/pb.svelte";
   import { reload, store } from "../lib/store.svelte";
-  import type { Saving } from "../lib/types";
+  import type { Saving, SavingMovement } from "../lib/types";
 
   let formOpen = $state(false);
   let editing = $state<Saving | null>(null);
   let movOpen = $state(false);
   let movSaving = $state<Saving | null>(null);
+  let movEditing = $state<SavingMovement | null>(null);
+
+  /** Registrar uno nuevo (`m` vacío) o corregir `m`. */
+  function openMovement(s: Saving | null, m: SavingMovement | null = null) {
+    movSaving = s;
+    movEditing = m;
+    movOpen = true;
+  }
+
+  /** Quien lo hizo o el dueño del ahorro, como en las reglas de la colección. */
+  const canEdit = (m: SavingMovement) => m.created_by === session.id || store.saving(m.saving)?.owner === session.id;
   let showArchived = $state(false);
   let horizon = $state(24);
 
-  // Abrir o cerrar "Abonos y retiros" se recuerda en este navegador.
-  const MOVS_KEY = "finanzas-ahorros-movs";
-  let showMovs = $state(readShowMovs());
-  function readShowMovs() {
+  // Los ahorros abiertos en la tabla (con sus abonos y retiros debajo). Se
+  // recuerdan en este navegador.
+  const OPEN_KEY = "finanzas-ahorros-abiertos";
+  const opened = new SvelteSet<string>(readOpened());
+  function readOpened(): string[] {
     try {
-      return localStorage.getItem(MOVS_KEY) !== "0";
+      return JSON.parse(localStorage.getItem(OPEN_KEY) ?? "[]");
     } catch {
-      return true;
+      return [];
     }
   }
-  function toggleMovs() {
-    showMovs = !showMovs;
+  function toggleOpen(id: string) {
+    if (opened.has(id)) opened.delete(id);
+    else opened.add(id);
     try {
-      localStorage.setItem(MOVS_KEY, showMovs ? "1" : "0");
+      localStorage.setItem(OPEN_KEY, JSON.stringify([...opened]));
     } catch {
       // Sin almacenamiento, vale para esta visita.
     }
   }
+
+  /**
+   * Los movimientos de cada ahorro, del más nuevo al más viejo, con lo que
+   * tenía el ahorro después de cada uno: así se lee cómo llegó a su total.
+   */
+  const movsBySaving = $derived.by(() => {
+    const map = new Map<string, { m: SavingMovement; after: number }[]>();
+    // store.movements viene del más nuevo al más viejo: la suma corre al revés.
+    const run = new Map<string, number>();
+    for (let i = store.movements.length - 1; i >= 0; i--) {
+      const m = store.movements[i];
+      const after = (run.get(m.saving) ?? 0) + m.amount;
+      run.set(m.saving, after);
+      let list = map.get(m.saving);
+      if (!list) map.set(m.saving, (list = []));
+      list.unshift({ m, after });
+    }
+    return map;
+  });
+  // Muchos movimientos: los últimos, y el resto con "Ver todos".
+  const SHOWN = 8;
+  const expandedAll = new SvelteSet<string>();
 
   const list = $derived(store.savings.filter((s) => showArchived || !s.archived));
   const totalSaved = $derived(store.activeSavings.reduce((s, x) => s + store.savingCurrent(x.id), 0));
@@ -80,15 +116,8 @@
     else excluded.clear();
   }
 
-  // "Abonos y retiros" lista lo de todos los ahorros que están en la gráfica.
   const selIds = $derived(new Set(simulated.map((s) => s.id)));
   const selCurrent = $derived(simulated.reduce((a, s) => a + store.savingCurrent(s.id), 0));
-  const selMovs = $derived(store.movements.filter((m) => selIds.has(m.saving)));
-  const byAccount = $derived.by(() => {
-    const map = new Map<string, number>();
-    for (const m of selMovs) map.set(m.account, (map.get(m.account) ?? 0) + m.amount);
-    return [...map.entries()].filter(([, v]) => v !== 0);
-  });
 
   const valueAt = (s: Saving, months: number) =>
     futureValue(store.savingCurrent(s.id), s.monthly_amount || 0, s.annual_rate || 0, months);
@@ -279,6 +308,11 @@
     }
   }
 
+  function movsCount(id: string) {
+    const n = movsBySaving.get(id)?.length ?? 0;
+    return n ? `${n} ${n === 1 ? "movimiento" : "movimientos"}` : "Sin movimientos";
+  }
+
   const accountName = (id: string) => store.account(id)?.name ?? (id ? "Cuenta de otra persona" : "Sin cuenta");
 </script>
 
@@ -295,6 +329,202 @@
   </header>
 
   <div class="stack">
+    {#if list.length}
+      <div class="sv-table-wrap card">
+        <table class="sv-table">
+          <thead>
+            <tr>
+              <th class="sv-check">
+                <button
+                  type="button"
+                  class="sv-plot"
+                  class:on={allOn}
+                  class:some={!allOn && simulated.length > 0}
+                  aria-pressed={allOn}
+                  aria-label={allOn ? "Ocultar todos de la gráfica" : "Agregar todos a la gráfica"}
+                  data-tip={allOn ? "Ocultar todos de la gráfica" : "Agregar todos a la gráfica"}
+                  onclick={toggleAll}
+                >
+                  <Icon name="activity-01" size={16} />
+                </button>
+              </th>
+              <th>Ahorro</th>
+              <th class="num">Al mes</th>
+              <th>Cuentas</th>
+              <th class="sv-goal-col">Meta</th>
+              <th class="num">Ahorrado</th>
+              <th><span class="sr-only">Acciones</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each list as s (s.id)}
+              {@const current = store.savingCurrent(s.id)}
+              {@const e = eta(s, current)}
+              {@const pct = s.target_amount ? Math.min(100, Math.max(0, (current / s.target_amount) * 100)) : 0}
+              <tr class:sv-archived={s.archived}>
+                <td class="sv-check">
+                  <button
+                    type="button"
+                    class="sv-plot"
+                    class:on={selIds.has(s.id)}
+                    aria-pressed={selIds.has(s.id)}
+                    aria-label={selIds.has(s.id) ? `Ocultar ${s.name} de la gráfica` : `Agregar ${s.name} a la gráfica`}
+                    data-tip={selIds.has(s.id) ? "Ocultar de la gráfica" : "Agregar a la gráfica"}
+                    onclick={() => toggle(s)}
+                  >
+                    <Icon name="activity-01" size={16} />
+                  </button>
+                </td>
+                <td class="sv-name">
+                  <!-- Abre o cierra sus abonos y retiros, debajo de la fila. -->
+                  <button type="button" class="sv-toggle" aria-expanded={opened.has(s.id)} aria-controls="sv-movs-{s.id}" onclick={() => toggleOpen(s.id)}>
+                    <Icon name="arrow-right-01" size={14} class="sv-chevron" />
+                    <span class="sv-ico"><Icon name={s.icon || "piggy-bank"} size={15} /></span>
+                    <span class="sv-name-text">
+                      <span class="sv-title">{s.name}<ColorDot color={s.palette} /></span>
+                      <span class="sv-sub">{movsCount(s.id)}</span>
+                    </span>
+                  </button>
+                  {#if s.members?.length || s.owner !== session.id}
+                    <span class="sv-mark" data-tip="Compartido"><Icon name="user-multiple" size={14} /></span>
+                  {/if}
+                </td>
+                <td class="num sv-cell">
+                  <Money value={s.monthly_amount} />
+                  <span class="sv-sub">
+                    {s.annual_rate ? `${s.annual_rate}% anual` : ""}{s.annual_rate && s.auto ? " · " : ""}{s.auto ? "automático" : ""}
+                  </span>
+                </td>
+                <td class="sv-cell">
+                  <!-- Dónde está, según sus movimientos. -->
+                  {#if store.savingAccounts(s.id).length}
+                    <span class="alloc-chips">
+                      {#each store.savingAccounts(s.id) as a (a.account)}
+                        {@const acc = store.account(a.account)}
+                        <span class="alloc-chip"
+                          ><i style:background={colorOf(acc?.palette)}></i>{a.account ? (acc?.name ?? "Otra cuenta") : "Sin cuenta"}
+                          <Money value={a.amount} /></span
+                        >
+                      {/each}
+                    </span>
+                  {:else}—{/if}
+                </td>
+                <td class="sv-goal-col sv-cell">
+                  {#if s.target_amount}
+                    <span class="sv-goal">
+                      <span class="sv-goal-top"><span>{Math.round(pct)}% de <Money value={s.target_amount} /></span></span>
+                      <span class="bar-track"><span style:width="{pct}%" style:background={colorOf(s.palette)}></span></span>
+                      <span class="sv-sub">
+                        {#if e && e.months === 0}Objetivo alcanzado{:else if e}Fecha estimada: {monthLabel(e.month)}{:else}Define un aporte para calcular la fecha estimada{/if}
+                      </span>
+                    </span>
+                  {:else}—{/if}
+                </td>
+                <td class="num sv-amount"><Money value={current} /></td>
+                <td class="sv-actions">
+                  <span>
+                    <Button size="sm" variant="secondary" onclick={() => openMovement(s)}><Icon name="add-circle" />Movimiento</Button>
+                    <Button size="sm" variant="ghost" aria-label="Editar" onclick={() => ((editing = s), (formOpen = true))}><Icon name="edit-02" /></Button>
+                  </span>
+                </td>
+              </tr>
+              {#if opened.has(s.id)}
+                {@const movs = movsBySaving.get(s.id) ?? []}
+                <tr class="sv-detail" class:sv-archived={s.archived} id="sv-movs-{s.id}">
+                  <td colspan="7">
+                    {#if movs.length}
+                      <table class="movs" aria-label="Abonos y retiros de {s.name}">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Movimiento</th>
+                            <th>Cuenta</th>
+                            <th class="num">Valor</th>
+                            <th class="num"><span data-tip="Lo que tenía el ahorro después de este movimiento">Quedó en</span></th>
+                            <th><span class="sr-only">Acciones</span></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {#each expandedAll.has(s.id) ? movs : movs.slice(0, SHOWN) as { m, after } (m.id)}
+                            {@const acc = store.account(m.account)}
+                            <!-- Toda la fila abre el movimiento para corregirlo; el de otra persona solo se ve. -->
+                            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+                            <tr class:editable={canEdit(m)} onclick={() => canEdit(m) && openMovement(s, m)}>
+                              <td class="mov-date">{dateShort(m.date)} {m.date.slice(0, 4)}</td>
+                              <td class="mov-what">
+                                <span class="mov-kind" class:out={m.amount < 0}>
+                                  <Icon name={m.amount < 0 ? "trade-down" : "trade-up"} size={13} />{m.amount < 0 ? "Retiro" : "Aporte"}
+                                </span>
+                                {#if m.note && m.note !== "Aporte" && m.note !== "Retiro"}<span class="mov-note">{m.note}</span>{/if}
+                              </td>
+                              <td class="mov-acc">
+                                <span class="alloc-chip"><i style:background={colorOf(acc?.palette)}></i>{accountName(m.account)}</span>
+                              </td>
+                              <td class="num"><Money value={m.amount} tone="auto" /></td>
+                              <td class="num mov-after"><Money value={after} /></td>
+                              <td class="mov-actions">
+                                {#if canEdit(m)}
+                                  <button
+                                    type="button"
+                                    class="btn-icon sm"
+                                    aria-label="Modificar"
+                                    data-tip="Modificar"
+                                    onclick={(e) => {
+                                      e.stopPropagation();
+                                      openMovement(s, m);
+                                    }}><Icon name="edit-02" size={14} /></button
+                                  >
+                                  <button
+                                    type="button"
+                                    class="btn-icon sm"
+                                    aria-label="Borrar"
+                                    data-tip="Borrar"
+                                    onclick={(e) => {
+                                      e.stopPropagation();
+                                      removeMovement(m.id);
+                                    }}><Icon name="delete-02" size={14} /></button
+                                  >
+                                {/if}
+                              </td>
+                            </tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                      {#if movs.length > SHOWN && !expandedAll.has(s.id)}
+                        <button type="button" class="link small mov-more" onclick={() => expandedAll.add(s.id)}>Ver los {movs.length} movimientos</button>
+                      {/if}
+                    {:else}
+                      <p class="mov-empty">
+                        Todavía no hay abonos ni retiros.
+                        <button type="button" class="link" onclick={() => openMovement(s)}>Registrar el primero</button>
+                      </p>
+                    {/if}
+                  </td>
+                </tr>
+              {/if}
+            {/each}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">
+                {allOn ? list.length : `${simulated.length} de ${list.length}`}
+                {list.length === 1 ? "ahorro" : "ahorros"}
+              </td>
+              <td class="num"><Money value={simMonthly} /></td>
+              <td></td>
+              <td class="sv-goal-col"></td>
+              <td class="num"><Money value={selCurrent} /></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    {:else}
+      <div class="card empty-card">
+        No hay ahorros registrados. Crea uno y define cuánto guardarás al mes.
+      </div>
+    {/if}
+
     {#if list.length && !selected}
       <div class="card empty-card">Marca al menos un ahorro en la tabla para verlo en la gráfica.</div>
     {/if}
@@ -346,173 +576,13 @@
         </div>
       </div>
     {/if}
-
-    {#if list.length}
-      <div class="sv-table-wrap card">
-        <table class="sv-table">
-          <thead>
-            <tr>
-              <th class="sv-check">
-                <input
-                  type="checkbox"
-                  aria-label="Marcar todos"
-                  checked={allOn}
-                  indeterminate={!allOn && simulated.length > 0}
-                  onchange={toggleAll}
-                />
-              </th>
-              <th>Ahorro</th>
-              <th class="num">Al mes</th>
-              <th>Cuentas</th>
-              <th class="sv-goal-col">Meta</th>
-              <th class="num">Ahorrado</th>
-              <th><span class="sr-only">Acciones</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each list as s (s.id)}
-              {@const current = store.savingCurrent(s.id)}
-              {@const e = eta(s, current)}
-              {@const pct = s.target_amount ? Math.min(100, Math.max(0, (current / s.target_amount) * 100)) : 0}
-              <tr class:sv-archived={s.archived}>
-                <td class="sv-check">
-                  <input type="checkbox" aria-label="Ver {s.name} en la gráfica" checked={selIds.has(s.id)} onchange={() => toggle(s)} />
-                </td>
-                <td class="sv-name">
-                  <span class="sv-ico"><Icon name={s.icon || "piggy-bank"} size={15} /></span>
-                  <span class="sv-title">{s.name}</span>
-                  <ColorDot color={s.palette} />
-                  {#if s.members?.length || s.owner !== session.id}
-                    <span class="sv-mark" data-tip="Compartido"><Icon name="user-multiple" size={14} /></span>
-                  {/if}
-                </td>
-                <td class="num sv-cell">
-                  <Money value={s.monthly_amount} />
-                  <span class="sv-sub">
-                    {s.annual_rate ? `${s.annual_rate}% anual` : ""}{s.annual_rate && s.auto ? " · " : ""}{s.auto ? "automático" : ""}
-                  </span>
-                </td>
-                <td class="sv-cell">
-                  {#if s.allocations?.length}
-                    <span class="alloc-chips">
-                      <!-- Por posición: un reparto viejo puede repetir cuenta. -->
-                      {#each s.allocations as a, i (i)}
-                        {@const acc = store.account(a.account)}
-                        <span class="alloc-chip"><i style:background={colorOf(acc?.palette)}></i>{acc?.name ?? "Otra cuenta"} {a.percent}%</span>
-                      {/each}
-                    </span>
-                  {:else}—{/if}
-                </td>
-                <td class="sv-goal-col sv-cell">
-                  {#if s.target_amount}
-                    <span class="sv-goal">
-                      <span class="sv-goal-top"><span>{Math.round(pct)}% de <Money value={s.target_amount} /></span></span>
-                      <span class="bar-track"><span style:width="{pct}%" style:background={colorOf(s.palette)}></span></span>
-                      <span class="sv-sub">
-                        {#if e && e.months === 0}Objetivo alcanzado{:else if e}Fecha estimada: {monthLabel(e.month)}{:else}Define un aporte para calcular la fecha estimada{/if}
-                      </span>
-                    </span>
-                  {:else}—{/if}
-                </td>
-                <td class="num sv-amount"><Money value={current} /></td>
-                <td class="sv-actions">
-                  <span>
-                    <Button size="sm" variant="secondary" onclick={() => ((movSaving = s), (movOpen = true))}><Icon name="add-circle" />Aportar</Button>
-                    <Button size="sm" variant="ghost" aria-label="Editar" onclick={() => ((editing = s), (formOpen = true))}><Icon name="edit-02" /></Button>
-                  </span>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="2">
-                {allOn ? list.length : `${simulated.length} de ${list.length}`}
-                {list.length === 1 ? "ahorro" : "ahorros"}
-              </td>
-              <td class="num"><Money value={simMonthly} /></td>
-              <td></td>
-              <td class="sv-goal-col"></td>
-              <td class="num"><Money value={selCurrent} /></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    {:else}
-      <div class="card empty-card">
-        No hay ahorros registrados. Crea uno y define el aporte mensual y las cuentas donde se guardará.
-      </div>
-    {/if}
-
-
-    {#if selected}
-      <div class="card">
-        <div class="card-head">
-          <div>
-            <h3 class="card-title">Abonos y retiros</h3>
-            <p class="card-sub">
-              <Money value={selCurrent} /> en {byAccount.length === 1 ? "1 cuenta" : `${byAccount.length} cuentas`} · {selMovs.length}
-              {selMovs.length === 1 ? "movimiento" : "movimientos"}
-            </p>
-          </div>
-          <div class="card-head-actions">
-            <Button size="sm" onclick={() => ((movSaving = selected), (movOpen = true))}><Icon name="add-01" />Movimiento</Button>
-            <Button size="sm" variant="ghost" aria-expanded={showMovs} aria-controls="saving-movs" onclick={toggleMovs}>
-              <Icon name={showMovs ? "arrow-up-01" : "arrow-down-01"} />{showMovs ? "Ocultar" : "Mostrar"}
-            </Button>
-          </div>
-        </div>
-        {#if showMovs}
-          <div class="card-body" id="saving-movs">
-            <div class="by-account">
-              {#each byAccount as [acc, amount] (acc)}
-                <div class="bar-row">
-                  <span class="acc-name"><i style:background={colorOf(store.account(acc)?.palette)}></i>{accountName(acc)}</span>
-                  <Money value={amount} />
-                </div>
-              {/each}
-            </div>
-            <p class="eyebrow mov-title">Movimientos</p>
-            <ul class="movs">
-              {#each selMovs.slice(0, 30) as m (m.id)}
-                <li>
-                  <span class="mov-date">{dateShort(m.date)}</span>
-                  <span class="mov-main">
-                    <span>{m.note || (m.amount >= 0 ? "Aporte" : "Retiro")}</span>
-                    <span class="small muted">
-                      {#if multi}{store.saving(m.saving)?.name} · {/if}{accountName(m.account)}
-                    </span>
-                  </span>
-                  <Money value={m.amount} tone="auto" />
-                  {#if m.created_by === session.id || store.saving(m.saving)?.owner === session.id}
-                    <button type="button" class="btn-icon sm" aria-label="Borrar" onclick={() => removeMovement(m.id)}>
-                      <Icon name="delete-02" size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {:else}
-                <li class="muted small">Todavía no hay aportes.</li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-      </div>
-    {/if}
   </div>
 </div>
 
 <SavingForm open={formOpen} saving={editing} onClose={() => (formOpen = false)} />
-<MovementForm open={movOpen} saving={movSaving} onClose={() => (movOpen = false)} />
+<MovementForm open={movOpen} saving={movSaving} movement={movEditing} onClose={() => (movOpen = false)} />
 
 <style>
-  /* Con el ancho completo, las cuentas del reparto van lado a lado. */
-  .by-account {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-    gap: 0 var(--sp-24);
-  }
-
   /* En angosto la tabla se desliza de lado dentro de su tarjeta. */
   .sv-table-wrap {
     padding: 0;
@@ -578,7 +648,9 @@
     }
 
     & .sv-title {
-      margin: 0 var(--sp-6) 0 var(--sp-10);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-6);
       font-weight: 600;
     }
   }
@@ -586,14 +658,38 @@
   .sv-check {
     width: 1%;
     padding-right: 0 !important;
+  }
 
-    & input {
-      display: block;
-      width: 1rem;
-      height: 1rem;
-      margin: 0;
-      accent-color: var(--accent);
-      cursor: pointer;
+  /* Encendido: el ahorro sale en la gráfica. */
+  .sv-plot {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    opacity: 0.35;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--bg-hover);
+      opacity: 1;
+    }
+
+    &.some {
+      color: var(--vivid-blue);
+      opacity: 1;
+    }
+
+    &.on {
+      --on-blue: light-dark(oklch(0.55 0.22 258), oklch(0.7 0.2 255));
+      background: color-mix(in oklab, var(--on-blue) 40%, transparent);
+      box-shadow: inset 0 0 0 1px var(--on-blue);
+      color: light-dark(oklch(0.4 0.2 260), oklch(0.93 0.07 255));
+      opacity: 1;
     }
   }
 
@@ -660,8 +756,7 @@
     gap: var(--sp-6);
   }
 
-  .alloc-chip,
-  .acc-name {
+  .alloc-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
@@ -674,11 +769,6 @@
       border-radius: 50%;
       background: var(--chart-1);
     }
-  }
-
-  .acc-name {
-    font-size: var(--text-sm);
-    color: var(--text-primary);
   }
 
   .sim-row {
@@ -711,39 +801,142 @@
     }
   }
 
-  .mov-title {
-    margin-top: var(--sp-16);
+  /* El nombre abre sus movimientos: la flecha gira al abrir. */
+  .sv-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-8);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    vertical-align: middle;
+
+    & :global(.sv-chevron) {
+      color: var(--text-muted);
+      transition: transform 0.15s;
+    }
+
+    &[aria-expanded="true"] :global(.sv-chevron) {
+      transform: rotate(90deg);
+    }
+
+    &:hover .sv-title {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .sv-name-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* La fila abierta: sus movimientos, en una tabla más chica que ocupa todo
+     el ancho, sin marco: solo las líneas entre filas, de lado a lado. */
+  .sv-table tbody tr.sv-detail > td {
+    padding: 0;
+    border-top: 0;
+    white-space: normal;
+  }
+
+  .sv-table tbody tr:has(+ .sv-detail) > td,
+  .sv-detail > td {
+    background: color-mix(in oklab, var(--accent) 4%, transparent);
   }
 
   .movs {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+    width: 100%;
+    border-collapse: collapse;
 
-    & li {
-      display: flex;
-      align-items: center;
-      gap: var(--sp-10);
-      padding: var(--sp-6) 0;
-      font-size: var(--text-sm);
+    & th {
+      padding: var(--sp-6) var(--sp-12) !important;
+      border-top: var(--border-width) solid var(--border);
+      font-size: 0.6875rem;
+    }
 
-      & + li {
-        border-top: var(--border-width) solid var(--border);
+    & td {
+      padding: var(--sp-6) var(--sp-12) !important;
+      border-top: var(--border-width) solid var(--border);
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+    }
+
+    & tr.editable {
+      cursor: pointer;
+
+      &:hover td {
+        background: var(--bg-hover);
       }
+    }
+
+    & .num :global(.money) {
+      font-weight: 600;
     }
   }
 
   .mov-date {
-    width: 3.5rem;
-    flex: none;
-    font-size: var(--text-xs);
+    width: 1%;
+    color: var(--text-muted) !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mov-what {
+    width: 100%;
+  }
+
+  .mov-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 600;
+    color: var(--success);
+
+    &.out {
+      color: var(--danger);
+    }
+  }
+
+  .mov-note {
+    margin-left: var(--sp-8);
+    color: var(--text-secondary);
+  }
+
+  .mov-after :global(.money) {
+    font-weight: 500 !important;
     color: var(--text-muted);
   }
 
-  .mov-main {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    flex-direction: column;
+  .mov-actions {
+    width: 1%;
+    white-space: nowrap;
+
+    & > .btn-icon {
+      display: inline-grid;
+      vertical-align: middle;
+    }
+
+    & .btn-icon {
+      opacity: 0.6;
+    }
+
+    & .btn-icon:hover {
+      opacity: 1;
+    }
+  }
+
+  .mov-more {
+    margin: 0 var(--sp-12) var(--sp-8);
+  }
+
+  .mov-empty {
+    margin: 0;
+    padding: var(--sp-10) var(--sp-12);
+    border-top: var(--border-width) solid var(--border);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 </style>

@@ -117,6 +117,22 @@ function runRecurring(app, userId) {
   return created;
 }
 
+/**
+ * La cuenta donde el dueño guardó por última vez en ese ahorro: el ahorro no
+ * tiene una cuenta fija, la dice cada movimiento. Sin ninguno, sin cuenta.
+ */
+function lastAccount(app, savingId, owner) {
+  var list = app.findRecordsByFilter(
+    "saving_movements",
+    "saving = {:s} && created_by = {:u} && account != ''",
+    "-date,-created",
+    1,
+    0,
+    { s: savingId, u: owner },
+  );
+  return list.length ? list[0].getString("account") : "";
+}
+
 function runSavings(app, userId) {
   var t = todayCo();
   var ym = t.y + "-" + pad(t.m);
@@ -131,61 +147,23 @@ function runSavings(app, userId) {
     if (t.d < dom) continue;
     var date = ym + "-" + pad(dom);
     var monthly = s.getFloat("monthly_amount");
-    var alloc = [];
-    try {
-      alloc = JSON.parse(s.getString("allocations") || "[]") || [];
-    } catch (_) {
-      alloc = [];
-    }
-    if (!alloc.length) alloc = [{ account: "", percent: 100 }];
-    // Una parte por cuenta: la marca del aporte es por cuenta y mes, así que
-    // un reparto viejo que repite cuenta solo haría la primera.
-    var byAccount = {};
-    var parts = [];
-    for (var p = 0; p < alloc.length; p++) {
-      var acc = String(alloc[p].account || "");
-      if (!(acc in byAccount)) {
-        byAccount[acc] = parts.length;
-        parts.push({ account: acc, percent: 0 });
-      }
-      parts[byAccount[acc]].percent += Math.max(0, +alloc[p].percent || 0);
-    }
-    alloc = parts;
-    // Cada parte es su porcentaje del aporte, en pesos enteros que suman
-    // justo lo que toca: con 33/33/34 no se pierde ni se inventa un peso.
-    var pcts = alloc.map(function (x) {
-      return x.percent;
-    });
-    var pctSum = pcts.reduce(function (acc, p) {
-      return acc + p;
-    }, 0);
-    var amounts = splitByPercent((monthly * pctSum) / 100, pcts);
+    var owner = s.getString("owner");
+    // Uno por ahorro y mes. Los de antes llevaban la cuenta en la marca
+    // ("auto:<mes>:<cuenta>"): cualquiera de ese mes cuenta.
+    if (has(app, "saving_movements", "saving = {:s} && external_id ~ {:k}", { s: s.id, k: "auto:" + ym + ":" })) continue;
+    var account = lastAccount(app, s.id, owner);
+    var key = "auto:" + ym + ":" + (account || "sin-cuenta");
 
-    for (var j = 0; j < alloc.length; j++) {
-      var a = alloc[j];
-      if (pcts[j] <= 0 || !amounts[j]) continue;
-      var key = "auto:" + ym + ":" + (a.account || "sin-cuenta");
-      if (has(app, "saving_movements", "saving = {:s} && external_id = {:k}", { s: s.id, k: key })) continue;
-      var creator = s.getString("owner");
-      // El aporte lo hace el dueño de la cuenta, que puede ser un miembro.
-      if (a.account) {
-        try {
-          creator = app.findRecordById("accounts", a.account).getString("owner");
-        } catch (_) {
-          continue;
-        }
-      }
-      var mv = new Record(col);
-      mv.set("saving", s.id);
-      if (a.account) mv.set("account", a.account);
-      mv.set("created_by", creator);
-      mv.set("amount", amounts[j]);
-      mv.set("date", date + " 12:00:00.000Z");
-      mv.set("note", "Aporte automático");
-      mv.set("external_id", key);
-      app.save(mv);
-      created++;
-    }
+    var mv = new Record(col);
+    mv.set("saving", s.id);
+    if (account) mv.set("account", account);
+    mv.set("created_by", owner);
+    mv.set("amount", Math.round(monthly));
+    mv.set("date", date + " 12:00:00.000Z");
+    mv.set("note", "Aporte automático");
+    mv.set("external_id", key);
+    app.save(mv);
+    created++;
   }
   return created;
 }
