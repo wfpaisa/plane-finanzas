@@ -327,8 +327,8 @@
   const MORE = [
     { href: "#/ahorros", label: "Ahorros", icon: "piggy-bank" },
     { href: "#/proyeccion", label: "Plan futuro", icon: "chart-line-data-01" },
-    { href: "#/importar", label: "Importar", icon: "mail-01" },
-    { href: "#/ajustes", label: "Ajustes y categorías", icon: "settings-01" },
+    { href: "#/ajustes?seccion=gmail", label: "Gmail", icon: "mail-01" },
+    { href: "#/ajustes?seccion=categorias", label: "Ajustes y categorías", icon: "settings-01" },
   ];
 </script>
 

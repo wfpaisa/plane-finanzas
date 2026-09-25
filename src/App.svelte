@@ -17,7 +17,6 @@
   import { txModal } from "./lib/ui.svelte";
   import Accounts from "./routes/Accounts.svelte";
   import Dashboard from "./routes/Dashboard.svelte";
-  import Import from "./routes/Import.svelte";
   import Login from "./routes/Login.svelte";
   import Mobile from "./routes/Mobile.svelte";
   import Plan from "./routes/Plan.svelte";
@@ -33,7 +32,6 @@
     { path: "/estados", label: "Análisis", icon: "pie-chart", mobile: true },
     { path: "/ahorros", label: "Ahorros", icon: "piggy-bank", mobile: false },
     { path: "/proyeccion", label: "Plan futuro", icon: "chart-line-data-01", mobile: false },
-    { path: "/importar", label: "Importar", icon: "mail-01", mobile: false },
     { path: "/ajustes", label: "Ajustes", icon: "settings-01", mobile: false },
   ];
 
@@ -44,11 +42,16 @@
     "/estados": Reports,
     "/ahorros": Savings,
     "/proyeccion": Plan,
-    "/importar": Import,
     "/ajustes": Settings,
   } as Record<string, typeof Dashboard>;
 
   const Page = $derived(PAGES[route.path] ?? Dashboard);
+
+  // Importar ahora es la pestaña Gmail de Ajustes; los enlaces viejos y la
+  // vuelta de Google (`?gmail=…`) llegan allá.
+  $effect(() => {
+    if (route.path === "/importar") go("/ajustes", { seccion: "gmail", gmail: route.query.get("gmail") ?? undefined });
+  });
 
   // En el teléfono la app abre en su vista (`#/m`), salvo que la persona haya
   // elegido la completa; y quien eligió la del teléfono vuelve a ella.
@@ -76,7 +79,7 @@
   const onKey = keys({
     n: () => session.user && route.path !== "/m" && txModal.new(),
     "?": () => session.user && (helpOpen = true),
-    // 1 … 8: las pantallas en el orden del menú.
+    // 1 … 7: las pantallas en el orden del menú.
     ...Object.fromEntries(NAV.map((item, i) => [String(i + 1), () => session.user && route.path !== "/m" && go(item.path)])),
   });
   const knownTags = $derived([...new Set(["fijo", "revisar", "viaje", "trabajo", "casa", "salud", "regalo", ...categoryTags()])]);

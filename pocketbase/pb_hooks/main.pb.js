@@ -111,13 +111,13 @@ routerAdd("GET", "/api/finanzas/gmail/callback", (e) => {
   const code = e.request.url.query().get("code");
   const state = e.request.url.query().get("state");
   const denied = e.request.url.query().get("error");
-  if (denied || !code || !state) return e.redirect(302, `${web}/#/importar?gmail=cancelado`);
+  if (denied || !code || !state) return e.redirect(302, `${web}/#/ajustes?seccion=gmail&gmail=cancelado`);
 
   let conn;
   try {
     conn = e.app.findFirstRecordByFilter("gmail_connections", "oauth_state = {:s}", { s: state });
   } catch (_) {
-    return e.redirect(302, `${web}/#/importar?gmail=estado-invalido`);
+    return e.redirect(302, `${web}/#/ajustes?seccion=gmail&gmail=estado-invalido`);
   }
   try {
     const tokens = gmail.exchangeCode(code);
@@ -131,9 +131,9 @@ routerAdd("GET", "/api/finanzas/gmail/callback", (e) => {
   } catch (err) {
     conn.set("last_error", String(err).slice(0, 2000));
     e.app.save(conn);
-    return e.redirect(302, `${web}/#/importar?gmail=error`);
+    return e.redirect(302, `${web}/#/ajustes?seccion=gmail&gmail=error`);
   }
-  return e.redirect(302, `${web}/#/importar?gmail=ok`);
+  return e.redirect(302, `${web}/#/ajustes?seccion=gmail&gmail=ok`);
 });
 
 routerAdd(

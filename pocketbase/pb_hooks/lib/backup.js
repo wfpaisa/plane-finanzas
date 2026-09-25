@@ -4,8 +4,11 @@
  *
  * Los ids no viajan tal cual: al importar cada registro se crea con un id
  * nuevo y las relaciones se traducen, así el mismo respaldo sirve para otra
- * cuenta u otro servidor. Los adjuntos de las transacciones (archivos) no se
- * exportan, ni el token de Gmail: la conexión se queda como está.
+ * cuenta u otro servidor. Los adjuntos no van en este JSON: aquí solo sus
+ * nombres, y la app los descarga y los empaca junto a él en un zip (ver
+ * src/lib/backupZip.ts); al importar, `files` le dice a qué movimiento nuevo
+ * subir los de cada uno. El token de Gmail tampoco viaja: la conexión se
+ * queda como está. Del usuario viajan su nombre y su color de fondo.
  *
  * Los ahorros compartidos: se exportan y se borran los propios. En los ajenos
  * no se toca nada, tampoco los aportes que uno hizo ahí.
@@ -43,7 +46,15 @@ function exportData(app, userId) {
   var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     data[names[i]] = own(app, names[i], userId).map(function (r) {
-      return plainOf(r, FIELDS[names[i]]);
+      var row = plainOf(r, FIELDS[names[i]]);
+      // El posible repetido apunta a otro movimiento: al importar se
+      // reconecta cuando ya están todos.
+      if (names[i] === "transactions" && r.getString("dup_of")) row.dup_of = r.getString("dup_of");
+      if (names[i] === "transactions") {
+        var files = r.getStringSlice("attachments");
+        if (files.length) row.attachments = files;
+      }
+      return row;
     });
   }
   data.saving_movements = app
@@ -62,6 +73,7 @@ function exportData(app, userId) {
   data.gmail = gmail;
 
   var user = app.findRecordById("users", userId);
+  data.profile = { name: user.getString("name"), tint: user.getString("tint") };
   return {
     app: "finanzas",
     version: VERSION,
@@ -147,7 +159,7 @@ function restoreData(app, userId, data, counts) {
     clean(tx, userId);
 
     // viejo id -> nuevo id, por colección.
-    var ids = { categories: {}, accounts: {}, savings: {}, rules: {} };
+    var ids = { categories: {}, accounts: {}, savings: {}, rules: {}, transactions: {} };
     function map(name, id) {
       return id ? ids[name][id] || "" : "";
     }
@@ -194,6 +206,21 @@ function restoreData(app, userId, data, counts) {
       r.set("category", map("categories", row.category));
       r.set("rule", map("rules", row.rule));
     });
+    // Para subir los adjuntos: viejo id -> nuevo, de los que traen alguno.
+    counts.files = {};
+    (data.transactions || []).forEach(function (row) {
+      if (row.attachments && row.attachments.length) counts.files[row.id] = map("transactions", row.id);
+    });
+
+    // Los posibles repetidos sin resolver, ya con los ids nuevos de los dos.
+    (data.transactions || []).forEach(function (row) {
+      var mine = map("transactions", row.id);
+      var twin = map("transactions", row.dup_of);
+      if (!mine || !twin) return;
+      var r = tx.findRecordById("transactions", mine);
+      r.set("dup_of", twin);
+      tx.save(r);
+    });
     insert("savings", data.savings, function (r, row) {
       r.set(
         "members",
@@ -218,6 +245,14 @@ function restoreData(app, userId, data, counts) {
 
     // Lo borrado a propósito; los respaldos de antes no lo traen.
     insert("ignored_imports", data.ignored_imports);
+
+    // Nombre y color de fondo; los respaldos de antes no los traen.
+    if (data.profile) {
+      var u = tx.findRecordById("users", userId);
+      if (data.profile.name) u.set("name", data.profile.name);
+      u.set("tint", data.profile.tint || "");
+      tx.save(u);
+    }
 
     if (data.gmail) {
       try {

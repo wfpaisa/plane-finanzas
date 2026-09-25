@@ -11,13 +11,14 @@
   import IconSelect from "../components/app/IconSelect.svelte";
   import MoneyInput from "../components/app/MoneyInput.svelte";
   import Money from "../components/app/Money.svelte";
-  import RulesCard from "../components/app/RulesCard.svelte";
   import Segmented from "../components/app/Segmented.svelte";
   import TagInput from "../components/app/TagInput.svelte";
   import TintPicker from "../components/app/TintPicker.svelte";
   import Icon from "../components/Icon.svelte";
+  import Import from "./Import.svelte";
   import { Button, ConfirmDialog, Field, Input, Modal, Textarea } from "../components/ui";
   import Tag, { type Tone } from "../components/ui/Tag.svelte";
+  import type { Backup, BackupFiles } from "../lib/backupZip";
   import type { Kind } from "../lib/finance";
   import { notify } from "../lib/notify.svelte";
   import { pb, session } from "../lib/pb.svelte";
@@ -28,17 +29,18 @@
   import type { Category } from "../lib/types";
 
   const SECTIONS = [
-    { id: "categorias", label: "Categorías", icon: "tag-01" },
-    { id: "reglas", label: "Reglas", icon: "flash" },
-    { id: "apariencia", label: "Apariencia", icon: "paint-board" },
     { id: "cuenta", label: "Cuenta y datos", icon: "user-circle" },
+    { id: "categorias", label: "Categorías", icon: "tag-01" },
+    { id: "gmail", label: "Gmail", icon: "mail-01" },
   ] as const;
   type Section = (typeof SECTIONS)[number]["id"];
 
   const section = $derived.by<Section>(() => {
     const s = route.query.get("seccion");
     if (SECTIONS.some((x) => x.id === s)) return s as Section;
-    return route.query.get("regla") ? "reglas" : "categorias";
+    // Reglas e Importar eran pestañas; ahora van en Gmail.
+    if (s === "reglas" || s === "importar" || route.query.get("regla")) return "gmail";
+    return "cuenta";
   });
 
   let catKind = $state<Kind>("expense");
@@ -77,7 +79,7 @@
   let running = $state(false);
 
   let exporting = $state(false);
-  let backupFile = $state<{ name: string; data: unknown; count: number } | null>(null);
+  let backupFile = $state<{ name: string; data: Backup; files: BackupFiles; count: number; attachments: number } | null>(null);
   let restoring = $state(false);
   let confirmClean = $state(false);
   let cleaning = $state(false);
@@ -164,11 +166,11 @@
   async function exportBackup() {
     exporting = true;
     try {
-      const data = await pb.send("/api/finanzas/backup", { method: "GET" });
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const { exportZip } = await import("../lib/backupZip");
+      const blob = await exportZip();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `finanzas-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `finanzas-${new Date().toISOString().slice(0, 10)}.zip`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err) {
@@ -181,11 +183,13 @@
   async function pickBackup(file: File | undefined) {
     if (!file) return;
     try {
-      const data = JSON.parse(await file.text());
-      if (data?.app !== "finanzas" || !data.data) throw new Error("El archivo no es un respaldo de Finanzas.");
-      backupFile = { name: file.name, data, count: data.data.transactions?.length ?? 0 };
+      const { readBackup } = await import("../lib/backupZip");
+      const { backup, files } = await readBackup(file);
+      const count = backup.data.transactions?.length ?? 0;
+      const attachments = [...files.values()].reduce((n, l) => n + l.length, 0);
+      backupFile = { name: file.name, data: backup, files, count, attachments };
     } catch (err) {
-      notify.fail(err instanceof SyntaxError ? new Error("El archivo no es un JSON válido.") : err);
+      notify.fail(err);
     } finally {
       if (fileInput) fileInput.value = "";
     }
@@ -195,11 +199,23 @@
     if (!backupFile) return;
     restoring = true;
     try {
-      const r = await pb.send<{ transactions: number; accounts: number }>("/api/finanzas/backup", { method: "POST", body: backupFile.data });
+      const r = await pb.send<{ transactions: number; accounts: number; files?: Record<string, string> }>("/api/finanzas/backup", {
+        method: "POST",
+        body: backupFile.data,
+      });
+      let failed = 0;
+      if (backupFile.files.size) {
+        const { uploadFiles } = await import("../lib/backupZip");
+        failed = await uploadFiles(backupFile.files, r.files ?? {});
+      }
+      // El respaldo trae el nombre y el color de fondo: la sesión los recoge.
+      await pb.collection("users").authRefresh();
       await reload();
       touchTransactions();
+      const attachments = backupFile.attachments - failed;
       backupFile = null;
-      notify.done(`Importado: ${r.accounts} cuentas y ${r.transactions} movimientos.`);
+      notify.done(`Importado: ${r.accounts} cuentas y ${r.transactions} movimientos${attachments ? `, con ${attachments} adjuntos` : ""}.`);
+      if (failed) notify.fail(new Error(`${failed} adjuntos no se pudieron subir.`));
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -299,18 +315,8 @@
         {/if}
       </div>
     </div>
-  {:else if section === "reglas"}
-    <RulesCard initialMatch={route.query.get("regla") ?? ""} />
-  {:else if section === "apariencia"}
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h3 class="card-title">Tinte del fondo</h3>
-          <p class="card-sub">El color del fondo de la aplicación, en claro y en oscuro. Se guarda en tu cuenta.</p>
-        </div>
-      </div>
-      <div class="card-body"><TintPicker /></div>
-    </div>
+  {:else if section === "gmail"}
+    <Import />
   {:else}
     <div class="stack">
       <div class="split-even">
@@ -337,14 +343,24 @@
       <div class="card">
         <div class="card-head">
           <div>
+            <h3 class="card-title">Tinte del fondo</h3>
+            <p class="card-sub">El color del fondo de la aplicación, en claro y en oscuro. Se guarda en tu cuenta.</p>
+          </div>
+        </div>
+        <div class="card-body"><TintPicker /></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
             <h3 class="card-title">Datos</h3>
-            <p class="card-sub">Descarga una copia de tus cuentas, categorías, movimientos frecuentes y ahorros. Las facturas, fotos y otros adjuntos no se incluyen.</p>
+            <p class="card-sub">Descarga un zip con todo: cuentas, categorías, movimientos, reglas, ahorros y los adjuntos (facturas, fotos). También puedes importar respaldos .json de antes.</p>
           </div>
         </div>
         <div class="card-body data-actions">
           <Button loading={exporting} onclick={exportBackup}><Icon name="database-export" />Exportar</Button>
           <Button onclick={() => fileInput?.click()}><Icon name="database-import" />Importar</Button>
-          <input bind:this={fileInput} type="file" accept=".json,application/json" hidden onchange={(e) => pickBackup(e.currentTarget.files?.[0])} />
+          <input bind:this={fileInput} type="file" accept=".zip,.json,application/zip,application/json" hidden onchange={(e) => pickBackup(e.currentTarget.files?.[0])} />
           <span class="flex-1"></span>
           <Button variant="ghost" class="btn-danger" onclick={() => (confirmClean = true)}><Icon name="delete-02" />Borrar todo</Button>
         </div>
@@ -419,7 +435,7 @@
   open={!!backupFile}
   onClose={() => (backupFile = null)}
   title="Importar respaldo"
-  message={`${backupFile?.name} contiene ${backupFile?.count} movimientos. Al continuar, reemplazará todos tus datos actuales. Descarga primero una copia si quieres conservarlos.`}
+  message={`${backupFile?.name} contiene ${backupFile?.count} movimientos${backupFile?.attachments ? ` y ${backupFile.attachments} adjuntos` : ""}. Al continuar, reemplazará todos tus datos actuales. Descarga primero una copia si quieres conservarlos.`}
   confirmLabel="Reemplazar todo"
   busy={restoring}
   onConfirm={restoreBackup}

@@ -290,7 +290,7 @@
             <TransactionList items={txs.slice(0, 8)} onOpen={(t) => txModal.edit(t)} />
           {:else if !loading}
             <div class="empty-card">
-              Sin movimientos todavía. Agrega uno con <b>+</b> o <a class="link" href="#/importar">impórtalos de Gmail</a>.
+              Sin movimientos todavía. Agrega uno con <b>+</b> o <a class="link" href="#/ajustes?seccion=gmail">impórtalos de Gmail</a>.
             </div>
           {/if}
         </div>

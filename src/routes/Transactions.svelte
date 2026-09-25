@@ -388,12 +388,13 @@
     <div class="filters-foot">
       <span>Ingresos <Money value={income} tone="income" /></span>
       <span>Gastos <Money value={expense} tone="expense" /></span>
-      <span
-        >Ingresos menos gastos <Money
-          value={income - expense}
-          tone="auto"
-        /></span
-      >
+      <!-- Con filtros el neto confunde: solo se ve una parte de los movimientos. -->
+      {#if !filtered}<span
+          >Ingresos menos gastos <Money
+            value={income - expense}
+            tone="auto"
+          /></span
+        >{/if}
       <span class="pick-hint small"
         ><Icon name="mouse-right-click-01" size={14} />Clic derecho en un
         movimiento para sumarlo</span
