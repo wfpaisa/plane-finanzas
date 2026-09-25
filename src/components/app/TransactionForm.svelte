@@ -259,22 +259,34 @@
 
   {#snippet footer()}
     {#if tx}
-      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}>
-        <Icon name="delete-02" />Borrar
-      </Button>
+      <!--
+        Borrar y Crear regla van en icono, con su globo de ayuda: con el
+        texto, los cuatro botones no caben en la fila y se montaban.
+      -->
+      <button
+        type="button"
+        class="btn-icon foot-icon foot-danger"
+        aria-label="Borrar"
+        data-tip="Borrar"
+        onclick={() => (confirmDelete = true)}
+      >
+        <Icon name="delete-02" size={18} />
+      </button>
       {#if tx.description}
-        <Button
-          variant="ghost"
-          data-tip="Que los movimientos con este texto se categoricen solos"
+        <button
+          type="button"
+          class="btn-icon foot-icon"
+          aria-label="Crear regla"
+          data-tip="Crear regla: que los movimientos con este texto se categoricen solos"
           onclick={() => {
             onClose();
             go("/ajustes", { regla: tx.description });
           }}
         >
-          <Icon name="magic-wand-01" />Crear regla
-        </Button>
+          <Icon name="magic-wand-01" size={18} />
+        </button>
       {/if}
-      <span class="flex-1"></span>
+      <span class="flex-1 foot-break"></span>
     {/if}
     <Button onclick={onClose}>Cancelar</Button>
     <Button variant="secondary" loading={busy} onclick={save}>Guardar</Button>
@@ -295,6 +307,33 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-16);
+  }
+
+  .foot-icon {
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .foot-danger {
+    color: var(--danger);
+  }
+
+  /* En el teléfono no caben los cuatro: Cancelar y Guardar arriba,
+     repartiéndose el ancho, y los iconos en la fila de abajo. */
+  @media (max-width: 30rem) {
+    .foot-break {
+      display: none;
+    }
+
+    .foot-icon {
+      order: 1;
+    }
+
+    :global(.modal-foot:has(.foot-icon) > .btn) {
+      flex: 1 1 calc(50% - 0.3125rem);
+      justify-content: center;
+    }
   }
 
   /* Una sola columna, siempre: un campo debajo del otro. */
