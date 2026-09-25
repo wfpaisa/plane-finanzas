@@ -591,9 +591,34 @@ textarea.field-control {
   border-radius: 1.375rem;
 }
 
+/* La flecha, cerca del borde derecho y a la misma distancia que el texto
+   del izquierdo. Con `base-select` es una pieza más del control (su
+   `::picker-icon`) y basta el relleno normal; sin él, es el fondo dibujado
+   en `components.css` y el texto le deja sitio. */
 .field select,
 select.field-control {
-  padding-right: 2.5rem;
+  padding-right: 2.25rem;
+  background-position: right 0.75rem center;
+  background-size: 1.125rem 1.125rem;
+}
+
+.field.sm select,
+select.field-control.sm {
+  padding-right: 2rem;
+  background-position: right 0.5rem center;
+}
+
+@supports (appearance: base-select) {
+  .field select,
+  select.field-control {
+    padding-right: 0.875rem;
+    background-image: none;
+  }
+
+  .field.sm select,
+  select.field-control.sm {
+    padding-right: 0.625rem;
+  }
 }
 
 .field [aria-invalid="true"],
@@ -628,14 +653,16 @@ select.field-control {
    almohada, en vez de hundirse como los campos donde se escribe. */
 .field select,
 select.field-control {
+  /* `background-color` y no `background`: el atajo borraba la flecha
+     dibujada donde no hay `base-select`. */
   &,
   &:focus {
-    background: var(--bg-field);
+    background-color: var(--bg-field);
     box-shadow: var(--pillow);
   }
 
   &:hover {
-    background: light-dark(oklch(1 0 0), oklch(0.34 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.7));
+    background-color: light-dark(oklch(1 0 0), oklch(0.34 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 230) / 0.7));
   }
 }
 
