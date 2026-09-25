@@ -306,7 +306,7 @@
       <div class="card-head">
         <div>
           <h3 class="card-title">Tinte del fondo</h3>
-          <p class="card-sub">El color del fondo de la aplicación, en claro y en oscuro. Se guarda en este navegador.</p>
+          <p class="card-sub">El color del fondo de la aplicación, en claro y en oscuro. Se guarda en tu cuenta.</p>
         </div>
       </div>
       <div class="card-body"><TintPicker /></div>

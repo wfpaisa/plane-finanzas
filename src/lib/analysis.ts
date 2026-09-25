@@ -85,6 +85,8 @@ export function cumulative(txs: TxLike[], kind: Kind, n: number, slot: (date: st
 export interface Insight {
   icon: string;
   tone: "good" | "bad" | "neutral";
+  /** La cifra que se lee primero, en grande: un monto o un porcentaje. */
+  figure: string;
   text: string;
 }
 
@@ -115,14 +117,15 @@ export function insights(i: InsightInput): Insight[] {
 
   if (i.income > 0 || i.expense > 0) {
     const left = i.income - i.expense;
-    if (i.income === 0) out.push({ icon: "alert-02", tone: "bad", text: `Salieron ${money(i.expense)} y no se anotaron ingresos.` });
+    if (i.income === 0) out.push({ icon: "alert-02", tone: "bad", figure: money(i.expense), text: "Salieron y no se anotaron ingresos." });
     else if (left >= 0)
       out.push({
         icon: "piggy-bank",
         tone: "good",
-        text: `Te quedaron ${money(left)}: guardaste ${pct((left / i.income) * 100)} de lo que entró.`,
+        figure: money(left),
+        text: `Te quedaron libres: guardaste ${pct((left / i.income) * 100)} de lo que entró.`,
       });
-    else out.push({ icon: "alert-02", tone: "bad", text: `Gastaste ${money(-left)} más de lo que entró.` });
+    else out.push({ icon: "alert-02", tone: "bad", figure: money(-left), text: "Gastaste de más: salió más de lo que entró." });
   }
 
   if (i.prev) {
@@ -135,17 +138,23 @@ export function insights(i: InsightInput): Insight[] {
       out.push({
         icon: up ? "chart-increase" : "chart-decrease",
         tone: up === spend ? "bad" : "good",
-        text: `${spend ? "Gastaste" : "Recibiste"} ${pct(c)} ${up ? "más" : "menos"} que ${when} (${money(before)}).`,
+        figure: `${up ? "+" : "−"}${pct(c)}`,
+        text: `${spend ? "Gastaste" : "Recibiste"} ${up ? "más" : "menos"} que ${when}: ${money(now)} contra ${money(before)}.`,
       });
     } else if (c !== null) {
-      out.push({ icon: "tick-02", tone: "neutral", text: `Vas casi igual que ${when}.` });
+      out.push({ icon: "tick-02", tone: "neutral", figure: money(now), text: `Vas casi igual que ${when} (${money(before)}).` });
     }
   }
 
   const total = i.cats.reduce((s, c) => s + c.total, 0);
   const top = i.cats[0];
   if (top && total > 0) {
-    out.push({ icon: "crown", tone: spend ? "bad" : "neutral", text: `${top.name} se llevó ${pct((top.total / total) * 100)} de tus ${word}.` });
+    out.push({
+      icon: "crown",
+      tone: spend ? "bad" : "neutral",
+      figure: money(top.total),
+      text: `${top.name} se llevó ${pct((top.total / total) * 100)} de tus ${word}.`,
+    });
   }
 
   if (i.prev) {
@@ -162,7 +171,8 @@ export function insights(i: InsightInput): Insight[] {
       out.push({
         icon: up ? "arrow-up-right-01" : "arrow-down-right-01",
         tone: up === spend ? "bad" : "good",
-        text: `Lo que más ${up ? "subió" : "bajó"}: ${best.name}, ${up ? "+" : "−"}\u2060${money(Math.abs(best.diff))} frente ${i.prev.name.replace(/^el /, "al ")}.`,
+        figure: `${up ? "+" : "−"}\u2060${money(Math.abs(best.diff))}`,
+        text: `Lo que más ${up ? "subió" : "bajó"}: ${best.name}, frente ${i.prev.name.replace(/^el /, "al ")}.`,
       });
     }
   }

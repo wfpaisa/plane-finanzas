@@ -8,6 +8,7 @@
 
   import CategoryPill from "../components/app/CategoryPill.svelte";
   import Money from "../components/app/Money.svelte";
+  import PickBar from "../components/app/PickBar.svelte";
   import MoneyFlow from "../components/app/MoneyFlow.svelte";
   import Segmented from "../components/app/Segmented.svelte";
   import Chart from "../components/Chart.svelte";
@@ -308,6 +309,25 @@
     },
   });
 
+  // Lo que está recortando la página, en la barra del fondo: cada uno se
+  // quita tocándolo, o todos a la vez.
+  const filters = $derived(
+    [
+      focus && { id: "cat", label: catName(focus === "none" ? "" : focus), clear: () => (focus = "") },
+      tag && { id: "tag", label: `#${tag}`, clear: () => (tag = "") },
+      account && {
+        id: "acc",
+        label: store.accounts.find((a) => a.id === account)?.name ?? "Una cuenta",
+        clear: () => (account = ""),
+      },
+    ].filter((f) => !!f),
+  );
+  const clearFilters = () => {
+    focus = "";
+    tag = "";
+    account = "";
+  };
+
   const title = $derived(g === "week" ? monthLabel(ym, true) : g === "month" ? String(year) : `${year - 5} – ${year}`);
 </script>
 
@@ -406,11 +426,14 @@
     {#if summary.length}
       <section class="card insights" aria-label="En pocas palabras">
         <h3 class="card-title">En pocas palabras</h3>
-        <ul>
+        <ul style:--n={summary.length}>
           {#each summary as item (item.text)}
             <li class="insight {item.tone}">
-              <span class="insight-ico"><Icon name={item.icon} size={16} /></span>
-              <span>{item.text}</span>
+              <span class="insight-ico"><Icon name={item.icon} size={18} /></span>
+              <span class="insight-body">
+                <b class="insight-figure">{item.figure}</b>
+                <span class="insight-text">{item.text}</span>
+              </span>
             </li>
           {/each}
         </ul>
@@ -654,9 +677,55 @@
       </div>
     </div>
   </div>
+
+  {#if filters.length}
+    <PickBar
+      count={filters.length}
+      label={filters.length === 1 ? "1 filtro" : `${filters.length} filtros`}
+      clearText="Quitar filtros"
+      onClear={clearFilters}
+    >
+      {#each filters as f (f.id)}
+        <button type="button" class="filter-chip" aria-label="Quitar filtro {f.label}" data-tip="Quitar este filtro" onclick={f.clear}>
+          {f.label}<Icon name="cancel-01" size={12} />
+        </button>
+      {/each}
+    </PickBar>
+  {/if}
 </div>
 
 <style>
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 1.625rem;
+    padding: 0 0.5rem 0 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    & :global(.icon-glyph) {
+      color: var(--text-muted);
+    }
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--danger) 50%, transparent);
+      background: color-mix(in oklab, var(--danger) 10%, transparent);
+      text-decoration: line-through;
+
+      & :global(.icon-glyph) {
+        color: var(--danger);
+      }
+    }
+  }
+
   .toolbar {
     display: flex;
     flex-direction: row;
@@ -761,8 +830,17 @@
 
     & ul {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-      gap: var(--sp-10) var(--sp-20);
+      /* Todas en una fila si caben; si no, de a dos, para que ninguna quede sola. */
+      grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+      gap: var(--sp-10);
+
+      @media (max-width: 80rem) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      @media (max-width: 40rem) {
+        grid-template-columns: minmax(0, 1fr);
+      }
       margin: 0;
       padding: 0;
       list-style: none;
@@ -772,10 +850,10 @@
   .insight {
     display: flex;
     align-items: flex-start;
-    gap: var(--sp-10);
-    font-size: var(--text-sm);
-    line-height: 1.45;
-    color: var(--text-secondary);
+    gap: var(--sp-12);
+    padding: var(--sp-12) var(--sp-14);
+    border-radius: var(--radius-md);
+    background: color-mix(in oklab, var(--tone) 6%, transparent);
 
     --tone: var(--text-muted);
 
@@ -786,8 +864,37 @@
     /* Lo malo se lee en rojo de una: gastar de más, la categoría que más se lleva. */
     &.bad {
       --tone: var(--danger);
+    }
+  }
 
-      color: var(--danger);
+  .insight-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .insight-figure {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+
+    .bad &,
+    .good & {
+      color: var(--tone);
+    }
+  }
+
+  .insight-text {
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    color: var(--text-secondary);
+
+    .bad & {
+      color: color-mix(in oklab, var(--danger) 80%, var(--text-secondary));
     }
   }
 
@@ -795,8 +902,8 @@
     display: grid;
     flex: none;
     place-items: center;
-    width: 1.875rem;
-    height: 1.875rem;
+    width: 2.25rem;
+    height: 2.25rem;
     border-radius: 99rem;
     background: color-mix(in oklab, var(--tone) 14%, transparent);
     color: var(--tone);

@@ -71,8 +71,10 @@ describe("insights", () => {
     const out = insights(base);
     expect(out.map((x) => x.tone)).toEqual(["good", "bad", "bad", "bad"]);
     expect(out[0].text).toContain("40%");
-    expect(out[1].text).toContain("20% más que a esta altura del mes pasado");
+    expect(out[1].figure).toBe("+20%");
+    expect(out[1].text).toContain("más que a esta altura del mes pasado");
     expect(out[2].text).toBe("Arriendo se llevó 67% de tus gastos.");
+    expect(out[2].figure).toContain("400");
     expect(out[3].text).toContain("Mercado");
     expect(out[3].text).toContain("frente al mes pasado");
   });

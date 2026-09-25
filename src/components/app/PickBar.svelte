@@ -2,6 +2,8 @@
   La barra de lo marcado con clic derecho: cuántos van, sus sumas (lo que
   se le pase adentro) y las acciones de marcar todos o quitar la marca.
   Pegada al fondo de la página mientras hay algo marcado; Esc la limpia.
+  También sirve para los filtros activos de una pantalla, con `label` y
+  `clearText`.
 -->
 <script lang="ts">
   import type { Snippet } from "svelte";
@@ -10,12 +12,18 @@
 
   let {
     count,
+    label,
+    clearText,
     onAll,
     onClear,
     children,
     actions,
   }: {
     count: number;
+    /** Lo que dice la pastilla del conteo; sin él, "N seleccionados". */
+    label?: string;
+    /** Texto del botón de limpiar; sin él es solo la equis. */
+    clearText?: string;
     /** Sin él no aparece el botón "Todos" (ya está todo marcado). */
     onAll?: () => void;
     onClear: () => void;
@@ -28,14 +36,22 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && !document.querySelector(":popover-open") && onClear()} />
 
 <div class="pick-bar" role="status">
-  <span class="pick-count">{count} {count === 1 ? "seleccionado" : "seleccionados"}</span>
+  <span class="pick-count">{label ?? `${count} ${count === 1 ? "seleccionado" : "seleccionados"}`}</span>
   <span class="pick-sums">{@render children()}</span>
   <span class="pick-actions">
     {@render actions?.()}
     {#if onAll}
       <button type="button" class="pick-all" onclick={onAll}>Todos</button>
     {/if}
-    <button type="button" class="pick-clear" aria-label="Quitar selección" data-tip="Quitar selección (Esc)" onclick={onClear}>
+    <button
+      type="button"
+      class="pick-clear"
+      class:with-text={!!clearText}
+      aria-label={clearText ?? "Quitar selección"}
+      data-tip="{clearText ?? 'Quitar selección'} (Esc)"
+      onclick={onClear}
+    >
+      {#if clearText}<span>{clearText}</span>{/if}
       <Icon name="cancel-01" size={14} />
     </button>
   </span>
@@ -162,5 +178,13 @@
 
   .pick-clear {
     width: 1.875rem;
+
+    &.with-text {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      width: auto;
+      padding: 0 0.75rem;
+    }
   }
 </style>

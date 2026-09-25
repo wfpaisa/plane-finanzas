@@ -6,6 +6,8 @@ export interface User extends RecordModel {
   email: string;
   name: string;
   avatar: string;
+  /** El tinte del fondo (`#3b82f6`); vacío es la bruma de partida. */
+  tint?: string;
 }
 
 export type AccountType =
