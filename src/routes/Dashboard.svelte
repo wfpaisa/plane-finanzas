@@ -37,6 +37,7 @@
       .getFullList<Transaction>({
         filter: pb.filter("date >= {:from} && date < {:to}", { from, to: nextMonth }),
         sort: "-date,-created",
+        expand: "rule",
       })
       .then((r) => alive && (txs = r))
       .catch(notify.fail)

@@ -160,14 +160,21 @@ function applyExisting(app, userId, ruleId) {
       tags: tags,
     };
     var after = apply(rule, before);
-    if (
+    var same =
       after.category === before.category &&
       after.description === before.description &&
       after.notes === before.notes &&
-      after.tags.join(",") === before.tags.join(",")
-    ) {
+      after.tags.join(",") === before.tags.join(",");
+    // Aunque no cambie nada, queda la marca de la regla: así se ve también en
+    // lo que ya estaba como la regla lo habría dejado.
+    if (same) {
+      if (r.getString("rule") !== rule.id) {
+        r.set("rule", rule.id);
+        app.save(r);
+      }
       continue;
     }
+    r.set("rule", rule.id);
     r.set("category", after.category);
     r.set("tags", after.tags);
     r.set("description", after.description.slice(0, 200));

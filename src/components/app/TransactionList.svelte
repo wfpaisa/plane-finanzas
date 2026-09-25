@@ -50,14 +50,19 @@
     }
   }
 
-  const collator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+  const collator = new Intl.Collator("es", {
+    sensitivity: "base",
+    numeric: true,
+  });
 
   function sortValue(t: Transaction, key: SortKey): string | number {
     if (key === "date") return t.date.slice(0, 10);
     if (key === "amount") return t.amount;
     if (key === "description") return titleOf(t);
     if (key === "category")
-      return t.type === "transfer" ? "Transferencia" : (store.category(t.category)?.name ?? "Sin categoría");
+      return t.type === "transfer"
+        ? "Transferencia"
+        : (store.category(t.category)?.name ?? "Sin categoría");
     return store.account(t.account)?.name ?? "";
   }
 
@@ -69,7 +74,10 @@
     return [...items].sort((a, b) => {
       const x = sortValue(a, key);
       const y = sortValue(b, key);
-      const c = typeof x === "number" && typeof y === "number" ? x - y : collator.compare(String(x), String(y));
+      const c =
+        typeof x === "number" && typeof y === "number"
+          ? x - y
+          : collator.compare(String(x), String(y));
       return c * dir;
     });
   });
@@ -145,7 +153,8 @@
   });
 
   /** "lunes 2 de septiembre" -> "Lunes 2 de Septiembre" (el "de" queda en minúscula). */
-  const titleCase = (s: string) => s.replace(/(^|\s)(?!de\b)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
+  const titleCase = (s: string) =>
+    s.replace(/(^|\s)(?!de\b)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
 
   const total = $derived(
     items.reduce(
@@ -167,6 +176,18 @@
   function tintOf(t: Transaction) {
     if (t.type === "transfer") return "tint-10";
     return store.category(t.category)?.color || "tint-10";
+  }
+
+  /** La regla que lo ajustó, como se escribió: "gou payments, gou admin". */
+  function ruleOf(t: Transaction): string {
+    if (!t.rule) return "";
+    return (
+      t.expand?.rule?.match
+        ?.split(",")
+        .map((k) => k.trim())
+        .filter(Boolean)
+        .join(", ") || "una regla"
+    );
   }
 
   function titleOf(t: Transaction) {
@@ -198,7 +219,7 @@
           {@render head("description", "Descripción")}
           {@render head("category", "Categoría")}
           {#if showAccount}{@render head("account", "Cuenta")}{/if}
-          <th class="tx-mail-col" aria-label="Importado de Gmail"
+          <th class="tx-mail-col" aria-label="Origen"
             ><Icon name="mail-01" size={14} /></th
           >
           {@render head("amount", "Valor", "num")}
@@ -265,6 +286,11 @@
               </td>
             {/if}
             <td class="tx-mail-col">
+              {#if t.rule}<span
+                  class="tx-rule-ico"
+                  data-tip="Ajustado por la regla «{ruleOf(t)}»"
+                  ><Icon name="magic-wand-01" size={14} /></span
+                >{/if}
               {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
                   ><Icon name="mail-01" size={14} /></span
                 >{/if}
@@ -334,9 +360,18 @@
                   </span>
                   <!-- Ancho: la nota va debajo del título; lo demás, en columnas. -->
                   {#if t.notes}<span class="tx-notes">{t.notes}</span>{/if}
-                  {#if tagsOf(t).length}
+                  {#if tagsOf(t).length || t.rule}
                     <!-- Las propias y, sin fondo, las que hereda de su categoría. -->
                     <span class="tx-tags">
+                      {#if t.rule}
+                        <span
+                          class="tx-rule"
+                          data-tip="Categoría, etiquetas o descripción puestas por esta regla"
+                          ><Icon name="magic-wand-01" size={11} />Regla: {ruleOf(
+                            t,
+                          )}</span
+                        >
+                      {/if}
                       {#each tagsOf(t) as tag (tag)}
                         {@const own = t.tags?.includes(tag)}
                         <Tag
@@ -380,6 +415,11 @@
                       name="attachment-01"
                       size={14}
                     />{/if}
+                  {#if t.rule}<span
+                      class="tx-rule-ico"
+                      data-tip="Ajustado por la regla «{ruleOf(t)}»"
+                      ><Icon name="magic-wand-01" size={14} /></span
+                    >{/if}
                   {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
                       ><Icon name="mail-01" size={14} /></span
                     >{/if}
@@ -479,7 +519,7 @@
   }
 
   .tx-date {
-    vertical-align: middle;
+    vertical-align: baseline;
     background: var(--bg-card);
     cursor: default;
     color: var(--text-muted);
@@ -661,7 +701,7 @@
       display: grid;
       grid-template-columns:
         2.25rem minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.1fr)
-        2.5rem minmax(7rem, auto);
+        3.5rem minmax(7rem, auto);
       column-gap: var(--sp-16);
 
       & > :global(.money) {
@@ -712,11 +752,34 @@
   /* Sin la columna de cuenta (filtrado por una cuenta), la plantilla la omite. */
   @container (min-width: 44rem) {
     .tx-rows.no-acc .tx-row {
-      grid-template-columns: 2.25rem minmax(0, 2.6fr) minmax(0, 1.2fr) 2.5rem minmax(
+      grid-template-columns: 2.25rem minmax(0, 2.6fr) minmax(0, 1.2fr) 3.5rem minmax(
           7rem,
           auto
         );
     }
+  }
+
+  /* Lo que puso una regla: se distingue de las etiquetas por el acento y la varita. */
+  .tx-rule {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 100%;
+    overflow: hidden;
+    padding: 0 var(--sp-6);
+    border: var(--border-width) dashed
+      color-mix(in oklab, var(--accent) 55%, transparent);
+    border-radius: var(--radius-pill);
+    color: var(--accent);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tx-rule-ico {
+    display: inline-flex;
+    color: var(--accent);
   }
 
   .tx-tags {

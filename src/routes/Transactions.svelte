@@ -29,7 +29,9 @@
 
   const q = route.query;
   let ym = $state(q.get("mes") ?? today().slice(0, 7));
-  let all = $state(q.get("mes") === "todo" || (!!q.get("tag") && !q.get("mes")));
+  let all = $state(
+    q.get("mes") === "todo" || (!!q.get("tag") && !q.get("mes")),
+  );
   let account = $state(q.get("cuenta") ?? "");
   let category = $state(q.get("cat") ?? "");
   let type = $state(q.get("tipo") ?? "");
@@ -70,7 +72,12 @@
     let alive = true;
     loading = true;
     pb.collection("transactions")
-      .getFullList<Transaction>({ filter: pb.filter(parts.join(" && "), params), sort: "-date,-created", batch: 500 })
+      .getFullList<Transaction>({
+        filter: pb.filter(parts.join(" && "), params),
+        sort: "-date,-created",
+        batch: 500,
+        expand: "rule",
+      })
       .then((r) => alive && (items = r))
       .catch(notify.fail)
       .finally(() => alive && (loading = false));
@@ -81,22 +88,36 @@
     const s = search.trim().toLowerCase();
     if (!s) return items;
     return items.filter((t) =>
-      [t.description, t.notes, store.category(t.category)?.name, ...tagsOf(t)].some((x) => x?.toLowerCase().includes(s)),
+      [
+        t.description,
+        t.notes,
+        store.category(t.category)?.name,
+        ...tagsOf(t),
+      ].some((x) => x?.toLowerCase().includes(s)),
     );
   });
 
-  const income = $derived(shown.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0));
-  const expense = $derived(shown.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0));
+  const income = $derived(
+    shown.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0),
+  );
+  const expense = $derived(
+    shown.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0),
+  );
   // Lo marcado para sumar. Solo cuenta lo que está a la vista: si un filtro
   // esconde un movimiento marcado, sale de la suma sin perder la marca.
   const selected = new SvelteSet<string>();
   const picked = $derived(shown.filter((t) => selected.has(t.id)));
-  const sumOf = (kind: string) => picked.filter((t) => t.type === kind).reduce((s, t) => s + t.amount, 0);
+  const sumOf = (kind: string) =>
+    picked.filter((t) => t.type === kind).reduce((s, t) => s + t.amount, 0);
   const pickedIncome = $derived(sumOf("income"));
   const pickedExpense = $derived(sumOf("expense"));
   const pickedTransfer = $derived(sumOf("transfer"));
 
-  const tags = $derived([...new Set([...categoryTags(), ...items.flatMap((t) => t.tags ?? [])])].sort());
+  const tags = $derived(
+    [
+      ...new Set([...categoryTags(), ...items.flatMap((t) => t.tags ?? [])]),
+    ].sort(),
+  );
   const types: [string, string, Tone][] = [
     ["expense", "Gastos", "tag-error"],
     ["income", "Ingresos", "tag-success"],
@@ -154,7 +175,12 @@
    */
   const series = $derived.by(() => {
     const dates = charted.map((t) => dayOf(t.date)).sort();
-    if (!dates.length) return { daily: true, keys: [] as string[], rows: new Map<string, Record<string, number>>() };
+    if (!dates.length)
+      return {
+        daily: true,
+        keys: [] as string[],
+        rows: new Map<string, Record<string, number>>(),
+      };
     const [first, last] = [dates[0], dates[dates.length - 1]];
     const span = (Date.parse(last) - Date.parse(first)) / 864e5;
     const daily = span <= 62;
@@ -163,9 +189,19 @@
       const [y, m, d] = first.split("-").map(Number);
       for (let i = 0; i <= span; i++) keys.push(ymd(new Date(y, m - 1, d + i)));
     } else {
-      for (let k = first.slice(0, 7); k <= last.slice(0, 7); k = addMonths(k, 1)) keys.push(k);
+      for (
+        let k = first.slice(0, 7);
+        k <= last.slice(0, 7);
+        k = addMonths(k, 1)
+      )
+        keys.push(k);
     }
-    const rows = new Map(keys.map((k) => [k, { income: 0, expense: 0, transfer: 0 } as Record<string, number>]));
+    const rows = new Map(
+      keys.map((k) => [
+        k,
+        { income: 0, expense: 0, transfer: 0 } as Record<string, number>,
+      ]),
+    );
     for (const t of charted) {
       const row = rows.get(daily ? dayOf(t.date) : t.date.slice(0, 7));
       if (row) row[t.type] += t.amount;
@@ -198,12 +234,23 @@
       options: {
         interaction: { mode: "index", intersect: false },
         scales: {
-          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 12 } },
-          y: { beginAtZero: true, ticks: { callback: (v) => money(Number(v)) }, border: { display: false } },
+          x: {
+            grid: { display: false },
+            ticks: { maxRotation: 0, autoSkipPadding: 12 },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => money(Number(v)) },
+            border: { display: false },
+          },
         },
         plugins: {
           legend: { position: "top", align: "end" },
-          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${money(Number(c.raw))}` } },
+          tooltip: {
+            callbacks: {
+              label: (c) => ` ${c.dataset.label}: ${money(Number(c.raw))}`,
+            },
+          },
         },
       },
     };
@@ -238,52 +285,85 @@
   <header class="page-head">
     <div>
       <h1>Movimientos</h1>
-      <p>{all ? "Todo el historial" : monthLabel(ym, true)} · {shown.length} {shown.length === 1 ? "movimiento" : "movimientos"}</p>
+      <p>
+        {all ? "Todo el historial" : monthLabel(ym, true)} · {shown.length}
+        {shown.length === 1 ? "movimiento" : "movimientos"}
+      </p>
     </div>
     <div class="page-actions">
       <div class="month-nav">
-        <button type="button" class="btn-icon sm" aria-label="Mes anterior" data-tip="Mes anterior (←)" disabled={all} onclick={() => (ym = addMonths(ym, -1))}>
+        <button
+          type="button"
+          class="btn-icon sm"
+          aria-label="Mes anterior"
+          data-tip="Mes anterior (←)"
+          disabled={all}
+          onclick={() => (ym = addMonths(ym, -1))}
+        >
           <Icon name="arrow-left-01" />
         </button>
         <MonthPicker bind:value={ym} disabled={all} />
-        <button type="button" class="btn-icon sm" aria-label="Mes siguiente" data-tip="Mes siguiente (→)" disabled={all} onclick={() => (ym = addMonths(ym, 1))}>
+        <button
+          type="button"
+          class="btn-icon sm"
+          aria-label="Mes siguiente"
+          data-tip="Mes siguiente (→)"
+          disabled={all}
+          onclick={() => (ym = addMonths(ym, 1))}
+        >
           <Icon name="arrow-right-01" />
         </button>
-        <Tag class="month-all" tone={all ? "tint-1" : "off"} onclick={() => (all = !all)} pressed={all}>Todo</Tag>
+        <Tag
+          class="month-all"
+          tone={all ? "tint-1" : "off"}
+          onclick={() => (all = !all)}
+          pressed={all}>Todo</Tag
+        >
       </div>
     </div>
   </header>
 
   <div class="filters card">
     <div class="filters-grid">
-      <div bind:this={searchBox}><Input bind:value={search} placeholder="Buscar… ( / )" /></div>
+      <div bind:this={searchBox}>
+        <Input bind:value={search} placeholder="Buscar… ( / )" />
+      </div>
       <Select bind:value={account}>
         <option value="">Todas las cuentas</option>
-        {#each store.accounts as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
+        {#each store.accounts as a (a.id)}<option value={a.id}>{a.name}</option
+          >{/each}
       </Select>
       <Select bind:value={category}>
         <option value="">Todas las categorías</option>
         <option value="none">Sin categoría</option>
         <optgroup label="Gastos">
-          {#each store.categories.filter((c) => c.kind === "expense") as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+          {#each store.categories.filter((c) => c.kind === "expense") as c (c.id)}<option
+              value={c.id}>{c.name}</option
+            >{/each}
         </optgroup>
         <optgroup label="Ingresos">
-          {#each store.categories.filter((c) => c.kind === "income") as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+          {#each store.categories.filter((c) => c.kind === "income") as c (c.id)}<option
+              value={c.id}>{c.name}</option
+            >{/each}
         </optgroup>
       </Select>
     </div>
     <div class="filters-tags">
       <!-- El tipo: uno a la vez; tocar el elegido lo quita. -->
       {#each types as [value, label, tone] (value)}
-        <Tag tone={type === value ? tone : "off"} pressed={type === value} onclick={() => (type = type === value ? "" : value)}
-          >{label}</Tag
+        <Tag
+          tone={type === value ? tone : "off"}
+          pressed={type === value}
+          onclick={() => (type = type === value ? "" : value)}>{label}</Tag
         >
       {/each}
       {#if tags.length || tag}
         <span class="filters-sep" aria-hidden="true"></span>
         {#each [...new Set([tag, ...tags].filter(Boolean))] as t (t)}
           <Tag
-            tone={tag === t ? ((t === "revisar" ? "tag-warning" : tintFor(t)) as Tone) : "off"}
+            tone={tag === t
+              ? ((t === "revisar" ? "tag-warning" : tintFor(t)) as Tone)
+              : "off"}
             pressed={tag === t}
             onclick={() => (tag = tag === t ? "" : t)}>#{t}</Tag
           >
@@ -293,26 +373,62 @@
     <div class="filters-foot">
       <span>Ingresos <Money value={income} tone="income" /></span>
       <span>Gastos <Money value={expense} tone="expense" /></span>
-      <span>Ingresos menos gastos <Money value={income - expense} tone="auto" /></span>
-      <span class="pick-hint small"><Icon name="mouse-right-click-01" size={14} />Clic derecho en un movimiento para sumarlo</span>
-      {#if filtered}<button type="button" class="link small" onclick={clear}>Quitar filtros</button>{/if}
+      <span
+        >Ingresos menos gastos <Money
+          value={income - expense}
+          tone="auto"
+        /></span
+      >
+      <span class="pick-hint small"
+        ><Icon name="mouse-right-click-01" size={14} />Clic derecho en un
+        movimiento para sumarlo</span
+      >
+      {#if filtered}<button type="button" class="link small" onclick={clear}
+          >Quitar filtros</button
+        >{/if}
     </div>
   </div>
 
   <div class="list-bar">
-    <button type="button" class="chip chart-toggle" class:active={chartOn} aria-pressed={chartOn} onclick={() => setChart(!chartOn)}>
+    <button
+      type="button"
+      class="chip chart-toggle"
+      class:active={chartOn}
+      aria-pressed={chartOn}
+      onclick={() => setChart(!chartOn)}
+    >
       <Icon name="chart-line-data-01" size={14} />Gráfica
     </button>
     <div class="chips view-tabs" role="tablist" aria-label="Vista de la lista">
-      <button type="button" role="tab" class="chip" class:active={!compact} aria-selected={!compact} onclick={() => setCompact(false)}>Ampliado</button>
-      <button type="button" role="tab" class="chip" class:active={compact} aria-selected={compact} onclick={() => setCompact(true)}>Compacto</button>
+      <button
+        type="button"
+        role="tab"
+        class="chip"
+        class:active={!compact}
+        aria-selected={!compact}
+        onclick={() => setCompact(false)}>Ampliado</button
+      >
+      <button
+        type="button"
+        role="tab"
+        class="chip"
+        class:active={compact}
+        aria-selected={compact}
+        onclick={() => setCompact(true)}>Compacto</button
+      >
     </div>
   </div>
 
   {#if loading && !items.length}
     <Loading />
   {:else if shown.length}
-    <TransactionList items={shown} onOpen={(t) => txModal.edit(t)} showAccount={!account} {compact} {selected} />
+    <TransactionList
+      items={shown}
+      onOpen={(t) => txModal.edit(t)}
+      showAccount={!account}
+      {compact}
+      {selected}
+    />
   {:else}
     <div class="card empty-card">
       No hay movimientos {filtered ? "con esos filtros" : "este mes"}.
@@ -322,40 +438,77 @@
     <div class="card tx-chart">
       <div class="card-head">
         <div>
-          <h3 class="card-title">{picked.length ? "Lo seleccionado" : filtered ? "Lo buscado" : "Movimientos"} en el tiempo</h3>
+          <h3 class="card-title">
+            {picked.length
+              ? "Lo seleccionado"
+              : filtered
+                ? "Lo buscado"
+                : "Movimientos"} en el tiempo
+          </h3>
           <p class="card-sub">
-            {charted.length} {charted.length === 1 ? "movimiento" : "movimientos"} · por {series.daily ? "día" : "mes"}
-            {#if !picked.length} · clic derecho en la lista para graficar solo algunos{/if}
+            {charted.length}
+            {charted.length === 1 ? "movimiento" : "movimientos"} · por {series.daily
+              ? "día"
+              : "mes"}
+            {#if !picked.length}
+              · clic derecho en la lista para graficar solo algunos{/if}
           </p>
         </div>
         <div class="card-head-actions">
-          <button type="button" class="btn-icon sm" aria-label="Cerrar gráfica" onclick={() => setChart(false)}><Icon name="cancel-01" /></button>
+          <button
+            type="button"
+            class="btn-icon sm"
+            aria-label="Cerrar gráfica"
+            onclick={() => setChart(false)}><Icon name="cancel-01" /></button
+          >
         </div>
       </div>
       <div class="card-body">
-        <Chart config={chartConfig} height={260} label="Movimientos en el tiempo" />
+        <Chart
+          config={chartConfig}
+          height={260}
+          label="Movimientos en el tiempo"
+        />
       </div>
     </div>
   {/if}
   {#if picked.length}
     <PickBar
       count={picked.length}
-      onAll={picked.length < shown.length ? () => shown.forEach((t) => selected.add(t.id)) : undefined}
+      onAll={picked.length < shown.length
+        ? () => shown.forEach((t) => selected.add(t.id))
+        : undefined}
       onClear={() => selected.clear()}
     >
       {#snippet actions()}
-        <button type="button" class="pick-extra" aria-pressed={chartOn} data-tip="Ver lo seleccionado en la gráfica" onclick={() => setChart(!chartOn)}>
+        <button
+          type="button"
+          class="pick-extra"
+          aria-pressed={chartOn}
+          data-tip="Ver lo seleccionado en la gráfica"
+          onclick={() => setChart(!chartOn)}
+        >
           <Icon name="chart-line-data-01" size={14} />Gráfica
         </button>
       {/snippet}
-      {#if pickedIncome}<span>Ingresos <Money value={pickedIncome} tone="income" /></span>{/if}
-      {#if pickedExpense}<span>Gastos <Money value={pickedExpense} tone="expense" /></span>{/if}
-      {#if pickedTransfer}<span>Transferencias <Money value={pickedTransfer} tone="transfer" /></span>{/if}
-      {#if pickedIncome && pickedExpense}<span>Ingresos menos gastos <Money value={pickedIncome - pickedExpense} tone="auto" /></span>{/if}
+      {#if pickedIncome}<span
+          >Ingresos <Money value={pickedIncome} tone="income" /></span
+        >{/if}
+      {#if pickedExpense}<span
+          >Gastos <Money value={pickedExpense} tone="expense" /></span
+        >{/if}
+      {#if pickedTransfer}<span
+          >Transferencias <Money value={pickedTransfer} tone="transfer" /></span
+        >{/if}
+      {#if pickedIncome && pickedExpense}<span
+          >Ingresos menos gastos <Money
+            value={pickedIncome - pickedExpense}
+            tone="auto"
+          /></span
+        >{/if}
     </PickBar>
   {/if}
 </div>
-
 
 <style>
   .pick-hint {

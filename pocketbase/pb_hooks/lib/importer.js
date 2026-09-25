@@ -168,6 +168,7 @@ function importMessages(app, userId, mails, opts) {
       r.set("amount", p.amount);
       r.set("description", p.description.slice(0, 200));
       if (p.notes) r.set("notes", p.notes);
+      if (p.rule) r.set("rule", p.rule);
       r.set("tags", p.tags);
       r.set("source", opts.source || "gmail");
       r.set("external_id", p.externalId);

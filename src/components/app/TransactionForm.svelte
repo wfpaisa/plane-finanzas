@@ -244,9 +244,14 @@
       </label>
     </div>
 
-    {#if tx?.source && tx.source !== "manual"}
+    {#if tx && ((tx.source && tx.source !== "manual") || tx.rule)}
       <div class="tx-origin">
-        <span>Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b></span>
+        <span>
+          {#if tx.source && tx.source !== "manual"}Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b>{/if}
+          {#if tx.rule}
+            <span class="tx-origin-rule"><Icon name="magic-wand-01" size={12} />Ajustado por la regla <b>«{tx.expand?.rule?.match ?? "…"}»</b></span>
+          {/if}
+        </span>
         {#if tx.raw}
           <button type="button" class="link" onclick={() => (showRaw = !showRaw)}>
             {showRaw ? "Ocultar" : "Ver"} texto original
@@ -389,6 +394,14 @@
     justify-content: space-between;
     font-size: var(--text-xs);
     color: var(--text-muted);
+  }
+
+  .tx-origin-rule {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-inline-start: var(--sp-8);
+    color: var(--accent);
   }
 
   .tx-raw {

@@ -73,7 +73,9 @@ export interface Transaction extends RecordModel {
   raw: string;
   /** Posible repetido: el movimiento que parece el mismo (ver pb_hooks/lib/dupes.js). */
   dup_of: string;
-  expand?: { dup_of?: Transaction };
+  /** La regla que lo ajustó al importarlo o al aplicarla a lo guardado. */
+  rule?: string;
+  expand?: { dup_of?: Transaction; rule?: Rule };
 }
 
 export interface Allocation {
