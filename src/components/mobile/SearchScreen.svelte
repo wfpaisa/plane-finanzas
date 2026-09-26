@@ -160,7 +160,7 @@
 <div class="se-box">
   <Icon name="search-01" size={16} />
   <!-- svelte-ignore a11y_autofocus -->
-  <input type="search" placeholder="Nota, categoría, cuenta…" enterkeyhint="search" bind:value={filters.text} autofocus />
+  <input type="search" placeholder="Descripción, categoría, cuenta…" enterkeyhint="search" bind:value={filters.text} autofocus />
   {#if filters.text}
     <button type="button" class="btn-icon sm" aria-label="Borrar texto" onclick={() => (filters.text = "")}>
       <Icon name="cancel-01" size={14} />

@@ -2,7 +2,7 @@
   La app del celular (`#/m`), ordenada como las apps de gastos de siempre:
   abajo cuatro pestañas —Movimientos, Análisis, Cuentas y Más— y en
   Movimientos el mes visto de cinco maneras: diario, calendario, mensual
-  (el año mes a mes), total (presupuesto y cuentas) y por nota.
+  (el año mes a mes), total (presupuesto y cuentas) y por descripción.
 
   Funciona sin internet: lo anotado se guarda en el teléfono y se envía solo
   al volver la conexión (ver lib/offline.svelte.ts). Y si lo que anotaste a
@@ -18,6 +18,7 @@
   import DayList from "../components/mobile/DayList.svelte";
   import MonthlyView from "../components/mobile/MonthlyView.svelte";
   import MonthNav from "../components/mobile/MonthNav.svelte";
+  import MonthSwipe from "../components/mobile/MonthSwipe.svelte";
   import NotesView from "../components/mobile/NotesView.svelte";
   import PlanView from "../components/mobile/PlanView.svelte";
   import SavingsView from "../components/mobile/SavingsView.svelte";
@@ -39,7 +40,7 @@
   import type { Transaction } from "../lib/types";
   import { nextDirection, route } from "../lib/router.svelte";
   import { transition } from "../lib/transition";
-  import { txModal } from "../lib/ui.svelte";
+  import { syncSheet, txModal } from "../lib/ui.svelte";
 
   type Tx = Pending<Transaction>;
   type Tab = "trans" | "stats" | "accounts" | "more";
@@ -56,7 +57,7 @@
     { id: "calendario", label: "Calendario" },
     { id: "mensual", label: "Mensual" },
     { id: "total", label: "Total" },
-    { id: "nota", label: "Nota" },
+    { id: "nota", label: "Descripción" },
   ];
 
   const thisMonth = today().slice(0, 7);
@@ -134,7 +135,7 @@
     location.hash = "#/m?ver=buscar";
   }
 
-  /** Una nota de la vista Nota: sus movimientos de ese mes, en el buscador. */
+  /** Una descripción de esa vista: sus movimientos de ese mes, en el buscador. */
   function findNote(text: string) {
     filters = { ...emptyFilters(), text, period: "month", ref: `${ym}-01` };
     location.hash = "#/m?ver=buscar";
@@ -152,44 +153,16 @@
     txModal.new({ type, date: day });
   }
 
-  // --- Sin conexión: el aviso y lo pendiente ----------------------------
-  let syncSheet = $state(false);
-
+  // --- Sin conexión: lo pendiente, en una hoja (la abre mobile/SyncButton) --
   // Con una hoja abierta la página de atrás se queda quieta.
   $effect(() => {
-    if (!daySheet && !syncSheet) return;
+    if (!daySheet && !syncSheet.open) return;
     const root = document.documentElement;
     const prev = root.style.overflow;
     root.style.overflow = "hidden";
     return () => {
       root.style.overflow = prev;
     };
-  });
-
-  const status = $derived.by(() => {
-    const n = offline.pending;
-    if (offline.authNeeded && n)
-      return {
-        icon: "alert-02",
-        text: "Entra de nuevo para enviar",
-        tone: "warn",
-      };
-    if (offline.failed.length) {
-      const f = offline.failed.length;
-      return {
-        icon: "alert-02",
-        text: f === 1 ? "1 cambio sin guardar" : `${f} cambios sin guardar`,
-        tone: "bad",
-      };
-    }
-    if (!offline.online)
-      return {
-        icon: "wifi-off-01",
-        text: n ? `Sin conexión · ${n} por enviar` : "Sin conexión",
-        tone: "",
-      };
-    if (n) return { icon: "cloud-upload", text: `Enviando ${n}…`, tone: "" };
-    return null;
   });
 
   const OP_LABEL = {
@@ -348,87 +321,89 @@
       {/each}
     </div>
 
-    <div class="m-sum">
-      <div><span>Ingresos</span><Money value={income} tone="income" /></div>
-      <div><span>Gastos</span><Money value={expense} tone="expense" /></div>
-      <div><span>Balance</span><Money value={income - expense} /></div>
-    </div>
+    <MonthSwipe bind:ym step={view === "mensual" ? 12 : 1}>
+      <div class="m-sum">
+        <div><span>Ingresos</span><Money value={income} tone="income" /></div>
+        <div><span>Gastos</span><Money value={expense} tone="expense" /></div>
+        <div><span>Balance</span><Money value={income - expense} /></div>
+      </div>
 
-    {#if view === "diario"}
-      {#each dupes as t (t.id)}
-        {@const pair = pairOf(t)}
-        {#if pair}
-          <section class="m-dupe" aria-label="Posible movimiento repetido">
-            <div class="m-dupe-head">
-              <Icon name="copy-01" size={16} />
-              <strong>¿Es el mismo movimiento?</strong>
-              <Money value={t.amount} tone={t.type} />
-            </div>
-            <div class="m-dupe-pair">
-              <div>
-                <span class="m-label">{dupeSide(pair.mine)}</span>
-                <span class="m-desc"
-                  >{pair.mine.description ||
-                    store.category(pair.mine.category)?.name ||
-                    "Sin descripción"}</span
-                >
-                <span class="m-sub"
-                  >{dateShort(pair.mine.date.slice(0, 10))} · {store.account(
-                    pair.mine.account,
-                  )?.name ?? ""}</span
-                >
+      {#if view === "diario"}
+        {#each dupes as t (t.id)}
+          {@const pair = pairOf(t)}
+          {#if pair}
+            <section class="m-dupe" aria-label="Posible movimiento repetido">
+              <div class="m-dupe-head">
+                <Icon name="copy-01" size={16} />
+                <strong>¿Es el mismo movimiento?</strong>
+                <Money value={t.amount} tone={t.type} />
               </div>
-              <div>
-                <span class="m-label">{dupeSide(pair.bank)}</span>
-                <span class="m-desc"
-                  >{pair.bank.description || "Sin descripción"}</span
-                >
-                <span class="m-sub"
-                  >{dateShort(pair.bank.date.slice(0, 10))} · {store.account(
-                    pair.bank.account,
-                  )?.name ?? ""}</span
-                >
+              <div class="m-dupe-pair">
+                <div>
+                  <span class="m-label">{dupeSide(pair.mine)}</span>
+                  <span class="m-desc"
+                    >{pair.mine.description ||
+                      store.category(pair.mine.category)?.name ||
+                      "Sin descripción"}</span
+                  >
+                  <span class="m-sub"
+                    >{dateShort(pair.mine.date.slice(0, 10))} · {store.account(
+                      pair.mine.account,
+                    )?.name ?? ""}</span
+                  >
+                </div>
+                <div>
+                  <span class="m-label">{dupeSide(pair.bank)}</span>
+                  <span class="m-desc"
+                    >{pair.bank.description || "Sin descripción"}</span
+                  >
+                  <span class="m-sub"
+                    >{dateShort(pair.bank.date.slice(0, 10))} · {store.account(
+                      pair.bank.account,
+                    )?.name ?? ""}</span
+                  >
+                </div>
               </div>
-            </div>
-            <div class="m-dupe-foot">
-              <button type="button" class="btn sm" onclick={() => distinct(t)}
-                >Son distintos</button
-              >
-              <button
-                type="button"
-                class="btn sm btn-primary"
-                disabled={merging === t.id}
-                onclick={() => merge(t)}
-              >
-                <Icon name="git-merge" />{merging === t.id
-                  ? "Uniendo…"
-                  : "Es el mismo: unir"}
-              </button>
-            </div>
-          </section>
-        {/if}
-      {/each}
-      <DayList
-        txs={monthTxs}
-        onOpen={(t) => txModal.edit(t)}
-        empty={loading ? "" : `Sin movimientos en ${monthLabel(ym, true)}.`}
-      />
-    {:else if view === "calendario"}
-      <CalendarView {ym} {txs} onPick={(d) => (daySheet = d)} />
-    {:else if view === "mensual"}
-      <MonthlyView
-        {ym}
-        {txs}
-        onPick={(m) => {
-          ym = m;
-          view = "diario";
-        }}
-      />
-    {:else if view === "total"}
-      <TotalView {ym} txs={monthTxs} />
-    {:else}
-      <NotesView txs={monthTxs} onPick={findNote} />
-    {/if}
+              <div class="m-dupe-foot">
+                <button type="button" class="btn sm" onclick={() => distinct(t)}
+                  >Son distintos</button
+                >
+                <button
+                  type="button"
+                  class="btn sm btn-primary"
+                  disabled={merging === t.id}
+                  onclick={() => merge(t)}
+                >
+                  <Icon name="git-merge" />{merging === t.id
+                    ? "Uniendo…"
+                    : "Es el mismo: unir"}
+                </button>
+              </div>
+            </section>
+          {/if}
+        {/each}
+        <DayList
+          txs={monthTxs}
+          onOpen={(t) => txModal.edit(t)}
+          empty={loading ? "" : `Sin movimientos en ${monthLabel(ym, true)}.`}
+        />
+      {:else if view === "calendario"}
+        <CalendarView {ym} {txs} onPick={(d) => (daySheet = d)} />
+      {:else if view === "mensual"}
+        <MonthlyView
+          {ym}
+          {txs}
+          onPick={(m) => {
+            ym = m;
+            view = "diario";
+          }}
+        />
+      {:else if view === "total"}
+        <TotalView {ym} txs={monthTxs} />
+      {:else}
+        <NotesView txs={monthTxs} onPick={findNote} />
+      {/if}
+    </MonthSwipe>
   {:else if tab === "stats"}
     <StatsView onOpen={(t) => txModal.edit(t)} />
   {:else if tab === "accounts"}
@@ -457,15 +432,6 @@
           >
         </li>
       {/each}
-      <li>
-        <button type="button" onclick={() => (syncSheet = true)}>
-          <Icon name="cloud-upload" size={18} />Cambios en el teléfono
-          {#if offline.pending || offline.failed.length}<span class="m-count"
-              >{offline.pending + offline.failed.length}</span
-            >{/if}
-          <Icon name="arrow-right-01" size={14} />
-        </button>
-      </li>
       <li class="m-menu-row">
         <span><Icon name="moon-02" size={18} />Modo oscuro</span>
         <ModeToggle
@@ -489,17 +455,6 @@
     </ul>
   {/if}
 </div>
-
-{#if status}
-  <button
-    type="button"
-    class="m-sync {status.tone}"
-    onclick={() => (syncSheet = true)}
-  >
-    <Icon name={status.icon} size={16} />{status.text}
-    <Icon name="arrow-right-01" size={14} />
-  </button>
-{/if}
 
 {#if !sub && (tab === "trans" || tab === "stats")}
   <button
@@ -529,7 +484,7 @@
         } else transition(() => (tab = t.id));
       }}
     >
-      <Icon name={t.icon} size={22} /><span>{t.label}</span>
+      <span class="m-ic"><Icon name={t.icon} size={22} /></span><span>{t.label}</span>
     </button>
   {/each}
 </nav>
@@ -573,11 +528,11 @@
   </div>
 {/if}
 
-{#if syncSheet}
+{#if syncSheet.open}
   <div
     class="m-veil"
     role="presentation"
-    onclick={() => (syncSheet = false)}
+    onclick={() => (syncSheet.open = false)}
   ></div>
   <div
     class="m-sheet"
@@ -590,7 +545,7 @@
         type="button"
         class="btn-icon sm"
         aria-label="Cerrar"
-        onclick={() => (syncSheet = false)}
+        onclick={() => (syncSheet.open = false)}
       >
         <Icon name="cancel-01" size={16} />
       </button>
@@ -750,48 +705,6 @@
 
     & :global(.money) {
       font-size: var(--text-sm);
-    }
-  }
-
-  .m-sync {
-    position: fixed;
-    left: var(--sp-16);
-    right: 5.5rem;
-    bottom: calc(4.75rem + env(safe-area-inset-bottom));
-    z-index: 11;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-8);
-    max-width: 24rem;
-    padding: var(--sp-8) var(--sp-12);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill, 99px);
-    background: var(--glass-2, var(--bg-field));
-    -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
-    backdrop-filter: blur(var(--glass-blur, 16px));
-    font: inherit;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    text-align: left;
-    cursor: pointer;
-    box-shadow: var(--shadow-md, none);
-
-    & :global(i:last-child) {
-      margin-left: auto;
-    }
-
-    &.warn {
-      border-color: color-mix(
-        in oklch,
-        var(--warning, var(--danger)) 50%,
-        var(--border)
-      );
-      color: var(--text-primary);
-    }
-
-    &.bad {
-      border-color: color-mix(in oklch, var(--danger) 50%, var(--border));
-      color: var(--danger);
     }
   }
 
@@ -964,14 +877,6 @@
     }
   }
 
-  .m-count {
-    padding: 0 var(--sp-6);
-    border-radius: var(--radius-pill, 99px);
-    background: var(--accent);
-    font-size: var(--text-xs);
-    color: var(--accent-text);
-  }
-
   /* --- Abajo: el botón de anotar y las pestañas --- */
   .m-fab {
     position: fixed;
@@ -1027,6 +932,21 @@
         color: var(--accent);
         font-weight: 600;
       }
+    }
+  }
+
+  /* La pestaña actual lleva el icono sobre una píldora con un tono del
+     color de acento. */
+  .m-ic {
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 1.875rem;
+    border-radius: var(--radius-pill, 99px);
+    transition: background 0.2s;
+
+    .on > & {
+      background: oklch(from var(--accent) l c h / 0.16);
     }
   }
 

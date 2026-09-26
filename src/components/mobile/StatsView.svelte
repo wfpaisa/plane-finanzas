@@ -14,6 +14,7 @@
   import Segmented from "../app/Segmented.svelte";
   import DayList from "./DayList.svelte";
   import MonthNav from "./MonthNav.svelte";
+  import MonthSwipe from "./MonthSwipe.svelte";
   import TopBar from "./TopBar.svelte";
   import { resolveColor } from "../../lib/colors";
   import { addMonths, today } from "../../lib/finance";
@@ -229,49 +230,51 @@
     {/snippet}
   </TopBar>
 
-  <div class="st-tabs" role="tablist">
-    <button type="button" role="tab" aria-selected={kind === "income"} class:on={kind === "income"} onclick={() => (kind = "income")}>
-      Ingresos <Money value={incomeTotal} />
-    </button>
-    <button type="button" role="tab" aria-selected={kind === "expense"} class:on={kind === "expense"} onclick={() => (kind = "expense")}>
-      Gastos <Money value={expenseTotal} />
-    </button>
-  </div>
-
-  <div class="st-by">
-    <Segmented
-      bind:value={by}
-      full
-      label="Repartir por"
-      options={[
-        { id: "category", label: "Por categoría" },
-        { id: "tag", label: "Por etiqueta" },
-      ]}
-    />
-    {#if byTags}<p>Un movimiento con varias etiquetas suma en cada una.</p>{/if}
-  </div>
-
-  {#if slices.length && !byTags}
-    <div class="st-pie">
-      {#key `${kind}${ym}${yearly}${by}`}
-        <Chart config={pieConfig} height={240} label="Reparto del periodo" />
-      {/key}
+  <MonthSwipe bind:ym step={yearly ? 12 : 1}>
+    <div class="st-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected={kind === "income"} class:on={kind === "income"} onclick={() => (kind = "income")}>
+        Ingresos <Money value={incomeTotal} />
+      </button>
+      <button type="button" role="tab" aria-selected={kind === "expense"} class:on={kind === "expense"} onclick={() => (kind = "expense")}>
+        Gastos <Money value={expenseTotal} />
+      </button>
     </div>
-  {/if}
 
-  <ul class="st-list">
-    {#each slices as s (s.key)}
-      <li>
-        <button type="button" onclick={() => pick(s.key)}>
-          <span class="st-pill" style:--c={s.color}>{pctLabel(s.pct)}</span>
-          <span class="st-name">{s.label}</span>
-          <Money value={s.total} />
-        </button>
-      </li>
-    {:else}
-      {#if !loading}<li class="st-empty">Nada en este periodo.</li>{/if}
-    {/each}
-  </ul>
+    <div class="st-by">
+      <Segmented
+        bind:value={by}
+        full
+        label="Repartir por"
+        options={[
+          { id: "category", label: "Por categoría" },
+          { id: "tag", label: "Por etiqueta" },
+        ]}
+      />
+      {#if byTags}<p>Un movimiento con varias etiquetas suma en cada una.</p>{/if}
+    </div>
+
+    {#if slices.length && !byTags}
+      <div class="st-pie">
+        {#key `${kind}${ym}${yearly}${by}`}
+          <Chart config={pieConfig} height={240} label="Reparto del periodo" />
+        {/key}
+      </div>
+    {/if}
+
+    <ul class="st-list">
+      {#each slices as s (s.key)}
+        <li>
+          <button type="button" onclick={() => pick(s.key)}>
+            <span class="st-pill" style:--c={s.color}>{pctLabel(s.pct)}</span>
+            <span class="st-name">{s.label}</span>
+            <Money value={s.total} />
+          </button>
+        </li>
+      {:else}
+        {#if !loading}<li class="st-empty">Nada en este periodo.</li>{/if}
+      {/each}
+    </ul>
+  </MonthSwipe>
 {:else}
   <TopBar>
     <button type="button" class="btn-icon sm" aria-label="Volver" onclick={back}><Icon name="arrow-left-02" size={20} /></button>
@@ -281,31 +284,33 @@
     {/snippet}
   </TopBar>
 
-  <div class="st-total">
-    <span>{kind === "expense" ? "Gastos" : "Ingresos"} del {yearly ? "año" : "mes"}</span>
-    <strong><Money value={filteredTotal} /></strong>
-  </div>
+  <MonthSwipe bind:ym step={yearly ? 12 : 1}>
+    <div class="st-total">
+      <span>{kind === "expense" ? "Gastos" : "Ingresos"} del {yearly ? "año" : "mes"}</span>
+      <strong><Money value={filteredTotal} /></strong>
+    </div>
 
-  <ul class="st-rows">
-    <li class="on"><span>Todas</span><span>100%</span><Money value={filteredTotal} /></li>
-    {#each slices as s (s.key)}
-      <li>
-        <button type="button" onclick={() => pick(s.key)}>
-          <span><i class="st-dot" style:--c={s.color}></i>{s.label}</span>
-          <span>{pctLabel(s.pct)}</span>
-          <Money value={s.total} />
-        </button>
-      </li>
-    {/each}
-  </ul>
+    <ul class="st-rows">
+      <li class="on"><span>Todas</span><span>100%</span><Money value={filteredTotal} /></li>
+      {#each slices as s (s.key)}
+        <li>
+          <button type="button" onclick={() => pick(s.key)}>
+            <span><i class="st-dot" style:--c={s.color}></i>{s.label}</span>
+            <span>{pctLabel(s.pct)}</span>
+            <Money value={s.total} />
+          </button>
+        </li>
+      {/each}
+    </ul>
 
-  <div class="st-line">
-    {#key `${kind}${ym}${yearly}${title}`}
-      <Chart config={lineConfig} height={200} label="Evolución en el tiempo" />
-    {/key}
-  </div>
+    <div class="st-line">
+      {#key `${kind}${ym}${yearly}${title}`}
+        <Chart config={lineConfig} height={200} label="Evolución en el tiempo" />
+      {/key}
+    </div>
 
-  <DayList txs={filtered} {onOpen} empty="Sin movimientos en este periodo." />
+    <DayList txs={filtered} {onOpen} empty="Sin movimientos en este periodo." />
+  </MonthSwipe>
 {/if}
 
 <style>

@@ -1,13 +1,16 @@
-<!-- La barra de arriba de cada pestaña del celular: lo suyo a la izquierda y las acciones a la derecha. -->
+<!-- La barra de arriba de cada pestaña del celular: lo suyo a la izquierda y
+     las acciones a la derecha, con el estado de la conexión cuando hace falta. -->
 <script lang="ts">
   import type { Snippet } from "svelte";
+
+  import SyncButton from "./SyncButton.svelte";
 
   let { children, actions }: { children: Snippet; actions?: Snippet } = $props();
 </script>
 
 <header class="tb">
   <div class="tb-main">{@render children()}</div>
-  {#if actions}<div class="tb-actions">{@render actions()}</div>{/if}
+  <div class="tb-actions"><SyncButton />{@render actions?.()}</div>
 </header>
 
 <style>

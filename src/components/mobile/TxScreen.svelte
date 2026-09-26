@@ -5,7 +5,7 @@
   categorías o un teclado de números— en vez del teclado del teléfono.
 
   Al anotar, cada elección pasa sola a la siguiente: cuenta → categoría →
-  importe → nota. "Continuar" guarda y deja la pantalla lista para otro con
+  importe → descripción. "Continuar" guarda y deja la pantalla lista para otro con
   la misma fecha y cuenta.
 -->
 <script lang="ts">
@@ -356,7 +356,7 @@
         </div>
 
         <label class="ts-row">
-          <span class="ts-label">Nota</span>
+          <span class="ts-label">Descripción</span>
           <input
             bind:this={noteEl}
             class="ts-value ts-input"
@@ -370,7 +370,7 @@
 
       <div class="ts-extra">
         <div class="ts-notes">
-          <textarea placeholder="Descripción" rows="1" bind:value={notes} onfocus={() => (panel = null)}></textarea>
+          <textarea placeholder="Notas" rows="1" bind:value={notes} onfocus={() => (panel = null)}></textarea>
           <label class="btn-icon ts-photo" aria-label="Agregar foto o recibo">
             <Icon name="camera-01" size={22} />
             <input
@@ -638,7 +638,7 @@
     text-overflow: ellipsis;
   }
 
-  /* --- Descripción, fotos y origen --- */
+  /* --- Notas, fotos y origen --- */
   .ts-extra {
     margin-top: var(--sp-12);
     padding: var(--sp-4) var(--sp-16) 0;

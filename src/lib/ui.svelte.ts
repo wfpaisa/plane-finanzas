@@ -32,3 +32,7 @@ export const txModal = {
     open = false;
   },
 };
+
+/** La hoja de lo guardado en el teléfono (celular): la abre el botón de
+ *  conexión de la barra de arriba, en cualquier pantalla. */
+export const syncSheet = $state({ open: false });
