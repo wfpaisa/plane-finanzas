@@ -57,6 +57,13 @@ describe("suggest", () => {
     expect(inbox.suggest(mail, { accounts, categories, rules: [regla] }).tx.tags).toEqual([]);
   });
 
+  test("una regla que descarta: se reconoce, pero no arma movimiento", () => {
+    const regla = { id: "r1", sender: "bancoprincipal", match: "panaderia", type: "discard" };
+    const s = inbox.suggest(mail, { accounts, categories, rules: [regla] });
+    expect(s.rule.id).toBe("r1");
+    expect(s.tx.rule).toBe("");
+  });
+
   test("una regla de otro remitente no aplica", () => {
     const regla = { id: "r1", sender: "billetera.co", match: "panaderia", account: "a3" };
     expect(inbox.suggest(mail, { accounts, categories, rules: [regla] }).rule).toBeNull();

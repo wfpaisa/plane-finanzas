@@ -269,12 +269,17 @@
         <span class="op">−</span>
         <div class="stat">
           <span class="s-label">Ahorros</span>
-          <span class="s-val accent"><Money value={plan.savings} /></span>
+          <span class="s-val saving"><Money value={plan.savings} /></span>
         </div>
         <span class="op">=</span>
-        <div class="stat free">
-          <span class="s-label">Disponible para otros gastos</span>
-          <span class="s-val"><Money value={plan.free} tone={plan.free < 0 ? "expense" : undefined} /></span>
+        <div class="stat free" class:short={plan.free < 0}>
+          <span class="s-label"><span class="free-dot"></span>Disponible para otros gastos</span>
+          <span class="s-val"><Money value={plan.free} /></span>
+          {#if plan.income > 0}
+            <span class="free-sub">
+              {plan.free < 0 ? "Te faltan cada mes" : `${Math.round(share(plan.free))}% de tus ingresos al mes`}
+            </span>
+          {/if}
         </div>
       </div>
       <div class="plan-bar" aria-hidden="true">
@@ -445,31 +450,65 @@
       font-weight: 700;
     }
 
-    & .accent {
-      color: var(--text-primary);
+    & .saving :global(.money) {
+      color: light-dark(oklch(from var(--viz-saving) calc(l - 0.12) c h), var(--viz-saving));
     }
 
+    /* El resultado: una tarjeta con el tinte de lo que queda --verde si
+       sobra, rojo si falta--, el mismo color de su tramo en la barra. */
     & .free {
+      --free-tone: var(--viz-free);
+      --free-ink: light-dark(oklch(from var(--free-tone) calc(l - 0.14) c h), var(--free-tone));
+
+      position: relative;
+      gap: var(--sp-4);
+      min-width: 15rem;
       margin-left: auto;
-      padding: var(--sp-10) var(--sp-16);
-      border-radius: var(--radius-md);
-      background: var(--text-primary);
-      color: var(--bg-level2);
+      padding: var(--sp-12) var(--sp-20);
+      overflow: hidden;
+      border: var(--border-width) solid oklch(from var(--free-tone) l c h / 0.4);
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(120% 140% at 100% 0%, oklch(from var(--free-tone) l c h / 0.28), transparent 60%),
+        oklch(from var(--free-tone) l c h / 0.1);
+      box-shadow: 0 0.5rem 1.5rem -0.75rem oklch(from var(--free-tone) l c h / 0.55);
+
+      &.short {
+        --free-tone: var(--viz-expense);
+      }
 
       & .s-label {
-        color: inherit;
-        opacity: 0.7;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--sp-6);
+        color: var(--text-secondary);
       }
 
       & .s-val {
-        font-size: 1.75rem;
-        color: inherit;
+        font-size: 1.875rem;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
       }
 
       & :global(.money) {
-        color: inherit;
+        color: var(--free-ink);
       }
     }
+  }
+
+  .free-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--free-tone);
+    box-shadow: 0 0 0 0.1875rem oklch(from var(--free-tone) l c h / 0.25);
+  }
+
+  .free-sub {
+    color: var(--free-ink);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    opacity: 0.85;
   }
 
   .op {

@@ -23,13 +23,14 @@
   --transfer: light-dark(var(--tinte-1), oklch(0.78 0.12 250));
 
   /* Las gráficas, en tonos de bruma: los mismos significados de siempre
-     (ingresos verdes, gastos rojos) pero apagados hacia el gris azulado del
+     (ingresos verdes, gastos rojos, ahorros azul pastel) pero apagados hacia el gris azulado del
      lienzo, para que convivan con él. La línea de tendencia va en la tinta
      azul marino. En oscuro, un punto más de luz. */
   --viz-income: light-dark(oklch(0.6 0.1 172), oklch(0.8 0.09 172));
   --viz-expense: light-dark(oklch(0.63 0.14 22), oklch(0.75 0.12 22));
-  --viz-saving: light-dark(oklch(0.64 0.09 268), oklch(0.79 0.075 268));
-  --viz-free: light-dark(oklch(0.55 calc(0.06 * var(--tint-k, 1)) var(--tint-h, 232)), oklch(0.8 calc(0.05 * var(--tint-k, 1)) var(--tint-h, 212)));
+  --viz-saving: light-dark(oklch(0.72 0.09 235), oklch(0.82 0.08 235));
+  /* Lo que queda libre en el plan: verde, como lo que entra. */
+  --viz-free: light-dark(oklch(0.6 0.11 158), oklch(0.8 0.1 158));
   --viz-line: light-dark(oklch(0.29 calc(0.045 * var(--tint-k, 1)) var(--tint-h, 240)), oklch(0.93 calc(0.035 * var(--tint-k, 1)) var(--tint-h, 178)));
   /* Lo que no tiene color propio ("Otras", una meta de referencia). */
   --viz-muted: light-dark(oklch(0.78 calc(0.015 * var(--tint-k, 1)) var(--tint-h, 230)), oklch(0.46 calc(0.02 * var(--tint-k, 1)) var(--tint-h, 235)));

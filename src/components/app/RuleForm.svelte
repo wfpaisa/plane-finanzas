@@ -113,7 +113,15 @@
   });
 
   // Las reglas de antes no decían el tipo: esa opción solo se ofrece a ellas.
-  const types = $derived(rule && !rule.type ? [{ id: "" as RuleType, label: "Según el correo", icon: "mail-01" }, ...TX_TYPES] : TX_TYPES);
+  /** Si ya se procesó con esta regla: se puede cambiar solo su movimiento. */
+  const usedHere = $derived(!!mail && !!rule && mail.row.status === "procesado");
+  // Descartar no aplica a un correo que ya es movimiento: ese se queda.
+  const types = $derived([
+    ...(rule && !rule.type ? [{ id: "" as RuleType, label: "Según el correo", icon: "mail-01" }] : []),
+    ...TX_TYPES,
+    ...(usedHere ? [] : [{ id: "discard" as RuleType, label: "Descartar", icon: "delete-02" }]),
+  ]);
+  const discarding = $derived(type === "discard");
   const cats = $derived(store.categories.filter((c) => c.kind === (type === "income" ? "income" : "expense")));
 
   // Al cambiar de tipo, una categoría del otro lado deja de valer.
@@ -140,8 +148,6 @@
   const original = $derived(mail?.suggestion.parsed?.description || mail?.row.subject || match.split(",")[0]?.trim().toUpperCase() || "GOU PAYMENTS S A");
   const preview = $derived(description.trim() ? renderDescription(description, date, original) : original);
 
-  /** Si ya se procesó con esta regla: se puede cambiar solo su movimiento. */
-  const usedHere = $derived(!!mail && !!rule && mail.row.status === "procesado");
   const title = $derived(usedHere ? "Regla de este movimiento" : rule ? "Editar regla" : "Nueva regla");
 
   function data() {
@@ -165,6 +171,7 @@
 
   function check(scope: "rule" | "this"): string {
     if (scope === "rule" && !sender.trim() && !match.trim()) return "Escribe un remitente o texto del correo.";
+    if (discarding) return "";
     if (!autoAmount && !(setAmount > 0)) return "Escribe la cantidad o usa la del correo.";
     if (mail) {
       if (!account) return "Elige la cuenta.";
@@ -181,7 +188,7 @@
     if (problem) return notify.fail(new Error(problem));
     busy = scope;
     try {
-      const r = await pb.send<{ created: number; updated: number; pending: number }>("/api/finanzas/inbox/rule", {
+      const r = await pb.send<{ created: number; updated: number; pending: number; discarded?: number }>("/api/finanzas/inbox/rule", {
         method: "POST",
         body: { rule: data(), inbox: mail?.row.id, scope, apply: applyNow },
       });
@@ -193,6 +200,7 @@
         if (r.created) parts.push(mail?.row.status === "procesado" ? "movimiento actualizado" : "movimiento creado");
         if (r.updated) parts.push(plural(r.updated, "movimiento actualizado", "movimientos actualizados"));
         if (r.pending) parts.push(plural(r.pending, "correo pendiente procesado", "correos pendientes procesados"));
+        if (r.discarded) parts.push(plural(r.discarded, "correo descartado", "correos descartados"));
       }
       notify.done(parts.join(" · "));
       if (r.created || r.updated || r.pending) touchTransactions();
@@ -274,11 +282,12 @@
         <Input bind:value={name} placeholder="Panadería, arriendo, pago de la tarjeta…" autofocus={!mail} />
       </Field>
 
+      <Segmented bind:value={type} options={types} full label="Tipo" />
+
+      {#if !discarding}
       <p class="rule-template-note">
         Los correos que coincidan crearán movimientos con estos datos.
       </p>
-
-      <Segmented bind:value={type} options={types} full label="Tipo" />
 
       <div class="form-grid">
         <!-- Sin Field: su <label> no puede envolver al del interruptor, y su
@@ -330,15 +339,24 @@
       <Field label="Notas">
         <Textarea bind:value={notes} rows={2} />
       </Field>
+      {/if}
 
       {#if rule || !mail}
         <div class="form-switches">
           {#if rule}<Switch bind:checked={paused} label="En pausa" />{/if}
-          {#if !mail && !paused}<Switch bind:checked={applyNow} label="Aplicar a correos ya importados" />{/if}
+          {#if !mail && !paused && !discarding}<Switch bind:checked={applyNow} label="Aplicar a correos ya importados" />{/if}
         </div>
       {/if}
 
-      {#if mail && !usedHere}
+      {#if discarding}
+        <p class="rule-outcome">
+          <Icon name="information-circle" size={16} />
+          <span>
+            {#if mail?.row.status === "pendiente"}Al guardar, este correo se descartará.{/if}
+            Los correos pendientes y nuevos que cumplan la regla se descartarán sin crear movimientos.
+          </span>
+        </p>
+      {:else if mail && !usedHere}
         <p class="rule-outcome">
           <Icon name="information-circle" size={16} />
           <span>
@@ -366,7 +384,11 @@
       <Button variant="secondary" loading={busy === "rule"} disabled={!!busy} onclick={() => save("rule")}>Actualizar regla y movimientos</Button>
     {:else}
       <Button variant="secondary" loading={busy === "rule"} onclick={() => save("rule")}>
-        {!mail ? "Guardar" : rule ? "Guardar y crear movimiento" : mail.row.status === "procesado" ? "Crear regla" : "Crear regla y movimiento"}
+        {#if discarding}
+          {!mail || mail.row.status === "procesado" ? (rule ? "Guardar" : "Crear regla") : rule ? "Guardar y descartar" : "Crear regla y descartar"}
+        {:else}
+          {!mail ? "Guardar" : rule ? "Guardar y crear movimiento" : mail.row.status === "procesado" ? "Crear regla" : "Crear regla y movimiento"}
+        {/if}
       </Button>
     {/if}
   {/snippet}

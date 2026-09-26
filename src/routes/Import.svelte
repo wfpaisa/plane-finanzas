@@ -83,8 +83,14 @@
     }
   }
 
-  async function saveSenders() {
-    if (await saveGmail({ senders })) notify.done("Remitentes guardados. La próxima lectura revisa los últimos 90 días.");
+  // Cada cambio de la lista se guarda solo, en fila: si se agregan dos
+  // seguidos, el segundo no pisa al primero con una lista vieja.
+  let saving: Promise<unknown> = Promise.resolve();
+  function setSenders(next: string[]) {
+    senders = next;
+    saving = saving.then(async () => {
+      if (await saveGmail({ senders: next })) notify.done("Remitentes guardados. La próxima lectura revisa los últimos 90 días.");
+    });
   }
 
   async function disconnect() {
@@ -97,7 +103,6 @@
     }
   }
 
-  const dirty = $derived(senders.join(",") !== (g?.senders ?? []).join(","));
   /** Los remitentes de las cuentas: también se leen. */
   const accountSenders = $derived([...new Set(store.activeAccounts.flatMap((a) => a.senders ?? []))]);
   const noSenders = $derived(store.activeAccounts.filter((a) => !a.senders?.length));
@@ -158,16 +163,15 @@
         {/if}
         <Field
           label="Remitentes transaccionales"
-          hint="Solo se leen los correos de estos remitentes: escribe el correo completo o una parte (el dominio o el nombre del banco) y pulsa Enter. La lectura se hace cada 30 minutos."
+          hint="Solo se leen los correos de estos remitentes: escribe el correo completo o una parte (el dominio o el nombre del banco) y pulsa Enter. Se guarda al instante. La lectura se hace cada 30 minutos."
         >
-          <TagInput bind:value={senders} prefix="" placeholder="alertas@banco.com, banco.com…" suggestions={config?.defaultSenders ?? []} />
+          <TagInput bind:value={() => senders, setSenders} prefix="" placeholder="alertas@banco.com, banco.com…" suggestions={config?.defaultSenders ?? []} />
         </Field>
         {#if accountSenders.length}
           <p class="muted small senders-note">También se leen los de tus cuentas: {accountSenders.join(", ")}.</p>
         {/if}
         <div class="flex flex-wrap items-center gap-3">
-          <Button size="sm" disabled={!dirty} onclick={saveSenders}>Guardar remitentes</Button>
-          <Button size="sm" variant="ghost" onclick={() => (senders = [...(config?.defaultSenders ?? [])])}>Usar los bancos comunes</Button>
+          <Button size="sm" variant="ghost" onclick={() => setSenders([...(config?.defaultSenders ?? [])])}>Usar los bancos comunes</Button>
           <span class="flex-1"></span>
           <Switch checked={g.paused} label="Pausar" onchange={(v) => saveGmail({ paused: v })} />
           <Button size="sm" variant="ghost" class="btn-danger" onclick={disconnect}><Icon name="unlink-01" />Desconectar</Button>

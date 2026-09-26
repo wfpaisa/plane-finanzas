@@ -330,7 +330,7 @@
 
   --success: oklch(0.789 0.185 152);
   --success-bg: oklch(0.262 0.038 157.6);
-  --danger: oklch(0.719 0.177 16.8);
+  --danger: oklch(66.323% 0.21689 20.222);
   --danger-bg: oklch(0.255 0.042 10.6);
   --danger-text: oklch(0.18 0.06 16.8);
   --warning: oklch(0.8 0.15 75);
@@ -441,7 +441,8 @@ input:autofill,
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px light-dark(rgba(255, 255, 255, 1), rgb(12, 13, 16)) inset;
+  -webkit-box-shadow: 0 0 0 1000px
+    light-dark(rgba(255, 255, 255, 1), rgb(12, 13, 16)) inset;
   -webkit-text-fill-color: var(--text-muted);
 }
 

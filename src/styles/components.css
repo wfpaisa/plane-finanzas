@@ -1642,12 +1642,13 @@ input[type="range"].field-control {
    --1.25rem el que enseña el color puesto dentro del campo hexadecimal,
    1.75rem el que se pulsa en los accesos rapidos-- siendo la misma cosa.
    La medida vive en `--swatch-size` para que no vuelva a separarse; el
-   cerco y la marca de elegido los pone `.opt-tile` cuando se pulsa. */
+   cerco y la marca de elegido los pone `.opt-tile` cuando se pulsa. Es un
+   círculo, como el punto de color de las cuentas (`ColorDot`). */
 .swatch-color {
   width: var(--swatch-size);
   height: var(--swatch-size);
   flex: none;
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
 }
 
 /* ----------------------------------------------------------

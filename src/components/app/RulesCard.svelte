@@ -96,7 +96,7 @@
               {#if r.amount}<span class="rule-amount">{money(r.amount)}</span>{/if}
               <Icon name="arrow-right-02" size={14} />
               <span class="rule-result">
-                {#if r.type}<span>{txTypeLabel(r.type)}</span>{/if}
+                {#if r.type}<span>{r.type === "discard" ? "Descarta" : txTypeLabel(r.type)}</span>{/if}
                 {#if acc}<span class="muted">{acc.name}{#if to} → {to.name}{/if}</span>{/if}
                 {#if r.description}<b>{r.description}</b>{/if}
                 {#if cat}<span class="muted">{cat.name}</span>{/if}

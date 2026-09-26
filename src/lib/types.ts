@@ -204,8 +204,8 @@ export interface Rule extends RecordModel {
   match: string;
   /** El movimiento debe traer este valor; 0: cualquiera. */
   amount: number;
-  /** Vacío: el que se leyó del correo. */
-  type: TxType | "";
+  /** Vacío: el que se leyó del correo. "discard": descarta los correos, no crea nada. */
+  type: TxType | "discard" | "";
   account: string;
   to_account: string;
   /** El valor del movimiento; 0: el del correo. */

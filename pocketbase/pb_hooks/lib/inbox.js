@@ -7,6 +7,10 @@
  * decide: descartarlo, crear el movimiento a mano (con lo que se leyó ya
  * puesto) o crear una regla para este y los que vengan.
  *
+ * Una regla de tipo "discard" descarta: lo que la cumple no se vuelve
+ * movimiento ni queda en la bandeja, y su id va a `ignored_imports` para no
+ * volver a leerse.
+ *
  * La cuenta se reconoce por el remitente: la primera cuya lista de
  * remitentes aparece en el "De:" del correo. Si dos cuentas comparten
  * remitente, gana la primera; la regla es la que dice cuál es.
@@ -115,9 +119,14 @@ function suggest(mail, ctx) {
   return {
     parsed: parsed ? { amount: parsed.amount, type: parsed.type, description: parsed.description, merchant: parsed.merchant, bank: parsed.bank } : null,
     rule: rule,
-    tx: rule ? withRule(rule, base) : strip(base),
+    tx: rule && !discards(rule) ? withRule(rule, base) : strip(base),
     pattern: { sender: address(mail.from), match: parsed && parsed.merchant ? parsed.merchant : "" },
   };
+}
+
+/** Si la regla descarta los correos en vez de volverlos movimiento. */
+function discards(rule) {
+  return !!rule && rule.type === "discard";
 }
 
 function strip(base) {
@@ -233,6 +242,11 @@ function ingest(app, userId, mails, opts) {
       continue;
     }
     var s = suggest(mail, ctx);
+    if (discards(s.rule)) {
+      ignored.remember(app, userId, mail.id);
+      out.skipped++;
+      continue;
+    }
     var row = new Record(col);
     row.set("owner", userId);
     row.set("external_id", mail.id);
@@ -261,7 +275,7 @@ function ingest(app, userId, mails, opts) {
   return out;
 }
 
-/** Pasa las reglas por lo pendiente. @returns {number} cuántos se volvieron movimiento */
+/** Pasa las reglas por lo pendiente. @returns {number} cuántos se volvieron movimiento o se descartaron */
 function processPending(app, userId) {
   var ctx = load(app, userId);
   if (!ctx.rules.length) return 0;
@@ -270,6 +284,12 @@ function processPending(app, userId) {
   for (var i = 0; i < rows.length; i++) {
     var mail = mailOf(rows[i]);
     var s = suggest(mail, ctx);
+    if (discards(s.rule)) {
+      // Al borrarlo queda en ignored_imports (ver main.pb.js).
+      app.delete(rows[i]);
+      n++;
+      continue;
+    }
     if (!s.rule || missing(s.tx)) continue;
     saveTx(app, userId, s.tx, mail, rows[i].getString("source"));
     rows[i].set("status", "procesado");
@@ -285,6 +305,11 @@ function processPending(app, userId) {
  * la persona lo pidió para ese correo. Si ya tenía movimiento, lo actualiza.
  */
 function applyRule(app, userId, row, rule) {
+  if (discards(rule)) {
+    // Uno pendiente se descarta; uno ya procesado conserva su movimiento.
+    if (row.getString("status") === "pendiente") app.delete(row);
+    return null;
+  }
   var ctx = load(app, userId);
   var mail = mailOf(row);
   var base = suggest(mail, { accounts: ctx.accounts, categories: ctx.categories, rules: [] });
@@ -305,6 +330,7 @@ function applyRule(app, userId, row, rule) {
  * vuelven. @returns {number} cuántos
  */
 function reapply(app, userId, rule) {
+  if (discards(rule)) return 0;
   var rows = app.findRecordsByFilter("inbox", "owner = {:u} && status = 'procesado'", "", 0, 0, { u: userId });
   var n = 0;
   for (var i = 0; i < rows.length; i++) {
@@ -358,7 +384,13 @@ function saveRule(app, userId, body) {
   clean.set_amount = Math.max(0, +data.set_amount || 0);
   clean.tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
   clean.paused = !!data.paused;
-  if (["income", "expense", "transfer"].indexOf(clean.type) < 0) clean.type = "";
+  if (["income", "expense", "transfer", "discard"].indexOf(clean.type) < 0) clean.type = "";
+  if (clean.type === "discard") {
+    // Descartar no crea nada: la plantilla sobra.
+    clean.account = clean.to_account = clean.category = clean.description = clean.notes = "";
+    clean.set_amount = 0;
+    clean.tags = [];
+  }
   if (clean.type !== "transfer") clean.to_account = "";
   if (clean.type === "transfer") clean.category = "";
   if (clean.account) mine(app, "accounts", clean.account, userId);
@@ -381,6 +413,16 @@ function saveRule(app, userId, body) {
   app.save(rec);
   var rule = rules.plain(rec);
 
+  if (discards(rule)) {
+    var discarded = 0;
+    if (row && !clean.paused && row.getString("status") === "pendiente") {
+      applyRule(app, userId, row, rule);
+      discarded++;
+    }
+    if (!clean.paused) discarded += processPending(app, userId);
+    return { rule: rec.id, created: 0, updated: 0, pending: 0, discarded: discarded };
+  }
+
   var created = 0;
   if (row && !clean.paused) {
     applyRule(app, userId, row, rule);
@@ -388,7 +430,7 @@ function saveRule(app, userId, body) {
   }
   var updated = 0;
   if (existed && body.apply !== false && !clean.paused) {
-    updated = reapply(app, userId, rule) + rules.applyExisting(app, userId, rec.id);
+    updated = discards(rule) ? 0 : reapply(app, userId, rule) + rules.applyExisting(app, userId, rec.id);
   }
   var pending = clean.paused ? 0 : processPending(app, userId);
   return { rule: rec.id, created: created, updated: updated, pending: pending };

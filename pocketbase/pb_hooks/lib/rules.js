@@ -222,8 +222,9 @@ function onlyLabels(rule) {
  * @returns {number} cuántos movimientos cambiaron
  */
 function applyExisting(app, userId, ruleId) {
+  // Las que descartan son para los correos: no cambian movimientos.
   var rules = load(app, userId).filter(function (r) {
-    return !ruleId || r.id === ruleId;
+    return (!ruleId || r.id === ruleId) && r.type !== "discard";
   });
   if (!rules.length) return 0;
   var withSender = rules.some(function (r) {
