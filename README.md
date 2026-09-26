@@ -43,11 +43,11 @@ Banco, tarjeta de crédito, efectivo, billeteras digitales, inversiones… Cada 
 ### Que los movimientos lleguen solos
 No tienes que escribir cada compra:
 
-- **Conecta tu Gmail** y la app lee cada 30 minutos las notificaciones de tu banco (Bancolombia, Nequi, Davivienda, BBVA, Nu, Bold y otros) y crea los movimientos **ya clasificados**.
+- **Conecta tu Gmail** y la app lee cada 30 minutos los correos de los remitentes que le indiques (tu banco, Nequi, Bold…). Llegan a una **bandeja**: abres cada correo y decides si crear el movimiento (ya viene llenado), crear una **regla** para que los que se parezcan se creen solos, o descartarlo.
 - **Pega un SMS o un correo** del banco y la app lo convierte en movimientos (antes te muestra una vista previa).
 - **Sube un CSV** exportado de otra app de gastos.
 
-Nunca se duplica nada. Si anotaste un gasto a mano y luego llega el mismo desde el banco, la app te pregunta si es el mismo. Lo que no tenga claro queda marcado con `#revisar`.
+Nunca se duplica nada. Si anotaste un gasto a mano y luego llega el mismo desde el banco, la app te pregunta si es el mismo. Nada se crea a ciegas: sin una regla tuya, el correo espera en la bandeja.
 
 ![Importar](docs/capturas/importar.png)
 
@@ -188,8 +188,9 @@ Se hace **una sola vez en el servidor** y sirve para todos los usuarios. Google 
 3. En **Credenciales** crea un **ID de cliente OAuth** de tipo *Aplicación web*, con este URI de redirección:
    `https://finanzas.midominio.com/api/finanzas/gmail/callback` (tu `APP_URL` + `/api/finanzas/gmail/callback`).
 4. Copia el ID y el secreto en `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del `.env` y reinicia (`docker compose up -d`).
-5. En la app: **Importar → Conectar Gmail**.
-6. En **Cuentas**, ponle a cada cuenta sus **pistas** (los últimos 4 dígitos o el nombre del banco) para que cada correo caiga en la cuenta correcta.
+5. En la app: **Ajustes → Gmail → Conectar Gmail**, y di qué **remitentes** son transaccionales.
+6. En **Cuentas**, ponle a cada cuenta sus **remitentes de correo** para que se proponga la cuenta de cada correo. Si dos cuentas comparten remitente, se propone la primera; una regla puede elegir otra.
+7. Revisa la **Bandeja**: la primera lectura deja todos los correos ahí para que decidas. Con cada regla que crees, los siguientes se hacen solos.
 
 ---
 
@@ -236,7 +237,7 @@ bun run seed -- --email yo@correo.com --password "clave-larga" --name "Yo" --fil
 ```
 pocketbase/
   pb_migrations/   esquema (colecciones + reglas por usuario)
-  pb_hooks/        Gmail, importar texto, reglas, respaldo, tareas automáticas
+  pb_hooks/        Gmail, bandeja, reglas, respaldo, tareas automáticas
     lib/parsers.js lector de notificaciones bancarias (probado en tests/)
 src/
   routes/          Resumen, Movimientos, Cuentas, Análisis, Ahorros, Plan futuro, Importar, Ajustes, vista móvil

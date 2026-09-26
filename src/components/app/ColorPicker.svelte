@@ -10,7 +10,12 @@
 <script lang="ts">
   import { parseHex, PRESET_COLORS } from "../../lib/palettes";
 
-  let { value = $bindable(""), label = "Color" }: { value?: string; label?: string } = $props();
+  let {
+    value = $bindable(""),
+    label = "Color",
+    presets = true,
+    placeholder = "#000000",
+  }: { value?: string; label?: string; presets?: boolean; placeholder?: string } = $props();
 
   let draft = $state<string | null>(null);
   const shown = $derived(draft ?? value);
@@ -45,12 +50,13 @@
       onblur={finish}
       onkeydown={(e) => e.key === "Enter" && finish()}
       spellcheck="false"
-      placeholder="#000000"
+      {placeholder}
       aria-label="{label}: código hexadecimal"
       class="color-text"
     />
   </label>
 
+  {#if presets}
   <div class="color-presets" role="group" aria-label="Colores rápidos">
     {#each PRESET_COLORS as p (p.hex)}
       <button
@@ -65,6 +71,7 @@
       ></button>
     {/each}
   </div>
+  {/if}
 </div>
 
 <style>
@@ -124,5 +131,9 @@
     font-size: var(--text-xs);
     text-transform: uppercase;
     outline: none;
+
+    &::placeholder {
+      text-transform: none;
+    }
   }
 </style>

@@ -31,7 +31,8 @@ export interface Account extends RecordModel {
   palette: string;
   icon: string;
   initial_balance: number;
-  match_keys: string;
+  /** Remitentes de correo que la reconocen: "alertas@banco.com", "banco.com". */
+  senders: string[] | null;
   exclude_from_total: boolean;
   archived: boolean;
   sort: number;
@@ -129,48 +130,91 @@ export interface Recurring extends RecordModel {
 export interface GmailConnection extends RecordModel {
   owner: string;
   email: string;
-  query: string;
+  /** Los remitentes que se leen, además de los de cada cuenta. */
+  senders: string[] | null;
   paused: boolean;
   last_sync: string;
-  last_result: { read: number; created: number; skipped: number; ignored: number; at: string } | null;
+  last_result: { read: number; created: number; pending?: number; skipped: number; at: string } | null;
   last_error: string;
 }
 
-export interface ImportItem {
-  externalId: string;
+/** Lo que dejó una lectura de Gmail o un texto pegado. */
+export interface SyncResult {
+  /** Los que una regla volvió movimiento. */
+  created: number;
+  /** Los que quedaron en la bandeja esperando una decisión. */
+  pending: number;
+  /** Los que ya se habían leído o se descartaron. */
+  skipped: number;
+  read?: number;
+}
+
+/** Un correo (o texto pegado) en la bandeja: ver pb_hooks/lib/inbox.js. */
+export interface InboxRow extends RecordModel {
+  owner: string;
+  external_id: string;
+  source: "gmail" | "texto";
+  sender: string;
+  subject: string;
+  date: string;
+  text: string;
+  /** El texto con negritas y enlaces, si llegó en HTML (ver parsers.htmlToRich). */
+  rich?: string;
+  parsed: { amount: number; type: TxType; description: string; merchant: string; bank: string | null } | null;
+  status: "pendiente" | "procesado";
+  rule: string;
+  expand?: { rule?: Rule };
+}
+
+/** El movimiento que se propone para un correo. */
+export interface TxDraft {
   type: TxType;
   amount: number;
   date: string;
-  description: string;
   account: string;
-  accountName: string;
-  toAccountName: string;
-  categoryName: string;
+  to_account: string;
+  category: string;
+  description: string;
+  notes: string;
   tags: string[];
-  bank: string | null;
-  /** "borrado": ya se importó y la persona lo borró; no vuelve. */
-  status: "creado" | "nuevo" | "duplicado" | "borrado" | "sin cuenta";
+  rule: string;
 }
 
-export interface ImportResult {
-  created: number;
-  skipped: number;
-  ignored: number;
-  read?: number;
-  items: ImportItem[];
+export interface Suggestion {
+  tx: TxDraft;
+  parsed: InboxRow["parsed"];
+  /** Con qué reconocer correos como este, para una regla nueva. */
+  pattern: { sender: string; match: string };
+  /** La regla que se usó (o que coincide hoy). */
+  rule: Rule | null;
+  /** El movimiento que ya tiene, si lo tiene. */
+  transaction: string;
 }
 
-/** "Si el movimiento dice X, es tal cosa": ver pb_hooks/lib/rules.js. */
+/**
+ * Una regla: la plantilla con que se crean los movimientos de los correos que
+ * coinciden. Ver pb_hooks/lib/rules.js.
+ */
 export interface Rule extends RecordModel {
   owner: string;
+  name: string;
+  /** El "De:" del correo debe tener alguno de estos (separados por coma). */
+  sender: string;
   /** Textos separados por coma; basta con que aparezca uno. */
   match: string;
   /** El movimiento debe traer este valor; 0: cualquiera. */
   amount: number;
+  /** Vacío: el que se leyó del correo. */
+  type: TxType | "";
+  account: string;
+  to_account: string;
+  /** El valor del movimiento; 0: el del correo. */
+  set_amount: number;
   category: string;
   tags: string[] | null;
   /** Admite {mes}, {año} y {original}. */
   description: string;
+  notes: string;
   to_notes: boolean;
   paused: boolean;
 }

@@ -105,7 +105,7 @@ describe("parseMessage", () => {
   });
 });
 
-describe("categorize y matchAccount", () => {
+describe("categorize", () => {
   const cats = [
     { id: "m", kind: "expense", keywords: "exito, carulla, d1, ara" },
     { id: "r", kind: "expense", keywords: "rappi, restaurante" },
@@ -119,43 +119,11 @@ describe("categorize y matchAccount", () => {
     expect(p.categorize("OTRA COSA", "expense", cats)).toBeNull();
   });
 
-  test("cuenta por terminación y luego por banco", () => {
-    const accounts = [
-      { id: "a", match_keys: "1234, bancolombia" },
-      { id: "b", match_keys: "nequi" },
-    ];
-    expect(p.matchAccount({ last4: ["1234"], bank: "Bancolombia" }, accounts).account.id).toBe("a");
-    expect(p.matchAccount({ last4: [], bank: "Nequi" }, accounts).account.id).toBe("b");
-    expect(p.matchAccount({ last4: ["9999"], bank: null }, accounts)).toBeNull();
-  });
-
-  test("con dos cuentas propias gana la terminación que va primero, no el orden de las cuentas", () => {
-    const accounts = [
-      { id: "tarjeta", match_keys: "5678" },
-      { id: "ahorros", match_keys: "1234" },
-    ];
-    expect(p.matchAccount({ last4: ["1234", "5678"], bank: null }, accounts).account.id).toBe("ahorros");
-    expect(p.matchAccount({ last4: ["5678"], bank: null }, accounts).account.id).toBe("tarjeta");
-  });
-
   test("categorías con las palabras ya partidas", () => {
     const withKeys = cats.map((c) => ({ ...c, keys: p.keywordsOf(c) }));
     expect(p.categorize("EXITO LAURELES", "expense", withKeys).id).toBe("m");
   });
 
-  test("pista de texto: una llave propia en el mensaje", () => {
-    const text =
-      "Bancolombia: ANA, transferiste $150,000.00 a la llave @ana123 desde tu cuenta *4321 a Ana Maria Perez Gomez el 20/09/26 a las 13:33.";
-    const accounts = [
-      { id: "a", match_keys: "4321, @otra, bancolombia" },
-      { id: "b", match_keys: "@ANA123, Bancolombia" },
-      { id: "c", match_keys: "nequi, 3001234567" },
-    ];
-    expect(p.matchKeyInText(text, accounts, "a").account.id).toBe("b");
-    // El origen no cuenta, y ni el banco ni las terminaciones son pistas de texto.
-    expect(p.matchKeyInText(text, accounts, "b")).toBeNull();
-    expect(p.matchKeyInText("Enviaste $50.000 al 3001234567", accounts, "a").account.id).toBe("c");
-  });
 });
 
 describe("gmail", () => {

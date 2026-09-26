@@ -1,27 +1,39 @@
 /**
- * Reglas del usuario: "si el movimiento dice X, es tal cosa".
+ * Reglas del usuario: plantillas con nombre. "Si el correo viene de X y dice
+ * Y, es tal movimiento".
  *
- * Se consultan al importar (Gmail o texto pegado) y se pueden aplicar a lo que
- * ya está guardado. Una regla que coincide manda sobre las palabras clave de
- * las categorías. Si coinciden varias, gana el texto más largo, igual que con
- * las categorías: "gou payments admin" antes que "gou payments".
+ * Se consultan al leer la bandeja (ver inbox.js): si una coincide, el correo
+ * se vuelve movimiento solo, con lo que diga la plantilla --tipo, cuentas,
+ * categoría, descripción, etiquetas y notas--. La fecha siempre es la del
+ * correo y el valor también, salvo que la regla fije uno (`set_amount`).
+ * También se pueden aplicar a lo que ya está guardado.
  *
- * Una regla con valor solo aplica si el movimiento trae ese valor, y gana
- * sobre las que no lo tienen: "GOU PAYMENTS" por $412.000 es la
- * administración aunque haya otra regla para "GOU PAYMENTS".
+ * Cuándo coincide: el remitente (`sender`, si lo tiene) debe aparecer en el
+ * "De:" del correo, y alguno de los textos (`match`, si tiene) en el correo.
+ * Si coinciden varias gana la más precisa: la que exige un valor (`amount`),
+ * luego la de texto más largo, y el remitente desempata. Una regla con solo
+ * remitente es la de "todo lo de este banco" y pierde con cualquiera con texto.
  */
 
 var parsers = require(__hooks + "/lib/parsers.js");
 
 var MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
-function keysOf(rule) {
-  return String(rule.match || "")
+function listOf(text) {
+  return String(text || "")
     .split(",")
     .map(function (k) {
       return parsers.norm(k);
     })
     .filter(Boolean);
+}
+
+function keysOf(rule) {
+  return listOf(rule.match);
+}
+
+function sendersOf(rule) {
+  return listOf(rule.sender);
 }
 
 /** Si el valor de la regla (0: cualquiera) coincide con el del movimiento. */
@@ -30,21 +42,38 @@ function amountMatches(rule, amount) {
   return !want || Math.abs(want - Math.abs(+amount || 0)) < 0.005;
 }
 
-/** La regla que le toca a un texto con su valor, o null. */
-function find(text, rules, amount) {
+/**
+ * Qué tan bien le queda una regla a un correo: 0 si no le queda. `hay` y
+ * `who` ya vienen comparables (ver `find`).
+ */
+function score(rule, hay, who, amount) {
+  if (rule.paused || !amountMatches(rule, amount)) return 0;
+  var senders = rule.senders || sendersOf(rule);
+  var keys = rule.keys || keysOf(rule);
+  if (!senders.length && !keys.length) return 0;
+  var fromOk = false;
+  for (var i = 0; i < senders.length; i++) if (who.indexOf(senders[i]) >= 0) fromOk = true;
+  if (senders.length && !fromOk) return 0;
+  var len = 0;
+  for (var j = 0; j < keys.length; j++) {
+    if (hay.indexOf(keys[j]) >= 0 && keys[j].length > len) len = keys[j].length;
+  }
+  if (keys.length && !len) return 0;
+  // El valor pesa más que cualquier texto, y el texto más que el remitente.
+  return (+rule.amount ? 100000 : 0) + (len ? 1000 + len : 0) + (senders.length ? 1 : 0);
+}
+
+/** La regla que le toca a un texto con su valor y remitente, o null. */
+function find(text, rules, amount, from) {
   var hay = " " + parsers.norm(text) + " ";
+  var who = parsers.norm(from);
   var best = null;
-  var bestLen = 0;
+  var bestScore = 0;
   for (var i = 0; i < rules.length; i++) {
-    if (rules[i].paused || !amountMatches(rules[i], amount)) continue;
-    // Con valor pesa más que cualquier largo de texto (máx. 500).
-    var bonus = +rules[i].amount ? 1000 : 0;
-    var keys = rules[i].keys || keysOf(rules[i]);
-    for (var j = 0; j < keys.length; j++) {
-      if (hay.indexOf(keys[j]) >= 0 && keys[j].length + bonus > bestLen) {
-        best = rules[i];
-        bestLen = keys[j].length + bonus;
-      }
+    var sc = score(rules[i], hay, who, amount);
+    if (sc > bestScore) {
+      best = rules[i];
+      bestScore = sc;
     }
   }
   return best;
@@ -63,22 +92,50 @@ function render(template, date, original) {
 }
 
 /**
- * Lo que cambia la regla en un movimiento. `tx` trae type, date, description,
- * notes, category y tags; devuelve los mismos campos ya ajustados.
+ * Lo que la regla hace con un movimiento. `tx` trae type, date, account,
+ * to_account, amount, description, notes, category y tags; devuelve los
+ * mismos campos (menos la fecha) ya ajustados. Lo que la regla no dice se
+ * queda como venía.
  */
 function apply(rule, tx) {
   var out = {
+    type: rule.type || tx.type,
+    account: rule.account || tx.account || "",
+    to_account: tx.to_account || "",
+    amount: +rule.set_amount > 0 ? +rule.set_amount : +tx.amount || 0,
     category: tx.category || "",
     tags: (tx.tags || []).slice(),
     description: tx.description || "",
     notes: tx.notes || "",
   };
-  // Una transferencia no lleva categoría.
-  if (rule.category && tx.type !== "transfer") {
+  if (out.type === "transfer") {
+    out.to_account = rule.to_account || out.to_account;
+    // Volverlo transferencia sin destino, o a la misma cuenta, no vale: se
+    // queda como venía.
+    if (tx.type !== "transfer" && (!out.to_account || out.to_account === out.account)) {
+      out.type = tx.type;
+      out.to_account = "";
+    }
+  } else {
+    out.to_account = "";
+  }
+
+  var known = false;
+  if (out.type === "transfer") {
+    // Una transferencia no lleva categoría.
+    out.category = "";
+    known = true;
+  } else if (rule.category) {
     out.category = rule.category;
-    // Ya se sabe qué es: deja de estar por revisar si era por la categoría.
+    known = true;
+  } else if (out.type !== tx.type) {
+    // La del otro tipo ya no vale.
+    out.category = "";
+  }
+  // Ya se sabe qué es: deja de estar por revisar, salvo que falte la cuenta.
+  if (known) {
     out.tags = out.tags.filter(function (t) {
-      return t !== "revisar" || tx.accountUnknown;
+      return t !== "revisar" || (tx.accountUnknown && !rule.account);
     });
   }
   var ruleTags = rule.tags || [];
@@ -98,39 +155,77 @@ function apply(rule, tx) {
       out.description = next;
     }
   }
+  var ruleNotes = String(rule.notes || "").trim();
+  if (ruleNotes && out.notes.indexOf(ruleNotes) < 0) out.notes = out.notes ? out.notes + "\n" + ruleNotes : ruleNotes;
   return out;
+}
+
+function jsonList(record, field) {
+  try {
+    var v = JSON.parse(record.getString(field) || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+/** Un registro de regla como objeto simple, con sus textos ya partidos. */
+function plain(r) {
+  var rule = {
+    id: r.id,
+    name: r.getString("name"),
+    sender: r.getString("sender"),
+    match: r.getString("match"),
+    amount: r.getFloat("amount"),
+    type: r.getString("type"),
+    account: r.getString("account"),
+    to_account: r.getString("to_account"),
+    set_amount: r.getFloat("set_amount"),
+    category: r.getString("category"),
+    tags: jsonList(r, "tags"),
+    description: r.getString("description"),
+    notes: r.getString("notes"),
+    to_notes: r.getBool("to_notes"),
+    paused: r.getBool("paused"),
+  };
+  rule.keys = keysOf(rule);
+  rule.senders = sendersOf(rule);
+  return rule;
 }
 
 /**
  * Las reglas activas de un usuario, como objetos simples. Con sus textos ya
- * partidos (`keys`): al aplicarlas a todo lo guardado se consultan miles de
- * veces.
+ * partidos: al aplicarlas a todo lo guardado se consultan miles de veces.
  */
 function load(app, userId) {
-  return app.findRecordsByFilter("rules", "owner = {:u} && paused = false", "created", 500, 0, { u: userId }).map(function (r) {
-    var tags = [];
-    try {
-      tags = JSON.parse(r.getString("tags") || "[]") || [];
-    } catch (_) {
-      tags = [];
-    }
-    var rule = {
-      id: r.id,
-      match: r.getString("match"),
-      amount: r.getFloat("amount"),
-      category: r.getString("category"),
-      tags: Array.isArray(tags) ? tags : [],
-      description: r.getString("description"),
-      to_notes: r.getBool("to_notes"),
-    };
-    rule.keys = keysOf(rule);
-    return rule;
-  });
+  return app.findRecordsByFilter("rules", "owner = {:u} && paused = false", "created", 500, 0, { u: userId }).map(plain);
+}
+
+/** De cada correo de la bandeja, su remitente: los movimientos no lo guardan. */
+function sendersByExternalId(app, userId) {
+  var out = {};
+  var rows = app.findRecordsByFilter("inbox", "owner = {:u}", "", 0, 0, { u: userId });
+  for (var i = 0; i < rows.length; i++) out[rows[i].getString("external_id")] = rows[i].getString("sender");
+  return out;
+}
+
+/** La regla sin lo que cambia el movimiento en sí: tipo, cuentas y valor. */
+function onlyLabels(rule) {
+  var out = {};
+  for (var k in rule) out[k] = rule[k];
+  out.type = "";
+  out.account = "";
+  out.to_account = "";
+  out.set_amount = 0;
+  return out;
 }
 
 /**
  * Aplica las reglas a lo ya guardado. Con `ruleId`, solo esa regla. Busca en
- * la descripción, las notas y el texto original del correo.
+ * la descripción, las notas y el texto original del correo. A lo importado
+ * le aplica la plantilla completa; a lo anotado a mano, solo categoría,
+ * etiquetas, descripción y notas: el tipo, la cuenta y el valor que alguien
+ * escribió no se tocan.
  * @returns {number} cuántos movimientos cambiaron
  */
 function applyExisting(app, userId, ruleId) {
@@ -138,29 +233,36 @@ function applyExisting(app, userId, ruleId) {
     return !ruleId || r.id === ruleId;
   });
   if (!rules.length) return 0;
+  var withSender = rules.some(function (r) {
+    return r.senders.length;
+  });
+  var senders = withSender ? sendersByExternalId(app, userId) : {};
   var list = app.findRecordsByFilter("transactions", "owner = {:u}", "", 0, 0, { u: userId });
   var changed = 0;
   for (var i = 0; i < list.length; i++) {
     var r = list[i];
+    var ext = r.getString("external_id");
     var text = r.getString("description") + " " + r.getString("notes") + " " + r.getString("raw");
-    var rule = find(text, rules, r.getFloat("amount"));
+    var rule = find(text, rules, r.getFloat("amount"), senders[ext] || "");
     if (!rule) continue;
-    var tags = [];
-    try {
-      tags = JSON.parse(r.getString("tags") || "[]") || [];
-    } catch (_) {
-      tags = [];
-    }
     var before = {
       type: r.getString("type"),
       date: r.getString("date").slice(0, 10),
+      account: r.getString("account"),
+      to_account: r.getString("to_account"),
+      amount: r.getFloat("amount"),
       description: r.getString("description"),
       notes: r.getString("notes"),
       category: r.getString("category"),
-      tags: tags,
+      tags: jsonList(r, "tags"),
     };
-    var after = apply(rule, before);
+    var imported = ext && (r.getString("source") === "gmail" || r.getString("source") === "texto");
+    var after = apply(imported ? rule : onlyLabels(rule), before);
     var same =
+      after.type === before.type &&
+      after.account === before.account &&
+      after.to_account === before.to_account &&
+      after.amount === before.amount &&
       after.category === before.category &&
       after.description === before.description &&
       after.notes === before.notes &&
@@ -175,6 +277,10 @@ function applyExisting(app, userId, ruleId) {
       continue;
     }
     r.set("rule", rule.id);
+    r.set("type", after.type);
+    r.set("account", after.account);
+    r.set("to_account", after.to_account);
+    r.set("amount", after.amount);
     r.set("category", after.category);
     r.set("tags", after.tags);
     r.set("description", after.description.slice(0, 200));
@@ -186,4 +292,4 @@ function applyExisting(app, userId, ruleId) {
   return changed;
 }
 
-module.exports = { find: find, render: render, apply: apply, load: load, applyExisting: applyExisting };
+module.exports = { find: find, render: render, apply: apply, plain: plain, load: load, applyExisting: applyExisting };

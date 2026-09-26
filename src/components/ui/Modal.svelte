@@ -40,6 +40,7 @@
   } = $props();
 
   let panel = $state<HTMLDivElement | null>(null);
+  let root = $state<HTMLDivElement | null>(null);
 
   /*
    * Escape cierra, y el foco entra al panel. Los dos los traia gratis el
@@ -51,7 +52,11 @@
   $effect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      // Con un modal abierto sobre otro (crear una cuenta desde una regla),
+      // Escape cierra solo el de encima.
+      const all = document.querySelectorAll(".dialog-modal");
+      if (all[all.length - 1] === root) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -165,7 +170,7 @@
     que cambia respecto de antes es el peldano, porque el suyo es 999. Ver la
     escala en `styles/global.css`.
   -->
-  <div use:portal {id} role="dialog" aria-modal="true" aria-label={title} class="dialog-modal">
+  <div bind:this={root} use:portal {id} role="dialog" aria-modal="true" aria-label={title} class="dialog-modal">
     <!-- Cerrar tocando el fondo; va antes para que la tarjeta pinte encima. -->
     <button
       type="button"

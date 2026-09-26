@@ -304,67 +304,6 @@ function categorize(text, type, categories) {
   return best;
 }
 
-function keysOf(account) {
-  return String(account.match_keys || "")
-    .split(",")
-    .map(function (k) {
-      return norm(k);
-    })
-    .filter(Boolean);
-}
-
-/**
- * La cuenta propia por sus pistas: `match_keys` (coma) contra los cuatro
- * últimos y el nombre del banco. Las terminaciones se miran en su orden:
- * con dos cuentas propias en el mensaje gana la primera (la de origen), no
- * la que esté primero en la lista de cuentas.
- */
-function matchAccount(parsed, accounts) {
-  var digits = parsed.last4 || [];
-  var bank = norm(parsed.bank || "");
-  var keys = accounts.map(keysOf);
-  for (var d = 0; d < digits.length; d++) {
-    for (var i = 0; i < accounts.length; i++) {
-      if (keys[i].indexOf(digits[d]) >= 0) return { account: accounts[i], key: digits[d] };
-    }
-  }
-  if (bank) {
-    for (var j = 0; j < accounts.length; j++) {
-      if (keys[j].indexOf(bank) >= 0) return { account: accounts[j], key: bank };
-    }
-  }
-  return null;
-}
-
-function isBankName(key) {
-  for (var i = 0; i < BANKS.length; i++) {
-    if (norm(BANKS[i].name) === key || norm(BANKS[i].id) === key) return true;
-    for (var j = 0; j < BANKS[i].hints.length; j++) if (norm(BANKS[i].hints[j]) === key) return true;
-  }
-  return false;
-}
-
-/**
- * La cuenta propia cuya pista de texto --una llave como "@ana123", un
- * celular, un número de cuenta completo-- aparece en el mensaje. Sirve para
- * ver que un "transferiste a la llave @ana123" va a otra cuenta mía. No
- * cuentan las terminaciones de cuatro dígitos ni los nombres de banco, que
- * salen en casi cualquier correo; tampoco la cuenta `exceptId` (el origen).
- */
-function matchKeyInText(text, accounts, exceptId) {
-  var hay = norm(text);
-  for (var i = 0; i < accounts.length; i++) {
-    if (accounts[i].id === exceptId) continue;
-    var keys = String(accounts[i].match_keys || "").split(",");
-    for (var j = 0; j < keys.length; j++) {
-      var k = norm(keys[j]);
-      if (k.length < 4 || /^\d{4}$/.test(k) || isBankName(k)) continue;
-      if (hay.indexOf(k) >= 0) return { account: accounts[i], key: k };
-    }
-  }
-  return null;
-}
-
 /** Sacar el texto legible de un HTML de correo. */
 function htmlToText(html) {
   return String(html || "")
@@ -390,15 +329,98 @@ function htmlToText(html) {
     .trim();
 }
 
+// Marcas del texto con formato (ver `htmlToRich`): caracteres de uso
+// privado, que no salen en un correo.
+var B_ON = "\uE000";
+var B_OFF = "\uE001";
+var A_ON = "\uE002";
+var A_HREF_END = "\uE003";
+var A_OFF = "\uE004";
+
+function entities(s) {
+  return s
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#36;|&dollar;/gi, "$")
+    .replace(/&aacute;/gi, "á")
+    .replace(/&eacute;/gi, "é")
+    .replace(/&iacute;/gi, "í")
+    .replace(/&oacute;/gi, "ó")
+    .replace(/&uacute;/gi, "ú")
+    .replace(/&ntilde;/gi, "ñ")
+    .replace(/&#(\d+);/g, function (_, n) {
+      return String.fromCharCode(+n);
+    });
+}
+
+/**
+ * El texto de un HTML de correo con lo poco de formato que ayuda a leerlo:
+ * negritas y enlaces. No es HTML: son marcas (`B_ON`…`A_OFF`) que la app
+ * convierte en elementos, así que nada del correo llega a la página como
+ * código. Enlace: A_ON + url + A_HREF_END + texto + A_OFF; solo http(s) y
+ * mailto.
+ */
+function htmlToRich(html) {
+  var src = String(html || "")
+    .replace(/[\uE000-\uE004]/g, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ");
+  var out = "";
+  var bold = 0;
+  var link = false;
+  var re = /<(\/?)([a-z0-9]+)([^>]*)>/gi;
+  var last = 0;
+  var m;
+  while ((m = re.exec(src))) {
+    out += src.slice(last, m.index);
+    last = m.index + m[0].length;
+    var close = !!m[1];
+    var tag = m[2].toLowerCase();
+    if (tag === "b" || tag === "strong") {
+      if (!close) {
+        if (!bold++) out += B_ON;
+      } else if (bold && !--bold) out += B_OFF;
+    } else if (tag === "a") {
+      if (!close && !link) {
+        var h = /href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(m[3]);
+        var href = h ? entities(h[1] || h[2] || h[3] || "").trim() : "";
+        if (/^(https?:|mailto:)/i.test(href)) {
+          out += A_ON + href.replace(/[\s\uE000-\uE004]/g, "") + A_HREF_END;
+          link = true;
+        }
+      } else if (close && link) {
+        out += A_OFF;
+        link = false;
+      }
+    } else if (tag === "br" || (close && /^(p|div|tr|li|h\d|table)$/.test(tag))) {
+      out += "\n";
+    } else if (close && tag === "td") {
+      out += " ";
+    }
+  }
+  out += src.slice(last);
+  if (link) out += A_OFF;
+  if (bold) out += B_OFF;
+  return entities(out)
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
 module.exports = {
+  htmlToRich: htmlToRich,
   norm: norm,
   parseAmount: parseAmount,
   parseDate: parseDate,
   parseMessage: parseMessage,
+  today: today,
   keywordsOf: keywordsOf,
   categorize: categorize,
-  matchAccount: matchAccount,
-  matchKeyInText: matchKeyInText,
   detectBank: detectBank,
   findLast4: findLast4,
   htmlToText: htmlToText,

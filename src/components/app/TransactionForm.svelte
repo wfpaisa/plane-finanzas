@@ -13,10 +13,13 @@
   import { pb, session } from "../../lib/pb.svelte";
   import { go } from "../../lib/router.svelte";
   import { store, touchTransactions } from "../../lib/store.svelte";
-  import type { Transaction } from "../../lib/types";
+  import { ruleLabel } from "../../lib/rules";
+  import type { Rule, Transaction, TxDraft } from "../../lib/types";
   import Icon from "../Icon.svelte";
   import { Button, ConfirmDialog, Field, Input, Modal, Select, Textarea } from "../ui";
+  import AccountSelect from "./AccountSelect.svelte";
   import MoneyInput from "./MoneyInput.svelte";
+  import RuleForm from "./RuleForm.svelte";
   import Segmented from "./Segmented.svelte";
   import TagInput from "./TagInput.svelte";
 
@@ -24,14 +27,22 @@
     open,
     tx = null,
     preset,
+    draft,
+    origin,
     onClose,
+    onSaved,
     knownTags = [],
   }: {
     open: boolean;
     tx?: Transaction | null;
     /** Valores de partida para una nueva (la cuenta desde la que se abre, por ejemplo). */
     preset?: Partial<Pick<Transaction, "type" | "account" | "category">>;
+    /** Todo ya llenado: lo que se leyó de un correo de la bandeja. */
+    draft?: TxDraft | null;
+    /** El correo del que sale: queda guardado con el movimiento tal como llegó. */
+    origin?: { external_id: string; raw: string; source: "gmail" | "texto"; sender?: string } | null;
     onClose: () => void;
+    onSaved?: () => void;
     knownTags?: string[];
   } = $props();
 
@@ -49,6 +60,17 @@
   let busy = $state(false);
   let confirmDelete = $state(false);
   let showRaw = $state(false);
+  /** La regla que lo creó, abierta encima; al cerrarla se vuelve aquí. */
+  let rule = $state<Rule | null>(null);
+
+  async function openRule() {
+    if (!tx?.rule) return;
+    try {
+      rule = tx.expand?.rule ?? (await pb.collection("rules").getOne<Rule>(tx.rule));
+    } catch (err) {
+      notify.fail(err);
+    }
+  }
 
   // Se llena al abrir o al cambiar de tx, y solo entonces: lo demás que
   // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
@@ -57,17 +79,18 @@
     if (!open) return;
     void tx;
     untrack(() => {
-      type = tx?.type ?? preset?.type ?? "expense";
-      amount = tx?.amount ?? 0;
-      date = tx ? tx.date.slice(0, 10) : today();
-      account = tx?.account ?? preset?.account ?? store.activeAccounts[0]?.id ?? "";
-      toAccount = tx?.to_account ?? "";
-      category = tx?.category ?? preset?.category ?? "";
-      description = tx?.description ?? "";
-      notes = tx?.notes ?? "";
-      tags = [...(tx?.tags ?? [])];
+      type = tx?.type ?? draft?.type ?? preset?.type ?? "expense";
+      amount = tx?.amount ?? draft?.amount ?? 0;
+      date = tx ? tx.date.slice(0, 10) : (draft?.date ?? today());
+      account = tx?.account ?? (draft?.account || preset?.account || store.activeAccounts[0]?.id || "");
+      toAccount = tx?.to_account ?? draft?.to_account ?? "";
+      category = tx?.category ?? draft?.category ?? preset?.category ?? "";
+      description = tx?.description ?? draft?.description ?? "";
+      notes = tx?.notes ?? draft?.notes ?? "";
+      tags = [...(tx?.tags ?? draft?.tags ?? [])];
       files = [];
       removed = [];
+      rule = null;
       showRaw = false;
     });
   });
@@ -109,20 +132,23 @@
         notes,
         tags,
       };
+      // Lo que viene de un correo guarda de dónde salió; así la bandeja lo da por hecho.
+      const born = origin ? { source: origin.source, external_id: origin.external_id, raw: origin.raw.slice(0, 4000) } : { source: "manual" };
       if (files.length || removed.length) {
         // Los adjuntos van directo al servidor: necesitan conexión.
         if (files.length) data["attachments+"] = files;
         if (removed.length) data["attachments-"] = removed;
         if (tx) await pb.collection("transactions").update(tx.id, data);
-        else await pb.collection("transactions").create({ ...data, source: "manual" });
+        else await pb.collection("transactions").create({ ...data, ...born });
         touchTransactions();
       } else if (tx) {
         // Lo demás pasa por la cola: funciona sin internet y se envía después.
         await offline.update("transactions", tx.id, data, tx);
       } else {
-        await offline.create("transactions", { ...data, source: "manual" });
+        await offline.create("transactions", { ...data, ...born });
       }
-      notify.done(!offline.online ? "Guardado en el teléfono: se envía al volver la conexión" : tx ? "Guardado" : "Transacción agregada");
+      notify.done(!offline.online ? "Guardado sin conexión. Se enviará al reconectar." : tx ? "Guardado" : "Movimiento creado");
+      onSaved?.();
       onClose();
     } catch (err) {
       notify.fail(err);
@@ -145,10 +171,13 @@
     }
   }
 
-  const title = $derived(tx ? "Editar movimiento" : "Nuevo movimiento");
+  const title = $derived(tx ? "Editar movimiento" : origin ? "Movimiento del correo" : "Nuevo movimiento");
+
+  /** Si vino de un correo de la bandeja: ahí se ve el correo y su regla. */
+  const fromMail = (t: Transaction) => !!t.external_id && (t.source === "gmail" || t.source === "texto");
 </script>
 
-<Modal {open} {onClose} {title}>
+<Modal open={open && !rule} {onClose} {title}>
   <div class="tx-form">
     <Segmented bind:value={type} options={TX_TYPES} full label="Tipo" />
 
@@ -160,20 +189,11 @@
         <input type="date" class="field-control w-full" bind:value={date} />
       </Field>
       <Field label={type === "transfer" ? "Desde" : "Cuenta"}>
-        <Select bind:value={account}>
-          {#each store.activeAccounts as a (a.id)}
-            <option value={a.id}>{a.name}</option>
-          {/each}
-        </Select>
+        <AccountSelect bind:value={account} senders={origin?.sender ? [origin.sender] : []} />
       </Field>
       {#if type === "transfer"}
         <Field label="Hacia">
-          <Select bind:value={toAccount}>
-            <option value="">Elige…</option>
-            {#each store.activeAccounts.filter((a) => a.id !== account) as a (a.id)}
-              <option value={a.id}>{a.name}</option>
-            {/each}
-          </Select>
+          <AccountSelect bind:value={toAccount} placeholder="Elige…" exclude={account} />
         </Field>
       {:else}
         <Field label="Categoría">
@@ -244,12 +264,20 @@
       </label>
     </div>
 
-    {#if tx && ((tx.source && tx.source !== "manual") || tx.rule)}
+    {#if origin && !tx}
+      <div class="tx-origin">
+        <span>Origen: <b>{SOURCE_LABEL[origin.source]}</b></span>
+        <button type="button" class="link" onclick={() => (showRaw = !showRaw)}>{showRaw ? "Ocultar" : "Ver"} texto original</button>
+      </div>
+      {#if showRaw}<pre class="tx-raw">{origin.raw}</pre>{/if}
+    {:else if tx && ((tx.source && tx.source !== "manual") || tx.rule)}
       <div class="tx-origin">
         <span>
           {#if tx.source && tx.source !== "manual"}Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b>{/if}
           {#if tx.rule}
-            <span class="tx-origin-rule"><Icon name="flash" size={12} />Ajustado por la regla <b>«{tx.expand?.rule?.match ?? "…"}»</b></span>
+            <button type="button" class="tx-origin-rule" data-tip="Ver la regla" onclick={openRule}>
+              <Icon name="flash" size={12} />Creado con la regla <b>«{ruleLabel(tx.expand?.rule)}»</b>
+            </button>
           {/if}
         </span>
         {#if tx.raw}
@@ -277,12 +305,25 @@
       >
         <Icon name="delete-02" size={18} />
       </button>
-      {#if tx.description}
+      {#if fromMail(tx)}
+        <button
+          type="button"
+          class="btn-icon foot-icon"
+          aria-label="Ver el correo"
+          data-tip="Ver correo y regla"
+          onclick={() => {
+            onClose();
+            go("/bandeja", { correo: tx.external_id });
+          }}
+        >
+          <Icon name="mail-open-01" size={18} />
+        </button>
+      {:else if tx.description}
         <button
           type="button"
           class="btn-icon foot-icon"
           aria-label="Crear regla"
-          data-tip="Crear regla: que los movimientos con este texto se categoricen solos"
+          data-tip="Crear regla para este texto"
           onclick={() => {
             onClose();
             go("/ajustes", { regla: tx.description });
@@ -297,6 +338,18 @@
     <Button variant="secondary" loading={busy} onclick={save}>Guardar</Button>
   {/snippet}
 </Modal>
+
+<!-- Si la regla cambia, puede rehacer este movimiento: se cierra todo. -->
+<RuleForm
+  open={open && !!rule}
+  {rule}
+  onClose={() => (rule = null)}
+  onSaved={() => {
+    rule = null;
+    onSaved?.();
+    onClose();
+  }}
+/>
 
 <ConfirmDialog
   open={confirmDelete}
@@ -401,7 +454,17 @@
     align-items: center;
     gap: 0.25rem;
     margin-inline-start: var(--sp-8);
+    padding: 0;
+    border: 0;
+    background: none;
     color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover b {
+      text-decoration: underline;
+      text-underline-offset: 0.15em;
+    }
   }
 
   .tx-raw {

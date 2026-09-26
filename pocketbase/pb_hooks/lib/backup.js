@@ -21,12 +21,13 @@ var VERSION = 1;
 // Los campos que se guardan de cada colección, sin id, dueño ni fechas de registro.
 var FIELDS = {
   categories: ["name", "kind", "icon", "color", "keywords", "budget", "tags"],
-  accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "match_keys", "exclude_from_total", "archived", "sort", "notes"],
+  accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "senders", "exclude_from_total", "archived", "sort", "notes"],
   recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
-  rules: ["match", "amount", "category", "tags", "description", "to_notes", "paused"],
+  rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "to_notes", "paused"],
+  inbox: ["external_id", "source", "sender", "subject", "date", "text", "rich", "parsed", "status", "rule"],
   ignored_imports: ["external_id"],
 };
 
@@ -43,7 +44,7 @@ function own(app, name, userId) {
 
 function exportData(app, userId) {
   var data = {};
-  var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules", "ignored_imports"];
+  var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules", "inbox", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     data[names[i]] = own(app, names[i], userId).map(function (r) {
       var row = plainOf(r, FIELDS[names[i]]);
@@ -66,7 +67,7 @@ function exportData(app, userId) {
   var gmail = null;
   try {
     var g = app.findFirstRecordByFilter("gmail_connections", "owner = {:u}", { u: userId });
-    gmail = { query: g.getString("query"), paused: g.getBool("paused") };
+    gmail = { senders: JSON.parse(g.getString("senders") || "[]"), paused: g.getBool("paused") };
   } catch (_) {
     // Sin Gmail conectado.
   }
@@ -107,7 +108,7 @@ function clean(app, userId) {
   var counts = {};
   // Primero lo que depende de otros, para que ningún borrado en cascada
   // descuadre la cuenta.
-  var names = ["rules", "transactions", "recurring", "savings", "accounts", "categories", "ignored_imports"];
+  var names = ["inbox", "rules", "transactions", "recurring", "savings", "accounts", "categories", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     var list = own(app, names[i], userId);
     for (var j = 0; j < list.length; j++) app.delete(list[j]);
@@ -122,6 +123,30 @@ function clean(app, userId) {
     // Sin Gmail conectado.
   }
   return counts;
+}
+
+function sendersFromKeys(keys) {
+  return String(keys || "")
+    .split(",")
+    .map(function (k) {
+      return k.trim().toLowerCase();
+    })
+    .filter(function (k) {
+      return /[a-z]/.test(k) && k.charAt(0) !== "@";
+    });
+}
+
+function sendersFromQuery(q) {
+  var m = /from:\(([^)]*)\)/i.exec(String(q || ""));
+  if (!m) return null;
+  return m[1]
+    .split(/\s+/)
+    .map(function (s) {
+      return s.trim().toLowerCase();
+    })
+    .filter(function (s) {
+      return s && s !== "or";
+    });
 }
 
 function userExists(app, id) {
@@ -190,7 +215,10 @@ function restoreData(app, userId, data, counts) {
     insert("categories", data.categories, function (r, row) {
       if (!row.tags && row.group) r.set("tags", [row.group]);
     });
-    insert("accounts", data.accounts);
+    // Los respaldos de antes traen pistas (`match_keys`): pasan las que parecen remitente.
+    insert("accounts", data.accounts, function (r, row) {
+      if (!row.senders && row.match_keys) r.set("senders", sendersFromKeys(row.match_keys));
+    });
     insert("recurring", data.recurring, function (r, row) {
       r.set("category", map("categories", row.category));
       r.set("account", map("accounts", row.account));
@@ -199,6 +227,8 @@ function restoreData(app, userId, data, counts) {
     // Los respaldos de antes de las reglas no las traen.
     insert("rules", data.rules, function (r, row) {
       r.set("category", map("categories", row.category));
+      r.set("account", map("accounts", row.account));
+      r.set("to_account", map("accounts", row.to_account));
     });
     insert("transactions", data.transactions, function (r, row) {
       r.set("account", map("accounts", row.account));
@@ -243,6 +273,11 @@ function restoreData(app, userId, data, counts) {
       r.set("account", map("accounts", row.account));
     });
 
+    // La bandeja; los respaldos de antes no la traen.
+    insert("inbox", data.inbox, function (r, row) {
+      r.set("rule", map("rules", row.rule));
+    });
+
     // Lo borrado a propósito; los respaldos de antes no lo traen.
     insert("ignored_imports", data.ignored_imports);
 
@@ -257,7 +292,9 @@ function restoreData(app, userId, data, counts) {
     if (data.gmail) {
       try {
         var g = tx.findFirstRecordByFilter("gmail_connections", "owner = {:u}", { u: userId });
-        if (data.gmail.query) g.set("query", data.gmail.query);
+        // Los respaldos de antes traen la búsqueda escrita: "from:(a OR b)".
+        var senders = data.gmail.senders || sendersFromQuery(data.gmail.query);
+        if (senders && senders.length) g.set("senders", senders);
         g.set("paused", !!data.gmail.paused);
         tx.save(g);
       } catch (_) {

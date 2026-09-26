@@ -4,9 +4,11 @@
 -->
 <script lang="ts">
   import { money } from "../../lib/format";
+  import { txTypeLabel } from "../../lib/labels";
   import { notify } from "../../lib/notify.svelte";
   import { tintFor } from "../../lib/palettes";
   import { pb } from "../../lib/pb.svelte";
+  import { ruleLabel } from "../../lib/rules";
   import { store, touchTransactions } from "../../lib/store.svelte";
   import type { Rule } from "../../lib/types";
   import Icon from "../Icon.svelte";
@@ -24,7 +26,7 @@
 
   async function load() {
     try {
-      rules = await pb.collection("rules").getFullList<Rule>({ sort: "match" });
+      rules = await pb.collection("rules").getFullList<Rule>({ sort: "name,match" });
     } catch (err) {
       notify.fail(err);
     }
@@ -67,7 +69,8 @@
     <div>
       <h3 class="card-title">Reglas</h3>
       <p class="card-sub">
-        Las reglas asignan una categoría, etiquetas y una descripción cuando un movimiento importado de Gmail contiene el texto indicado.
+        Cada regla es una plantilla: los correos que cumplen su condición se vuelven movimientos solos, con el tipo, la cuenta, la
+        categoría y la descripción que indica. Lo más fácil es crearlas desde un correo de la <a class="link" href="#/bandeja">bandeja</a>.
       </p>
     </div>
     <div class="card-head-actions">
@@ -82,12 +85,19 @@
       <ul class="rule-list">
         {#each rules as r (r.id)}
           {@const cat = store.category(r.category)}
+          {@const acc = store.account(r.account)}
+          {@const to = store.account(r.to_account)}
           <li>
             <button type="button" class="rule-item" class:paused={r.paused} onclick={() => openRule(r)}>
-              <span class="rule-match">{r.match}</span>
+              <span class="rule-when">
+                <b class="rule-name">{ruleLabel(r)}</b>
+                <span class="rule-match">{[r.sender, r.match].filter(Boolean).join(" · ")}</span>
+              </span>
               {#if r.amount}<span class="rule-amount">{money(r.amount)}</span>{/if}
               <Icon name="arrow-right-02" size={14} />
               <span class="rule-result">
+                {#if r.type}<span>{txTypeLabel(r.type)}</span>{/if}
+                {#if acc}<span class="muted">{acc.name}{#if to} → {to.name}{/if}</span>{/if}
                 {#if r.description}<b>{r.description}</b>{/if}
                 {#if cat}<span class="muted">{cat.name}</span>{/if}
                 {#each r.tags ?? [] as t (t)}<Tag tone={tintFor(t) as Tone}>#{t}</Tag>{/each}
@@ -99,8 +109,8 @@
       </ul>
     {:else}
       <p class="muted small empty">
-        Todavía no hay reglas. Ejemplo: si dice <b>GOU PAYMENTS</b>, que sea <b>Administración {"{mes}"}</b>, categoría Vivienda y etiqueta
-        #administración. También puedes crearla desde un movimiento.
+        Todavía no hay reglas. Ejemplo: si el correo viene de <b>alertas@banco.com</b> y dice <b>GOU PAYMENTS</b>, que sea un gasto de
+        <b>Administración {"{mes}"}</b> en la cuenta de ahorros, categoría Vivienda. Ábrela desde un correo de la bandeja y ya viene llena.
       </p>
     {/if}
   </div>
@@ -144,11 +154,24 @@
     }
   }
 
-  .rule-match {
+  .rule-when {
+    display: flex;
     flex: none;
+    flex-direction: column;
     max-width: 40%;
+    min-width: 0;
+  }
+
+  .rule-name {
     overflow: hidden;
     color: var(--text-primary);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .rule-match {
+    overflow: hidden;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     white-space: nowrap;

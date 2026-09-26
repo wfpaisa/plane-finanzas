@@ -1,25 +1,22 @@
 <!--
-  La pestaña Gmail de Ajustes: conectar Gmail para que las notificaciones del banco se vuelvan
-  transacciones solas, y las reglas que ajustan lo que llega.
+  La pestaña Gmail de Ajustes: conectar Gmail, decir qué remitentes son
+  transaccionales y las reglas. Lo que llega va a la bandeja (`#/bandeja`).
 -->
 <script lang="ts">
-  import Money from "../components/app/Money.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Button, Field, Switch, Textarea } from "../components/ui";
-  import Tag from "../components/ui/Tag.svelte";
-  import { dateShort } from "../lib/format";
+  import { Button, Field, Switch } from "../components/ui";
   import { notify } from "../lib/notify.svelte";
   import { pb } from "../lib/pb.svelte";
   import { go, route } from "../lib/router.svelte";
   import { reload, store, touchTransactions } from "../lib/store.svelte";
-  import type { ImportItem, ImportResult } from "../lib/types";
+  import type { SyncResult } from "../lib/types";
   import RulesCard from "../components/app/RulesCard.svelte";
+  import TagInput from "../components/app/TagInput.svelte";
 
-  let config = $state<{ configured: boolean; redirectUri: string; defaultQuery: string } | null>(null);
+  let config = $state<{ configured: boolean; redirectUri: string; defaultSenders: string[] } | null>(null);
   let syncing = $state(false);
   let connecting = $state(false);
-  let query = $state("");
-  let lastSync = $state<ImportResult | null>(null);
+  let senders = $state<string[]>([]);
 
   const g = $derived(store.gmail);
   const connected = $derived(!!g?.email);
@@ -31,7 +28,7 @@
   });
 
   $effect(() => {
-    query = g?.query ?? "";
+    senders = [...(g?.senders ?? [])];
   });
 
   // Vuelta de Google.
@@ -58,10 +55,15 @@
   async function sync() {
     syncing = true;
     try {
-      lastSync = await pb.send<ImportResult>("/api/finanzas/gmail/sync", { method: "POST" });
-      touchTransactions();
+      const r = await pb.send<SyncResult>("/api/finanzas/gmail/sync", { method: "POST" });
+      if (r.created) touchTransactions();
       await reload("gmail");
-      notify.done(`${lastSync.created} movimientos nuevos de ${lastSync.read ?? 0} correos.`);
+      const fresh = r.created + r.pending;
+      notify.done(
+        fresh
+          ? `${fresh} correos nuevos: ${r.created} movimientos creados por reglas y ${r.pending} en la bandeja.`
+          : "No hay correos nuevos.",
+      );
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -74,9 +76,15 @@
     try {
       await pb.collection("gmail_connections").update(g.id, patch);
       await reload("gmail");
+      return true;
     } catch (err) {
       notify.fail(err);
+      return false;
     }
+  }
+
+  async function saveSenders() {
+    if (await saveGmail({ senders })) notify.done("Remitentes guardados. La próxima lectura revisa los últimos 90 días.");
   }
 
   async function disconnect() {
@@ -89,10 +97,10 @@
     }
   }
 
-  const statusTone = (s: ImportItem["status"]) =>
-    s === "creado" ? "tag-success" : s === "nuevo" ? "tint-1" : s === "duplicado" || s === "borrado" ? "off" : "tag-warning";
-
-  const noKeys = $derived(store.activeAccounts.filter((a) => !a.match_keys?.trim()));
+  const dirty = $derived(senders.join(",") !== (g?.senders ?? []).join(","));
+  /** Los remitentes de las cuentas: también se leen. */
+  const accountSenders = $derived([...new Set(store.activeAccounts.flatMap((a) => a.senders ?? []))]);
+  const noSenders = $derived(store.activeAccounts.filter((a) => !a.senders?.length));
 </script>
 
 <div class="stack">
@@ -103,7 +111,7 @@
         <div>
           <h3 class="card-title">Gmail</h3>
           <p class="card-sub">
-            {#if connected}Conectado como <b>{g?.email}</b>{:else}Lee las notificaciones de tu banco y las convierte en movimientos organizados por categoría.{/if}
+            {#if connected}Conectado como <b>{g?.email}</b>{:else}Lee los correos de tu banco y los lleva a la bandeja, donde decides qué hacer con cada uno.{/if}
           </p>
         </div>
       </div>
@@ -138,81 +146,48 @@
           </div>
           {#if g.last_result}
             <div class="stat"><span class="s-label">Correos leídos</span><span class="s-val">{g.last_result.read}</span></div>
-            <div class="stat"><span class="s-label">Nuevas</span><span class="s-val">{g.last_result.created}</span></div>
-            <div class="stat"><span class="s-label">Ya estaban</span><span class="s-val">{g.last_result.skipped}</span></div>
+            <div class="stat"><span class="s-label">Creados por reglas</span><span class="s-val">{g.last_result.created}</span></div>
           {/if}
+          <div class="stat">
+            <span class="s-label">Esperan en la bandeja</span>
+            <a class="s-val link" href="#/bandeja">{store.inboxPending}</a>
+          </div>
         </div>
         {#if g.last_error}
           <div class="alert danger"><Icon name="alert-02" /><div>{g.last_error}</div></div>
         {/if}
-        <Field label="Correos que se deben leer" hint="Indica los remitentes de las entidades financieras. La búsqueda se ejecuta cada 30 minutos.">
-          <Textarea bind:value={query} rows={2} />
+        <Field
+          label="Remitentes transaccionales"
+          hint="Solo se leen los correos de estos remitentes: escribe el correo completo o una parte (el dominio o el nombre del banco) y pulsa Enter. La lectura se hace cada 30 minutos."
+        >
+          <TagInput bind:value={senders} prefix="" placeholder="alertas@banco.com, banco.com…" suggestions={config?.defaultSenders ?? []} />
         </Field>
+        {#if accountSenders.length}
+          <p class="muted small senders-note">También se leen los de tus cuentas: {accountSenders.join(", ")}.</p>
+        {/if}
         <div class="flex flex-wrap items-center gap-3">
-          <Button size="sm" onclick={() => saveGmail({ query })}>Guardar búsqueda</Button>
-          <Button size="sm" variant="ghost" onclick={() => (query = config?.defaultQuery ?? "")}>Restaurar</Button>
+          <Button size="sm" disabled={!dirty} onclick={saveSenders}>Guardar remitentes</Button>
+          <Button size="sm" variant="ghost" onclick={() => (senders = [...(config?.defaultSenders ?? [])])}>Usar los bancos comunes</Button>
           <span class="flex-1"></span>
           <Switch checked={g.paused} label="Pausar" onchange={(v) => saveGmail({ paused: v })} />
           <Button size="sm" variant="ghost" class="btn-danger" onclick={disconnect}><Icon name="unlink-01" />Desconectar</Button>
         </div>
       {/if}
 
-      {#if noKeys.length}
+      {#if noSenders.length}
         <div class="alert warn">
           <Icon name="alert-02" />
           <div>
-            Para identificar la cuenta correspondiente a cada correo, agrega los <b>últimos 4 dígitos</b> o el nombre de la entidad en
-            <a class="link" href="#/cuentas">Cuentas</a>. Falta esta información en: {noKeys.map((a) => a.name).join(", ")}.
+            Para que se proponga la cuenta de cada correo, agrega sus remitentes en <a class="link" href="#/cuentas">Cuentas</a>. Faltan en:
+            {noSenders.map((a) => a.name).join(", ")}.
           </div>
         </div>
       {/if}
     </div>
   </div>
 
-  {#if lastSync?.items?.length}
-    {@render results(lastSync, "Resultado de la sincronización")}
-  {/if}
-
   <RulesCard initialMatch={route.query.get("regla") ?? ""} />
 </div>
-
-{#snippet results(r: ImportResult, title: string)}
-  <div class="card table-card">
-    <div class="card-head">
-      <div>
-        <h3 class="card-title">{title}</h3>
-        <p class="card-sub">
-          {r.created} movimientos creados · {r.items.filter((i) => i.status === "nuevo").length} detectados por primera vez · {r.skipped} ya existían o los borraste · {r.ignored} sin una cantidad reconocible
-        </p>
-      </div>
-      <div class="card-head-actions">
-        <Button size="sm" variant="ghost" onclick={() => go("/movimientos", { tag: "revisar" })}>Revisar movimientos pendientes</Button>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th>Fecha</th><th>Descripción</th><th>Cuenta</th><th>Categoría</th><th>Cantidad</th><th>Resultado</th></tr>
-        </thead>
-        <tbody>
-          {#each r.items as i (i.externalId)}
-            <tr>
-              <td>{dateShort(i.date)}</td>
-              <td>{i.description}{#if i.bank}<span class="muted small"> · {i.bank}</span>{/if}</td>
-              <td>{i.accountName}{#if i.toAccountName} → {i.toAccountName}{/if}</td>
-              <td>
-                {i.categoryName || "—"}
-                {#if i.tags.includes("revisar")}<Tag tone="tag-warning">revisar</Tag>{/if}
-              </td>
-              <td><Money value={i.amount} tone={i.type} /></td>
-              <td><Tag tone={statusTone(i.status)}>{i.status}</Tag></td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  </div>
-{/snippet}
 
 <style>
   .gmail-title {
@@ -229,6 +204,10 @@
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, #ea4335, #fbbc05 45%, #34a853 75%, #4285f4);
     color: white;
+  }
+
+  .senders-note {
+    margin: calc(var(--sp-8) * -1) 0 0;
   }
 
   .gmail-status {

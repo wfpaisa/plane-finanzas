@@ -1,6 +1,6 @@
 <!--
-  Crear o editar una cuenta: nombre, tipo, color, icono, saldo y las pistas
-  con las que la importación de Gmail la reconoce.
+  Crear o editar una cuenta: nombre, tipo, color, icono, saldo y los
+  remitentes de correo con los que la bandeja la reconoce.
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -18,15 +18,22 @@
   import ColorDot from "./ColorDot.svelte";
   import MoneyInput from "./MoneyInput.svelte";
   import ColorPicker from "./ColorPicker.svelte";
+  import TagInput from "./TagInput.svelte";
 
   let {
     open,
     account = null,
+    senders: startSenders = [],
     onClose,
+    onCreated,
   }: {
     open: boolean;
     account?: Account | null;
+    /** Remitentes de partida para una cuenta nueva (los del correo desde el que se crea). */
+    senders?: string[];
     onClose: () => void;
+    /** Al crear una: la cuenta ya guardada, para elegirla donde se pidió. */
+    onCreated?: (a: Account) => void;
   } = $props();
 
   let name = $state("");
@@ -35,7 +42,7 @@
   let icon = $state("");
   let color = $state("");
   let balance = $state(0);
-  let matchKeys = $state("");
+  let senders = $state<string[]>([]);
   let exclude = $state(false);
   let archived = $state(false);
   let notes = $state("");
@@ -61,16 +68,20 @@
       icon = account?.icon ?? "";
       color = account?.palette ? colorOf(account.palette) : nextColor(store.accounts.map((a) => a.palette));
       balance = shownBalance = account ? store.balance(account.id) : 0;
-      matchKeys = account?.match_keys ?? "";
+      senders = [...(account?.senders ?? startSenders)];
       exclude = account?.exclude_from_total ?? false;
       archived = account?.archived ?? false;
       notes = account?.notes ?? "";
     });
   });
 
+  /** Los remitentes que Gmail lee, para elegir con un clic. */
+  const knownSenders = $derived([...(store.gmail?.senders ?? [])].sort());
+
   async function save() {
     if (!name.trim()) return notify.fail(new Error("Ponle un nombre a la cuenta."));
     busy = true;
+    let created: Account | null = null;
     try {
       const data = {
         owner: session.id,
@@ -79,7 +90,7 @@
         bank: bank.trim(),
         icon: icon || accountTypeIcon(type),
         palette: color,
-        match_keys: matchKeys.trim(),
+        senders,
         exclude_from_total: exclude,
         archived,
         notes,
@@ -93,9 +104,10 @@
         const initial = (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) + (balance - current);
         await pb.collection("accounts").update(account.id, changed ? { ...data, initial_balance: initial } : data);
       } else {
-        await pb.collection("accounts").create({ ...data, initial_balance: balance, sort: store.accounts.length });
+        created = await pb.collection("accounts").create<Account>({ ...data, initial_balance: balance, sort: store.accounts.length });
       }
       await reload("accounts");
+      if (created) onCreated?.(created);
       notify.done(account ? "Cuenta guardada" : "Cuenta creada");
       onClose();
     } catch (err) {
@@ -151,10 +163,10 @@
     </div>
 
     <Field
-      label="Datos para identificar esta cuenta en los correos"
-      hint="Escribe datos separados por comas, como los últimos 4 dígitos, el banco, una llave o un celular. Así, una transferencia entre tus cuentas no se registrará por error como gasto. Ejemplo: 1234, Bancolombia, @millave."
+      label="Remitentes de correo"
+      hint="Los correos de estos remitentes se leen y se asignan a esta cuenta. Basta con una parte del remitente: «nu@» o «nu.com» reconocen a nu@nu.com.co. Pulsa Enter para agregarla. Si varias cuentas coinciden, se propone la primera; una regla puede elegir otra."
     >
-      <Input bind:value={matchKeys} placeholder="1234, @millave" />
+      <TagInput bind:value={senders} prefix="" placeholder="alertas@banco.com, banco.com…" suggestions={knownSenders} limit={30} />
     </Field>
 
     <div>

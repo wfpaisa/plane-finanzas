@@ -1,6 +1,7 @@
 <!--
   Etiquetas libres: se escribe y Enter (o coma) la agrega. Cada etiqueta
-  tiene siempre el mismo color (`tintFor`).
+  tiene siempre el mismo color (`tintFor`). Sirve también para listas de
+  remitentes: con `prefix=""` y otro `placeholder`.
 -->
 <script lang="ts">
   import { tintFor } from "../../lib/palettes";
@@ -9,7 +10,17 @@
   let {
     value = $bindable([]),
     suggestions = [],
-  }: { value?: string[]; suggestions?: string[] } = $props();
+    prefix = "#",
+    placeholder = "viaje, trabajo, casa…",
+    limit = 8,
+  }: {
+    value?: string[];
+    suggestions?: string[];
+    prefix?: string;
+    placeholder?: string;
+    /** Cuántas sugerencias mostrar a la vez. */
+    limit?: number;
+  } = $props();
 
   let text = $state("");
 
@@ -20,18 +31,18 @@
   }
 
   const offer = $derived(
-    suggestions.filter((s) => !value.includes(s) && (!text || s.includes(text.toLowerCase()))).slice(0, 8),
+    suggestions.filter((s) => !value.includes(s) && (!text || s.includes(text.toLowerCase()))).slice(0, limit),
   );
 </script>
 
 <div class="tag-input">
   <div class="tag-input-row field-control">
     {#each value as t (t)}
-      <Tag tone={tintFor(t) as Tone} onRemove={() => (value = value.filter((x) => x !== t))}>#{t}</Tag>
+      <Tag tone={tintFor(t) as Tone} onRemove={() => (value = value.filter((x) => x !== t))}>{prefix}{t}</Tag>
     {/each}
     <input
       bind:value={text}
-      placeholder={value.length ? "" : "viaje, trabajo, casa…"}
+      placeholder={value.length ? "" : placeholder}
       onkeydown={(e) => {
         if (e.key === "Enter" || e.key === ",") {
           e.preventDefault();

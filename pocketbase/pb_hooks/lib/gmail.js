@@ -10,9 +10,38 @@
 
 var SCOPE = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email";
 
-/** La búsqueda por defecto: remitentes de los bancos más comunes en Colombia. */
-var DEFAULT_QUERY =
-  "from:(bancolombia OR notificacionesbancolombia OR bold.co OR nequi OR davivienda OR daviplata OR bbva OR bancodebogota OR bancodeoccidente OR colpatria OR nu.com.co OR rappipay OR lulobank)";
+/** Los remitentes que se leen si la persona no ha dicho otros: los bancos más comunes en Colombia. */
+var DEFAULT_SENDERS = [
+  "bancolombia",
+  "bold.co",
+  "nequi",
+  "davivienda",
+  "daviplata",
+  "bbva",
+  "bancodebogota",
+  "bancodeoccidente",
+  "colpatria",
+  "nu.com.co",
+  "rappipay",
+  "lulobank",
+];
+
+/** La búsqueda de Gmail para una lista de remitentes. */
+function queryFor(senders) {
+  var list = (senders || [])
+    .map(function (s) {
+      // Sin espacios ni paréntesis: romperían la búsqueda. Un fragmento como
+      // "nu@" o "@nu.com" se busca sin la arroba ni el punto de las puntas.
+      return String(s || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[\s()"]+/g, "")
+        .replace(/^[@.]+|[@.]+$/g, "");
+    })
+    .filter(Boolean);
+  if (!list.length) list = DEFAULT_SENDERS;
+  return "from:(" + list.join(" OR ") + ")";
+}
 
 function env(name, fallback) {
   var v = $os.getenv(name);
@@ -179,8 +208,8 @@ function header(msg, name) {
   return "";
 }
 
-/** El cuerpo en texto: el `text/plain` si hay, y si no el HTML aplanado. */
-function bodyText(payload, htmlToText) {
+/** Las dos versiones del cuerpo: `text/plain` y `text/html` (vacías si no están). */
+function bodyParts(payload) {
   var plain = "";
   var html = "";
   (function walk(p) {
@@ -193,11 +222,21 @@ function bodyText(payload, htmlToText) {
     var parts = p.parts || [];
     for (var i = 0; i < parts.length; i++) walk(parts[i]);
   })(payload);
-  return plain && plain.replace(/\s/g, "").length > 20 ? plain : htmlToText(html) || plain;
+  return { plain: plain, html: html };
 }
 
-function getMessage(token, id, htmlToText) {
+/** El cuerpo en texto: el `text/plain` si hay, y si no el HTML aplanado. */
+function bodyText(parts, htmlToText) {
+  return parts.plain && parts.plain.replace(/\s/g, "").length > 20 ? parts.plain : htmlToText(parts.html) || parts.plain;
+}
+
+/**
+ * Un correo: remitente, asunto, fecha, el texto (con el que se lee) y, si
+ * trae HTML, el texto con negritas y enlaces (`rich`, ver parsers.htmlToRich).
+ */
+function getMessage(token, id, htmlToText, htmlToRich) {
   var m = api(token, "messages/" + id + "?format=full");
+  var parts = bodyParts(m.payload);
   var ms = +m.internalDate || Date.now();
   // La fecha local de Colombia (UTC-5), que es la del extracto.
   var local = new Date(ms - 5 * 3600 * 1000).toISOString().slice(0, 10);
@@ -206,12 +245,19 @@ function getMessage(token, id, htmlToText) {
     from: header(m, "from"),
     subject: header(m, "subject"),
     date: local,
-    text: bodyText(m.payload, htmlToText) || m.snippet || "",
+    text: bodyText(parts, htmlToText) || m.snippet || "",
+    rich: parts.html && htmlToRich ? htmlToRich(parts.html) : "",
   };
 }
 
+/** El HTML del correo, tal como llegó ("" si solo trae texto). */
+function getHtml(token, id) {
+  return bodyParts(api(token, "messages/" + id + "?format=full").payload).html;
+}
+
 module.exports = {
-  DEFAULT_QUERY: DEFAULT_QUERY,
+  DEFAULT_SENDERS: DEFAULT_SENDERS,
+  queryFor: queryFor,
   config: config,
   configured: configured,
   authUrl: authUrl,
@@ -220,5 +266,6 @@ module.exports = {
   profile: profile,
   listIds: listIds,
   getMessage: getMessage,
+  getHtml: getHtml,
   decodeBase64Url: decodeBase64Url,
 };

@@ -17,6 +17,7 @@
   import { txModal } from "./lib/ui.svelte";
   import Accounts from "./routes/Accounts.svelte";
   import Dashboard from "./routes/Dashboard.svelte";
+  import Inbox from "./routes/Inbox.svelte";
   import Login from "./routes/Login.svelte";
   import Mobile from "./routes/Mobile.svelte";
   import Plan from "./routes/Plan.svelte";
@@ -27,11 +28,22 @@
 
   const NAV = [
     { path: "/", label: "Resumen", icon: "dashboard-square-01", mobile: true },
-    { path: "/movimientos", label: "Movimientos", icon: "exchange-01", mobile: true },
+    {
+      path: "/movimientos",
+      label: "Movimientos",
+      icon: "exchange-01",
+      mobile: true,
+    },
     { path: "/cuentas", label: "Cuentas", icon: "wallet-01", mobile: true },
     { path: "/estados", label: "Análisis", icon: "pie-chart", mobile: true },
+    { path: "/bandeja", label: "Bandeja", icon: "mail-01", mobile: false },
     { path: "/ahorros", label: "Ahorros", icon: "piggy-bank", mobile: false },
-    { path: "/proyeccion", label: "Plan futuro", icon: "chart-line-data-01", mobile: false },
+    {
+      path: "/proyeccion",
+      label: "Plan futuro",
+      icon: "chart-line-data-01",
+      mobile: false,
+    },
     { path: "/ajustes", label: "Ajustes", icon: "settings-01", mobile: false },
   ];
 
@@ -40,6 +52,7 @@
     "/movimientos": Transactions,
     "/cuentas": Accounts,
     "/estados": Reports,
+    "/bandeja": Inbox,
     "/ahorros": Savings,
     "/proyeccion": Plan,
     "/ajustes": Settings,
@@ -50,7 +63,11 @@
   // Importar ahora es la pestaña Gmail de Ajustes; los enlaces viejos y la
   // vuelta de Google (`?gmail=…`) llegan allá.
   $effect(() => {
-    if (route.path === "/importar") go("/ajustes", { seccion: "gmail", gmail: route.query.get("gmail") ?? undefined });
+    if (route.path === "/importar")
+      go("/ajustes", {
+        seccion: "gmail",
+        gmail: route.query.get("gmail") ?? undefined,
+      });
   });
 
   // En el teléfono la app abre en su vista (`#/m`), salvo que la persona haya
@@ -58,7 +75,11 @@
   try {
     const vista = localStorage.getItem("finanzas-vista");
     const phone = matchMedia("(max-width: 56rem)").matches;
-    if (route.path === "/" && (vista === "sencilla" || (phone && vista !== "completa"))) go("/m");
+    if (
+      route.path === "/" &&
+      (vista === "sencilla" || (phone && vista !== "completa"))
+    )
+      go("/m");
   } catch {}
 
   // Entrar carga todo; salir lo suelta. Solo cuenta el id (refrescar la
@@ -79,10 +100,26 @@
   const onKey = keys({
     n: () => session.user && route.path !== "/m" && txModal.new(),
     "?": () => session.user && (helpOpen = true),
-    // 1 … 7: las pantallas en el orden del menú.
-    ...Object.fromEntries(NAV.map((item, i) => [String(i + 1), () => session.user && route.path !== "/m" && go(item.path)])),
+    // 1 … 8: las pantallas en el orden del menú.
+    ...Object.fromEntries(
+      NAV.map((item, i) => [
+        String(i + 1),
+        () => session.user && route.path !== "/m" && go(item.path),
+      ]),
+    ),
   });
-  const knownTags = $derived([...new Set(["fijo", "revisar", "viaje", "trabajo", "casa", "salud", "regalo", ...categoryTags()])]);
+  const knownTags = $derived([
+    ...new Set([
+      "fijo",
+      "revisar",
+      "viaje",
+      "trabajo",
+      "casa",
+      "salud",
+      "regalo",
+      ...categoryTags(),
+    ]),
+  ]);
 </script>
 
 {#if !session.user}
@@ -96,22 +133,44 @@
 {:else}
   <div class="shell">
     <aside class="sidebar">
-      <a href="#/" class="brand"><span class="brand-mark"><Logo size={17} /></span>Finanzas</a>
+      <a href="#/" class="brand"
+        ><span class="brand-mark"><Logo size={17} /></span>Finanzas</a
+      >
       <nav class="nav">
         {#each NAV as item (item.path)}
-          <a href="#{item.path}" class="nav-item" class:active={route.path === item.path}>
+          <a
+            href="#{item.path}"
+            class="nav-item"
+            class:active={route.path === item.path}
+          >
             <Icon name={item.icon} size={18} />{item.label}
+            {#if item.path === "/bandeja" && store.inboxPending}<span
+                class="nav-count">{store.inboxPending}</span
+              >{/if}
           </a>
         {/each}
       </nav>
       <div class="sidebar-foot">
         <div class="me">
-          <span class="avatar-letter">{(session.user.name || session.user.email).slice(0, 1).toUpperCase()}</span>
+          <span class="avatar-letter"
+            >{(session.user.name || session.user.email)
+              .slice(0, 1)
+              .toUpperCase()}</span
+          >
           <span class="me-name">{session.user.name || session.user.email}</span>
         </div>
         <div class="flex items-center gap-1">
-          <ModeToggle dark={theme.name === "dark"} onToggle={(next) => theme.set(next)} />
-          <button type="button" class="btn-icon sm" data-tip="Salir" aria-label="Salir" onclick={logout}>
+          <ModeToggle
+            dark={theme.name === "dark"}
+            onToggle={(next) => theme.set(next)}
+          />
+          <button
+            type="button"
+            class="btn-icon sm"
+            data-tip="Salir"
+            aria-label="Salir"
+            onclick={logout}
+          >
             <Icon name="logout-01" size={16} />
           </button>
         </div>
@@ -139,7 +198,14 @@
       <Icon name="keyboard" size={16} />
     </button>
 
-    <button type="button" class="fab" aria-label="Agregar movimiento" data-tip="Agregar movimiento" data-tip-side="left" onclick={() => txModal.new()}>
+    <button
+      type="button"
+      class="fab"
+      aria-label="Agregar movimiento"
+      data-tip="Agregar movimiento"
+      data-tip-side="left"
+      onclick={() => txModal.new()}
+    >
       <Icon name="add-01" size={24} />
     </button>
 
@@ -149,18 +215,31 @@
           <Icon name={item.icon} size={20} /><span>{item.label}</span>
         </a>
       {/each}
-      <button type="button" class:active={!NAV.find((n) => n.path === route.path)?.mobile} onclick={() => (moreOpen = !moreOpen)}>
+      <button
+        type="button"
+        class:active={!NAV.find((n) => n.path === route.path)?.mobile}
+        onclick={() => (moreOpen = !moreOpen)}
+      >
         <Icon name="menu-01" size={20} /><span>Más</span>
       </button>
       {#if moreOpen}
         <div class="more-sheet plane-card">
           {#each NAV.filter((n) => !n.mobile) as item (item.path)}
-            <a href="#{item.path}" onclick={() => (moreOpen = false)}><Icon name={item.icon} size={18} />{item.label}</a>
+            <a href="#{item.path}" onclick={() => (moreOpen = false)}
+              ><Icon name={item.icon} size={18} />{item.label}</a
+            >
           {/each}
-          <a href="#/m" onclick={() => (moreOpen = false)}><Icon name="smart-phone-01" size={18} />Vista del teléfono</a>
+          <a href="#/m" onclick={() => (moreOpen = false)}
+            ><Icon name="smart-phone-01" size={18} />Vista del teléfono</a
+          >
           <div class="more-row">
-            <ModeToggle dark={theme.name === "dark"} onToggle={(next) => theme.set(next)} />
-            <button type="button" class="btn sm" onclick={logout}><Icon name="logout-01" />Salir</button>
+            <ModeToggle
+              dark={theme.name === "dark"}
+              onToggle={(next) => theme.set(next)}
+            />
+            <button type="button" class="btn sm" onclick={logout}
+              ><Icon name="logout-01" />Salir</button
+            >
           </div>
         </div>
       {/if}
@@ -170,7 +249,12 @@
 
 <svelte:window onkeydown={onKey} />
 
-<Modal open={helpOpen} onClose={() => (helpOpen = false)} title="Atajos de teclado" icon="keyboard">
+<Modal
+  open={helpOpen}
+  onClose={() => (helpOpen = false)}
+  title="Atajos de teclado"
+  icon="keyboard"
+>
   <div class="keys-help">
     {#each SHORTCUTS as group (group.where)}
       <section>
@@ -188,7 +272,13 @@
 </Modal>
 
 {#if session.user}
-  <TransactionForm open={txModal.open} tx={txModal.tx} preset={txModal.preset} onClose={() => txModal.close()} {knownTags} />
+  <TransactionForm
+    open={txModal.open}
+    tx={txModal.tx}
+    preset={txModal.preset}
+    onClose={() => txModal.close()}
+    {knownTags}
+  />
 {/if}
 
 <ErrorNote message={notify.error} />
@@ -241,7 +331,7 @@
     display: grid;
     grid-template-columns: 15.5rem 1fr;
     gap: var(--sp-12);
-    height: 100%;
+    min-height: 100%;
     padding: var(--sp-12);
 
     @media (max-width: 56rem) {
@@ -250,7 +340,13 @@
     }
   }
 
+  /* La página hace scroll en el documento; el menú se queda fijo con el
+     alto de la ventana menos el aire del marco. */
   .sidebar {
+    position: sticky;
+    top: var(--sp-12);
+    align-self: start;
+    height: calc(100dvh - 2 * var(--sp-12));
     display: flex;
     flex-direction: column;
     gap: var(--sp-20);
@@ -260,9 +356,7 @@
     background: var(--glass-sheen), var(--bg-sidebar);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-    box-shadow:
-      var(--glass-spec),
-      var(--glass-shadow);
+    box-shadow: var(--glass-spec), var(--glass-shadow);
     overflow-y: auto;
 
     @media (max-width: 56rem) {
@@ -289,8 +383,11 @@
     height: 2.25rem;
     border-radius: 0.625rem;
     /* Igual que el ícono de la app: negro con brillo azul detrás de la F. */
-    background:
-      radial-gradient(circle at 50% 44%, oklch(0.52 0.25 265 / 0.6), transparent 70%),
+    background: radial-gradient(
+        circle at 50% 44%,
+        oklch(0.52 0.25 265 / 0.6),
+        transparent 70%
+      ),
       oklch(0.12 0.005 265);
     color: #fff;
     box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.12);
@@ -331,6 +428,19 @@
       color: var(--text-primary);
       font-weight: 600;
     }
+  }
+
+  .nav-count {
+    margin-left: auto;
+    min-width: 1.25rem;
+    padding: 0 0.375rem;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
   }
 
   .sidebar-foot {
@@ -376,16 +486,7 @@
      tarjetas. Ella desenfoca el lienzo; lo de dentro ya no lo repite. */
   .main {
     min-width: 0;
-    overflow-y: auto;
     padding: var(--sp-28) 2rem 6rem;
-    border: 1px solid var(--glass-rim);
-    border-radius: var(--radius-card);
-    background: var(--glass-sheen), var(--glass-0);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-    box-shadow:
-      var(--glass-spec),
-      var(--glass-shadow);
 
     @media (max-width: 56rem) {
       padding: var(--sp-16) var(--sp-16) 8rem;
@@ -446,7 +547,8 @@
     border: 1px solid var(--border-float, var(--border));
     border-radius: 50%;
     background: var(--glass-sheen), var(--glass-2);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
+    -webkit-backdrop-filter: blur(var(--glass-blur))
+      saturate(var(--glass-sat, 170%));
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
     box-shadow: var(--glass-spec), var(--glass-shadow-float, var(--shadow-xl));
     color: var(--text-secondary, var(--text-primary));
@@ -474,10 +576,12 @@
       z-index: 10;
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      padding: var(--sp-6) var(--sp-4) calc(var(--sp-6) + env(safe-area-inset-bottom));
+      padding: var(--sp-6) var(--sp-4)
+        calc(var(--sp-6) + env(safe-area-inset-bottom));
       border-top: var(--border-width) solid var(--border);
       background: var(--glass-2);
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
+      -webkit-backdrop-filter: blur(var(--glass-blur))
+        saturate(var(--glass-sat, 170%));
       backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
       box-shadow: var(--glass-spec);
 

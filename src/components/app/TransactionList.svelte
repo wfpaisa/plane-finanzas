@@ -11,6 +11,7 @@
 <script lang="ts">
   import { dateLong } from "../../lib/format";
   import { colorOf, tintFor } from "../../lib/palettes";
+  import { ruleLabel } from "../../lib/rules";
   import { store } from "../../lib/store.svelte";
   import { tagsOf } from "../../lib/tags";
   import type { SvelteSet } from "svelte/reactivity";
@@ -178,16 +179,9 @@
     return store.category(t.category)?.color || "tint-10";
   }
 
-  /** La regla que lo ajustó, como se escribió: "gou payments, gou admin". */
+  /** La regla que lo creó o ajustó: su nombre, o sus textos. */
   function ruleOf(t: Transaction): string {
-    if (!t.rule) return "";
-    return (
-      t.expand?.rule?.match
-        ?.split(",")
-        .map((k) => k.trim())
-        .filter(Boolean)
-        .join(", ") || "una regla"
-    );
+    return t.rule ? ruleLabel(t.expand?.rule) : "";
   }
 
   function titleOf(t: Transaction) {
@@ -294,7 +288,7 @@
                 >{/if}
               {#if t.rule}<span
                   class="tx-rule-ico"
-                  data-tip="Ajustado por la regla «{ruleOf(t)}»"
+                  data-tip="Regla «{ruleOf(t)}»"
                   ><Icon name="flash" size={14} /></span
                 >{/if}
               {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
@@ -434,7 +428,7 @@
                     >{/if}
                   {#if t.rule}<span
                       class="tx-rule-ico"
-                      data-tip="Ajustado por la regla «{ruleOf(t)}»"
+                      data-tip="Regla «{ruleOf(t)}»"
                       ><Icon name="flash" size={14} /></span
                     >{/if}
                   {#if t.source === "gmail"}<span data-tip="Importado de Gmail"

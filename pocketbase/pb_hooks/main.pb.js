@@ -53,7 +53,44 @@ onRecordDelete((e) => {
   } catch (err) {
     console.log("[finanzas] borrados: " + err);
   }
+}, "transactions", "inbox");
+
+// ---------- Movimiento creado desde un correo de la bandeja: ya está procesado ----------
+onRecordAfterCreateSuccess((e) => {
+  const ext = e.record.getString("external_id");
+  if (ext) {
+    try {
+      const row = e.app.findFirstRecordByFilter("inbox", "owner = {:u} && external_id = {:e} && status = 'pendiente'", {
+        u: e.record.getString("owner"),
+        e: ext,
+      });
+      row.set("status", "procesado");
+      e.app.save(row);
+    } catch (_) {
+      // No viene de la bandeja.
+    }
+  }
+  e.next();
 }, "transactions");
+
+// ---------- Remitentes nuevos en Gmail: la próxima lectura mira 90 días atrás ----------
+onRecordUpdate((e) => {
+  if (e.record.getString("senders") !== e.record.original().getString("senders")) e.record.set("last_sync", "");
+  e.next();
+}, "gmail_connections");
+
+// ---------- Cuenta con remitentes nuevos: también ----------
+onRecordAfterCreateSuccess((e) => {
+  if (e.record.getString("senders").length > 2) require(`${__hooks}/lib/sync.js`).rewind(e.app, e.record.getString("owner"));
+  e.next();
+}, "accounts");
+
+onRecordAfterUpdateSuccess((e) => {
+  if (e.record.getString("senders") !== e.record.original().getString("senders")) {
+    require(`${__hooks}/lib/sync.js`).rewind(e.app, e.record.getString("owner"));
+  }
+  e.next();
+}, "accounts");
 
 routerAdd(
   "POST",
@@ -75,7 +112,7 @@ routerAdd(
   (e) => {
     const gmail = require(`${__hooks}/lib/gmail.js`);
     const c = gmail.config();
-    return e.json(200, { configured: gmail.configured(), redirectUri: c.redirectUri, defaultQuery: gmail.DEFAULT_QUERY });
+    return e.json(200, { configured: gmail.configured(), redirectUri: c.redirectUri, defaultSenders: gmail.DEFAULT_SENDERS });
   },
   $apis.requireAuth("users"),
 );
@@ -95,7 +132,7 @@ routerAdd(
     } catch (_) {
       conn = new Record(e.app.findCollectionByNameOrId("gmail_connections"));
       conn.set("owner", userId);
-      conn.set("query", gmail.DEFAULT_QUERY);
+      conn.set("senders", gmail.DEFAULT_SENDERS);
     }
     const state = $security.randomString(40);
     conn.set("oauth_state", state);
@@ -149,7 +186,7 @@ routerAdd(
     }
     try {
       const r = sync.syncConnection(e.app, conn);
-      return e.json(200, { read: r.read, created: r.created, skipped: r.skipped, ignored: r.ignored, items: r.items });
+      return e.json(200, { read: r.read, created: r.created, pending: r.pending, skipped: r.skipped });
     } catch (err) {
       throw new BadRequestError("No se pudo leer Gmail: " + (err && err.message ? err.message : err));
     }
@@ -157,24 +194,91 @@ routerAdd(
   $apis.requireAuth("users"),
 );
 
-// ---------- Pegar texto: SMS, correos copiados, extractos ----------
+// ---------- Pegar texto: SMS o correos copiados, a la bandeja ----------
 
 routerAdd(
   "POST",
   "/api/finanzas/import-text",
   (e) => {
-    const importer = require(`${__hooks}/lib/importer.js`);
-    const body = e.requestInfo().body || {};
-    const text = String(body.text || "");
+    const inbox = require(`${__hooks}/lib/inbox.js`);
+    const text = String((e.requestInfo().body || {}).text || "");
     if (!text.trim()) throw new BadRequestError("Pega al menos una notificación.");
-    const blocks = importer.splitText(text).slice(0, 500);
-    const mails = blocks.map((b) => ({ id: importer.textId(b), text: b, from: "", subject: "" }));
-    const r = importer.importMessages(e.app, e.auth.id, mails, {
-      dry: !!body.dry,
-      account: body.account || "",
-      source: "texto",
+    const blocks = inbox.splitText(text).slice(0, 500);
+    const mails = blocks.map((b) => ({ id: inbox.textId(b), text: b, from: "", subject: "" }));
+    return e.json(200, inbox.ingest(e.app, e.auth.id, mails, { source: "texto" }));
+  },
+  $apis.requireAuth("users"),
+);
+
+// ---------- La bandeja: sugerir, reglas y pasar las reglas por lo pendiente ----------
+
+routerAdd(
+  "POST",
+  "/api/finanzas/inbox/suggest",
+  (e) => {
+    const inbox = require(`${__hooks}/lib/inbox.js`);
+    const id = String((e.requestInfo().body || {}).id || "");
+    if (!id) throw new BadRequestError("Falta el correo.");
+    return e.json(200, inbox.suggestFor(e.app, e.auth.id, id));
+  },
+  $apis.requireAuth("users"),
+);
+
+// El HTML original de un correo de Gmail, para verlo como llegó. No se guarda:
+// se pide a Gmail al abrirlo. Limpiarlo es cosa de la app (ver MailHtml.svelte).
+routerAdd(
+  "GET",
+  "/api/finanzas/inbox/{id}/html",
+  (e) => {
+    const gmail = require(`${__hooks}/lib/gmail.js`);
+    let row;
+    try {
+      row = e.app.findFirstRecordByFilter("inbox", "id = {:id} && owner = {:u}", { id: e.request.pathValue("id"), u: e.auth.id });
+    } catch (_) {
+      throw new NotFoundError("No está ese correo.");
+    }
+    if (row.getString("source") !== "gmail") return e.json(200, { html: "" });
+    let conn;
+    try {
+      conn = e.app.findFirstRecordByFilter("gmail_connections", "owner = {:u} && refresh_token != ''", { u: e.auth.id });
+    } catch (_) {
+      return e.json(200, { html: "" });
+    }
+    try {
+      const token = gmail.accessToken(conn.getString("refresh_token"));
+      return e.json(200, { html: gmail.getHtml(token, row.getString("external_id")) });
+    } catch (err) {
+      throw new BadRequestError("No se pudo leer Gmail: " + (err && err.message ? err.message : err));
+    }
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "POST",
+  "/api/finanzas/inbox/rule",
+  (e) => {
+    const inbox = require(`${__hooks}/lib/inbox.js`);
+    const body = e.requestInfo().body || {};
+    let r;
+    e.app.runInTransaction((tx) => {
+      r = inbox.saveRule(tx, e.auth.id, body);
     });
     return e.json(200, r);
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "POST",
+  "/api/finanzas/inbox/process",
+  (e) => {
+    const inbox = require(`${__hooks}/lib/inbox.js`);
+    let created = 0;
+    e.app.runInTransaction((tx) => {
+      created = inbox.processPending(tx, e.auth.id);
+    });
+    return e.json(200, { created });
   },
   $apis.requireAuth("users"),
 );

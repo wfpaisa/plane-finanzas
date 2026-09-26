@@ -63,10 +63,9 @@
      `margin-inline: auto` la centra ahí. */
   .pick-bar {
     position: sticky;
-    /* `sticky` se mide desde dentro del relleno de abajo de <main> (6rem;
-       8rem en el celular, ver App.svelte): se le resta para quedar a 0.75rem
-       del borde de la ventana. */
-    bottom: calc(0.75rem - 6rem);
+    /* La página hace scroll en el documento, así que `sticky` se mide desde
+       el borde de la ventana. */
+    bottom: 0.75rem;
     z-index: 5;
     display: flex;
     align-items: center;
@@ -95,7 +94,8 @@
     }
 
     @media (max-width: 56rem) {
-      bottom: calc(4.75rem - 8rem);
+      /* Encima de la barra de navegación de abajo. */
+      bottom: 4.75rem;
       flex-wrap: wrap;
       max-width: calc(100% - 4.5rem);
       margin-left: 0;

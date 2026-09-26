@@ -29,6 +29,8 @@ let savings = $state<Saving[]>([]);
 let movements = $state<SavingMovement[]>([]);
 let recurring = $state<Recurring[]>([]);
 let gmail = $state<GmailConnection | null>(null);
+/** Cuántos correos esperan una decisión en la bandeja. */
+let inboxPending = $state(0);
 let loaded = $state(false);
 /** Sube con cada cambio en transacciones: las pantallas lo leen para recargar. */
 let txVersion = $state(0);
@@ -113,8 +115,12 @@ async function loadRecurring() {
 }
 
 async function loadGmail() {
-  const list = await pb.collection("gmail_connections").getFullList<GmailConnection>();
+  const [list, pending] = await Promise.all([
+    pb.collection("gmail_connections").getFullList<GmailConnection>(),
+    pb.collection("inbox").getList(1, 1, { filter: 'status = "pendiente"', fields: "id", skipTotal: false }),
+  ]);
   gmail = list[0] ?? null;
+  inboxPending = pending.totalItems;
 }
 
 const loaders = {
@@ -192,6 +198,7 @@ async function subscribe() {
     watch("saving_movements", () => soon("savings")),
     watch("recurring", () => soon("recurring")),
     watch("gmail_connections", () => soon("gmail")),
+    watch("inbox", () => soon("gmail")),
   ]);
 }
 
@@ -244,6 +251,7 @@ export async function stop() {
   movements = [];
   recurring = [];
   gmail = null;
+  inboxPending = 0;
 }
 
 /** Avisar a las pantallas de que las transacciones cambiaron. */
@@ -282,6 +290,9 @@ export const store = {
   },
   get gmail() {
     return gmail;
+  },
+  get inboxPending() {
+    return inboxPending;
   },
   /** El saldo del servidor más lo que falta por enviar. */
   balance(id: string) {
