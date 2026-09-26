@@ -9,6 +9,8 @@
   mano llega también desde el banco, pregunta si es el mismo movimiento.
 -->
 <script lang="ts">
+  import { untrack } from "svelte";
+
   import Icon from "../components/Icon.svelte";
   import Money from "../components/app/Money.svelte";
   import AccountsView from "../components/mobile/AccountsView.svelte";
@@ -19,6 +21,7 @@
   import NotesView from "../components/mobile/NotesView.svelte";
   import PlanView from "../components/mobile/PlanView.svelte";
   import SavingsView from "../components/mobile/SavingsView.svelte";
+  import SearchScreen from "../components/mobile/SearchScreen.svelte";
   import StatsView from "../components/mobile/StatsView.svelte";
   import TopBar from "../components/mobile/TopBar.svelte";
   import TotalView from "../components/mobile/TotalView.svelte";
@@ -26,8 +29,7 @@
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
   import { dateLong, dateShort, monthLabel } from "../lib/format";
   import { dupeSide } from "../lib/labels";
-  import { matches, sumOf } from "../lib/mobile";
-  import { categoryTags, hasTag } from "../lib/tags";
+  import { emptyFilters, filterCount, sumOf } from "../lib/mobile";
   import { notify } from "../lib/notify.svelte";
   import { cachedList, offline } from "../lib/offline.svelte";
   import { overlay, type OutboxItem, type Pending } from "../lib/outbox";
@@ -60,10 +62,9 @@
   let tab = $state<Tab>("trans");
   let view = $state<View>("diario");
   let ym = $state(thisMonth);
-  let accountFilter = $state("");
-  let tagFilter = $state("");
-  let search = $state("");
-  let searchOpen = $state(false);
+  // Lo del buscador (ver mobile/SearchScreen.svelte): se conserva al volver.
+  let filters = $state(emptyFilters());
+  const searching = $derived(!!filters.text.trim() || filterCount(filters) > 0);
 
   let serverTxs = $state<Transaction[]>([]);
   let loading = $state(true);
@@ -111,42 +112,32 @@
     }).toSorted((a, b) => b.date.localeCompare(a.date) || String(b.created).localeCompare(String(a.created)));
   });
 
-  const shown = $derived(
-    txs.filter(
-      (t) =>
-        (!accountFilter || t.account === accountFilter || t.to_account === accountFilter) &&
-        (!tagFilter || hasTag(t, tagFilter)) &&
-        matches(t, search),
-    ),
-  );
-  // Las etiquetas para filtrar: las de las categorías y las que traen los movimientos.
-  const tagOptions = $derived([...new Set([...categoryTags(), ...txs.flatMap((t) => t.tags ?? [])])].sort());
-  const monthTxs = $derived(shown.filter((t) => t.date.slice(0, 7) === ym));
+  const monthTxs = $derived(txs.filter((t) => t.date.slice(0, 7) === ym));
   // Arriba: el año en Mensual, el mes en lo demás.
-  const headTxs = $derived(view === "mensual" ? shown : monthTxs);
+  const headTxs = $derived(view === "mensual" ? txs : monthTxs);
   const income = $derived(sumOf(headTxs, "income"));
   const expense = $derived(sumOf(headTxs, "expense"));
 
+  /** Una cuenta de Cuentas: sus movimientos del mes, en el buscador y con la cuenta como filtro. */
   function openAccount(id: string) {
-    accountFilter = id;
-    tab = "trans";
-    view = "diario";
+    filters = { ...emptyFilters(), accounts: [id], period: "month", ref: `${thisMonth}-01` };
+    location.hash = "#/m?ver=buscar";
   }
 
+  /** Una nota de la vista Nota: sus movimientos de ese mes, en el buscador. */
   function findNote(text: string) {
-    search = text;
-    searchOpen = !!text;
-    view = "diario";
+    filters = { ...emptyFilters(), text, period: "month", ref: `${ym}-01` };
+    location.hash = "#/m?ver=buscar";
   }
 
   // --- Un día del calendario --------------------------------------------
   let daySheet = $state("");
-  const dayTxs = $derived(daySheet ? shown.filter((t) => t.date.slice(0, 10) === daySheet) : []);
+  const dayTxs = $derived(daySheet ? txs.filter((t) => t.date.slice(0, 10) === daySheet) : []);
 
   // --- Anotar: la pantalla de movimiento (ver mobile/TxScreen.svelte) ------
   function openSheet(type: "expense" | "income", day = today()) {
     daySheet = "";
-    txModal.new({ type, date: day, account: accountFilter || undefined });
+    txModal.new({ type, date: day });
   }
 
   // --- Sin conexión: el aviso y lo pendiente ----------------------------
@@ -248,9 +239,19 @@
 
   // Ahorros y Plan futuro se abren encima de Más, en la misma ruta
   // (`#/m?ver=ahorros`): así el botón de atrás del teléfono vuelve a Más.
-  const sub = $derived(route.query.get("ver") === "ahorros" || route.query.get("ver") === "plan" ? route.query.get("ver") : null);
+  const SUBS = ["ahorros", "plan", "buscar"];
+  const sub = $derived(SUBS.includes(route.query.get("ver") ?? "") ? route.query.get("ver") : null);
+  // Mientras está abierta se marca su pestaña; al cerrarla se vuelve a la
+  // de antes (de una cuenta, a Cuentas).
+  let tabBefore: Tab | null = null;
   $effect(() => {
-    if (sub) tab = "more";
+    if (sub) {
+      tabBefore ??= untrack(() => tab);
+      tab = sub === "buscar" ? "trans" : "more";
+    } else if (tabBefore) {
+      tab = tabBefore;
+      tabBefore = null;
+    }
   });
   function closeSub() {
     if (history.length > 1) history.back();
@@ -263,44 +264,18 @@
     <SavingsView onBack={closeSub} />
   {:else if sub === "plan"}
     <PlanView onBack={closeSub} />
+  {:else if sub === "buscar"}
+    <SearchScreen bind:filters onBack={closeSub} />
   {:else if tab === "trans"}
     <TopBar>
       <MonthNav bind:ym yearly={view === "mensual"} />
       {#snippet actions()}
-        <button
-          type="button"
-          class="btn-icon sm"
-          class:on={searchOpen || !!search || !!tagFilter}
-          aria-label="Buscar"
-          onclick={() => {
-            searchOpen = !searchOpen;
-            if (!searchOpen) {
-              search = "";
-              tagFilter = "";
-            }
-          }}
-        >
+        <a href="#/m?ver=buscar" class="btn-icon sm m-search-btn" class:on={searching} aria-label={searching ? "Buscar (con filtros puestos)" : "Buscar"}>
           <Icon name="search-01" size={20} />
-        </button>
+          {#if searching}<i class="m-dot"></i>{/if}
+        </a>
       {/snippet}
     </TopBar>
-
-    {#if searchOpen}
-      <div class="m-search">
-        <Icon name="search-01" size={16} />
-        <!-- svelte-ignore a11y_autofocus -->
-        <input type="search" placeholder="Buscar en {view === 'mensual' ? 'el año' : 'el mes'}…" bind:value={search} autofocus />
-      </div>
-      {#if tagOptions.length}
-        <div class="m-tags" aria-label="Etiqueta">
-          {#each tagOptions as t (t)}
-            <button type="button" class="m-filter" class:on={tagFilter === t} aria-pressed={tagFilter === t} onclick={() => (tagFilter = tagFilter === t ? "" : t)}>
-              #{t}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {/if}
 
     <div class="m-views" role="tablist">
       {#each VIEWS as v (v.id)}
@@ -315,21 +290,6 @@
       <div><span>Gastos</span><Money value={expense} tone="expense" /></div>
       <div><span>Balance</span><Money value={income - expense} /></div>
     </div>
-
-    {#if accountFilter || (tagFilter && !searchOpen)}
-      <div class="m-filters">
-        {#if accountFilter}
-          <button type="button" class="m-filter" onclick={() => (accountFilter = "")}>
-            {store.account(accountFilter)?.name}<Icon name="cancel-01" size={12} />
-          </button>
-        {/if}
-        {#if tagFilter && !searchOpen}
-          <button type="button" class="m-filter" onclick={() => (tagFilter = "")}>
-            #{tagFilter}<Icon name="cancel-01" size={12} />
-          </button>
-        {/if}
-      </div>
-    {/if}
 
     {#if view === "diario"}
       {#each dupes as t (t.id)}
@@ -365,14 +325,14 @@
       <DayList
         txs={monthTxs}
         onOpen={(t) => txModal.edit(t)}
-        empty={loading ? "" : search || tagFilter ? `Nada con “${search || `#${tagFilter}`}” en ${monthLabel(ym, true)}.` : `Sin movimientos en ${monthLabel(ym, true)}.`}
+        empty={loading ? "" : `Sin movimientos en ${monthLabel(ym, true)}.`}
       />
     {:else if view === "calendario"}
-      <CalendarView {ym} txs={shown} onPick={(d) => (daySheet = d)} />
+      <CalendarView {ym} txs={txs} onPick={(d) => (daySheet = d)} />
     {:else if view === "mensual"}
       <MonthlyView
         {ym}
-        txs={shown}
+        txs={txs}
         onPick={(m) => {
           ym = m;
           view = "diario";
@@ -438,6 +398,7 @@
       aria-current={tab === t.id ? "page" : undefined}
       onclick={() => {
         tab = t.id;
+        tabBefore = null;
         if (sub) location.replace("#/m");
       }}
     >
@@ -546,23 +507,19 @@
     color: var(--accent);
   }
 
-  .m-search {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-8);
-    padding: var(--sp-8) var(--sp-16);
-    border-bottom: 1px solid var(--border);
-    color: var(--text-muted);
+  .m-search-btn {
+    position: relative;
+  }
 
-    & input {
-      flex: 1;
-      min-width: 0;
-      border: 0;
-      outline: 0;
-      background: none;
-      font: inherit;
-      color: var(--text-primary);
-    }
+  .m-dot {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border: 2px solid var(--bg-level1);
+    border-radius: 50%;
+    background: var(--accent);
   }
 
   .m-views {
@@ -611,43 +568,6 @@
 
     & :global(.money) {
       font-size: var(--text-sm);
-    }
-  }
-
-  .m-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-6);
-    padding: var(--sp-8) var(--sp-16) 0;
-  }
-
-  .m-tags {
-    display: flex;
-    gap: var(--sp-6);
-    padding: var(--sp-8) var(--sp-16);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .m-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-6);
-    padding: var(--sp-4) var(--sp-10);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill, 99px);
-    background: var(--bg-field);
-    font: inherit;
-    font-size: var(--text-xs);
-    color: var(--text-primary);
-    white-space: nowrap;
-    cursor: pointer;
-
-    &.on {
-      border-color: var(--accent);
-      background: color-mix(in oklch, var(--accent) 18%, var(--bg-field));
-      font-weight: 600;
     }
   }
 
