@@ -1,6 +1,6 @@
 <!--
   La pestaña Gmail de Ajustes: conectar Gmail, decir qué remitentes son
-  transaccionales y las reglas. Lo que llega va a la bandeja (`#/bandeja`).
+  transaccionales y las reglas. Lo que llega va a la bandeja (`#/correos`).
 -->
 <script lang="ts">
   import Icon from "../components/Icon.svelte";
@@ -61,7 +61,7 @@
       const fresh = r.created + r.pending;
       notify.done(
         fresh
-          ? `${fresh} correos nuevos: ${r.created} movimientos creados por reglas y ${r.pending} en la bandeja.`
+          ? `${fresh} correos nuevos: ${r.created} movimientos creados por reglas y ${r.pending} esperan en Correos.`
           : "No hay correos nuevos.",
       );
     } catch (err) {
@@ -111,7 +111,7 @@
         <div>
           <h3 class="card-title">Gmail</h3>
           <p class="card-sub">
-            {#if connected}Conectado como <b>{g?.email}</b>{:else}Lee los correos de tu banco y los lleva a la bandeja, donde decides qué hacer con cada uno.{/if}
+            {#if connected}Conectado como <b>{g?.email}</b>{:else}Lee los correos de tu banco y los lleva a Correos, donde decides qué hacer con cada uno.{/if}
           </p>
         </div>
       </div>
@@ -149,8 +149,8 @@
             <div class="stat"><span class="s-label">Creados por reglas</span><span class="s-val">{g.last_result.created}</span></div>
           {/if}
           <div class="stat">
-            <span class="s-label">Esperan en la bandeja</span>
-            <a class="s-val link" href="#/bandeja">{store.inboxPending}</a>
+            <span class="s-label">Esperan en Correos</span>
+            <a class="s-val link" href="#/correos">{store.inboxPending}</a>
           </div>
         </div>
         {#if g.last_error}

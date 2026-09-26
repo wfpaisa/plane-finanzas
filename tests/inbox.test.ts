@@ -48,8 +48,13 @@ describe("suggest", () => {
     const s = inbox.suggest(mail, { accounts, categories, rules: [regla] });
     expect(s.rule.id).toBe("r1");
     expect(s.tx).toMatchObject({ account: "a2", category: "c-otros", description: "Pan septiembre", date: "2026-09-24", amount: 20000, rule: "r1" });
-    expect(s.tx.tags).toContain("casa");
+    expect(s.tx.tags).toEqual(["casa"]);
     expect(inbox.missing(s.tx)).toBe("");
+  });
+
+  test("con regla sin etiquetas: el movimiento no lleva ninguna", () => {
+    const regla = { id: "r1", sender: "bancoprincipal", match: "panaderia", account: "a1", tags: [] };
+    expect(inbox.suggest(mail, { accounts, categories, rules: [regla] }).tx.tags).toEqual([]);
   });
 
   test("una regla de otro remitente no aplica", () => {

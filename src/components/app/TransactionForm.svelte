@@ -313,7 +313,7 @@
           data-tip="Ver correo y regla"
           onclick={() => {
             onClose();
-            go("/bandeja", { correo: tx.external_id });
+            go("/correos", { correo: tx.external_id });
           }}
         >
           <Icon name="mail-open-01" size={18} />

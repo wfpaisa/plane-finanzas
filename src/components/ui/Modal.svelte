@@ -293,6 +293,11 @@
     max-width: 44rem;
   }
 
+  /* Para formularios en dos columnas. */
+  .modal-panel-width-xl {
+    max-width: min(90rem, calc(100vw - 2rem));
+  }
+
   .modal-panel-fill {
     height: calc(100dvh - 5rem);
   }

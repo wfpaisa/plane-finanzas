@@ -43,11 +43,11 @@ Banco, tarjeta de crédito, efectivo, billeteras digitales, inversiones… Cada 
 ### Que los movimientos lleguen solos
 No tienes que escribir cada compra:
 
-- **Conecta tu Gmail** y la app lee cada 30 minutos los correos de los remitentes que le indiques (tu banco, Nequi, Bold…). Llegan a una **bandeja**: abres cada correo y decides si crear el movimiento (ya viene llenado), crear una **regla** para que los que se parezcan se creen solos, o descartarlo.
+- **Conecta tu Gmail** y la app lee cada 30 minutos los correos de los remitentes que le indiques (tu banco, Nequi, Bold…). Llegan a **Correos**: abres cada correo y decides si crear el movimiento (ya viene llenado), crear una **regla** para que los que se parezcan se creen solos, o descartarlo.
 - **Pega un SMS o un correo** del banco y la app lo convierte en movimientos (antes te muestra una vista previa).
 - **Sube un CSV** exportado de otra app de gastos.
 
-Nunca se duplica nada. Si anotaste un gasto a mano y luego llega el mismo desde el banco, la app te pregunta si es el mismo. Nada se crea a ciegas: sin una regla tuya, el correo espera en la bandeja.
+Nunca se duplica nada. Si anotaste un gasto a mano y luego llega el mismo desde el banco, la app te pregunta si es el mismo. Nada se crea a ciegas: sin una regla tuya, el correo espera en Correos.
 
 ![Importar](docs/capturas/importar.png)
 
@@ -190,7 +190,7 @@ Se hace **una sola vez en el servidor** y sirve para todos los usuarios. Google 
 4. Copia el ID y el secreto en `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del `.env` y reinicia (`docker compose up -d`).
 5. En la app: **Ajustes → Gmail → Conectar Gmail**, y di qué **remitentes** son transaccionales.
 6. En **Cuentas**, ponle a cada cuenta sus **remitentes de correo** para que se proponga la cuenta de cada correo. Si dos cuentas comparten remitente, se propone la primera; una regla puede elegir otra.
-7. Revisa la **Bandeja**: la primera lectura deja todos los correos ahí para que decidas. Con cada regla que crees, los siguientes se hacen solos.
+7. Revisa **Correos**: la primera lectura deja todos los correos ahí para que decidas. Con cada regla que crees, los siguientes se hacen solos.
 
 ---
 

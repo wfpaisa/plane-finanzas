@@ -64,8 +64,8 @@
         tab = r.status;
         openId = r.id;
       })
-      .catch(() => notify.fail(new Error("El correo ya no está en la bandeja.")))
-      .finally(() => go("/bandeja"));
+      .catch(() => notify.fail(new Error("El correo ya no está en Correos.")))
+      .finally(() => go("/correos"));
   });
 
   async function sync() {
@@ -83,18 +83,19 @@
     }
   }
 
-  /** "Banco <alertas@banco.com>" -> "Banco"; sin nombre, el correo. */
-  function senderName(from: string): string {
-    const m = /^\s*"?([^"<]*?)"?\s*<([^>]+)>/.exec(from);
-    return (m ? m[1] || m[2] : from).trim() || "Texto pegado";
+  /** "Banco <alertas@banco.com>" -> "alertas@banco.com"; sin remitente, texto pegado. */
+  function senderAddress(from: string): string {
+    const m = /<([^>]+)>/.exec(from);
+    return (m ? m[1] : from).trim() || "Texto pegado";
   }
+
 </script>
 
 <div class="page">
   <header class="page-head">
     <div>
-      <h1>Bandeja</h1>
-      <p>Revisa los correos del banco y decide qué hacer.</p>
+      <h1>Correos</h1>
+      <p>Revisa los correos del banco y decide qué hacer. Estos correos fueron filtrados por los tags que tiene cada cuenta.</p>
     </div>
     <div class="page-actions">
       {#if store.gmail?.email}
@@ -131,8 +132,8 @@
             <button type="button" class="inbox-row" onclick={() => (openId = r.id)}>
               <span class="inbox-date">{dateShort(r.date.slice(0, 10))}</span>
               <span class="inbox-main">
-                <span class="inbox-from">{senderName(r.sender)}</span>
-                <span class="inbox-subject">{r.parsed?.description || r.subject || "Sin asunto"}{#if r.subject && r.parsed?.description}<span class="muted"> · {r.subject}</span>{/if}</span>
+                <span class="inbox-title">{r.subject || "Sin asunto"}</span>
+                <span class="inbox-sender">{senderAddress(r.sender)}</span>
               </span>
               {#if r.status === "procesado"}
                 {#if r.rule}
@@ -221,13 +222,13 @@
     min-width: 0;
   }
 
-  .inbox-from {
+  .inbox-title {
     color: var(--text-primary);
     font-weight: 600;
   }
 
-  .inbox-from,
-  .inbox-subject {
+  .inbox-title,
+  .inbox-sender {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

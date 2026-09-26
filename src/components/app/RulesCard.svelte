@@ -70,7 +70,7 @@
       <h3 class="card-title">Reglas</h3>
       <p class="card-sub">
         Cada regla es una plantilla: los correos que cumplen su condición se vuelven movimientos solos, con el tipo, la cuenta, la
-        categoría y la descripción que indica. Lo más fácil es crearlas desde un correo de la <a class="link" href="#/bandeja">bandeja</a>.
+        categoría y la descripción que indica. Lo más fácil es crearlas desde un correo en <a class="link" href="#/correos">Correos</a>.
       </p>
     </div>
     <div class="card-head-actions">
@@ -110,7 +110,7 @@
     {:else}
       <p class="muted small empty">
         Todavía no hay reglas. Ejemplo: si el correo viene de <b>alertas@banco.com</b> y dice <b>GOU PAYMENTS</b>, que sea un gasto de
-        <b>Administración {"{mes}"}</b> en la cuenta de ahorros, categoría Vivienda. Ábrela desde un correo de la bandeja y ya viene llena.
+        <b>Administración {"{mes}"}</b> en la cuenta de ahorros, categoría Vivienda. Ábrela desde un correo en Correos y ya viene llena.
       </p>
     {/if}
   </div>

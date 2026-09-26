@@ -11,7 +11,6 @@ const admin = {
   category: "cat-admin",
   tags: ["administración", "Casa"],
   description: "Administración {mes}",
-  to_notes: true,
 };
 
 describe("find", () => {
@@ -82,22 +81,18 @@ describe("apply", () => {
     tags: ["revisar", "bancolombia"],
   };
 
-  test("categoría, etiquetas, descripción y el original a las notas", () => {
+  test("categoría, etiquetas y descripción; las notas no cambian", () => {
     expect(r.apply(admin, tx)).toMatchObject({
       category: "cat-admin",
       tags: ["bancolombia", "administración", "casa"],
       description: "Administración septiembre",
-      notes: "GOU PAYMENTS S A EASPBV",
+      notes: "",
     });
   });
 
   test("aplicarla dos veces no cambia nada más", () => {
     const once = r.apply(admin, tx);
     expect(r.apply(admin, { ...tx, ...once })).toEqual(once);
-  });
-
-  test("sin pasar a notas, el original se pierde de la descripción pero no se copia", () => {
-    expect(r.apply({ ...admin, to_notes: false }, tx).notes).toBe("");
   });
 
   test("con la cuenta sin reconocer sigue por revisar", () => {
@@ -137,7 +132,7 @@ describe("apply", () => {
     });
 
     test("las notas de la regla se agregan una vez", () => {
-      const conNotas = { ...admin, to_notes: false, notes: "Pago mensual" };
+      const conNotas = { ...admin, notes: "Pago mensual" };
       const once = r.apply(conNotas, base);
       expect(once.notes).toBe("Pago mensual");
       expect(r.apply(conNotas, { ...base, ...once }).notes).toBe("Pago mensual");
@@ -168,7 +163,7 @@ describe("applyExisting", () => {
     const notes = "x".repeat(3000);
     const app = fakeApp({ type: "expense", date: "2026-09-20 12:00:00.000Z", amount: 412000, description: "GOU PAYMENTS", notes, raw: "", category: "", tags: [] });
     expect(r.applyExisting(app, "u", "")).toBe(1);
-    expect(app.saved[0].notes).toBe(`GOU PAYMENTS\n${notes}`);
+    expect(app.saved[0].notes).toBe(notes);
     expect(app.saved[0].description).toBe("Administración septiembre");
   });
 

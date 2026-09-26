@@ -26,7 +26,7 @@ var FIELDS = {
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
-  rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "to_notes", "paused"],
+  rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "paused"],
   inbox: ["external_id", "source", "sender", "subject", "date", "text", "rich", "parsed", "status", "rule"],
   ignored_imports: ["external_id"],
 };

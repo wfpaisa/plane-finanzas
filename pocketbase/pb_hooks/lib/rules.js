@@ -147,13 +147,7 @@ function apply(rule, tx) {
   var original = tx.description || "";
   if (rule.description) {
     var next = render(rule.description, tx.date, original);
-    if (next && next !== original) {
-      // El texto del banco se guarda en las notas, sin repetirlo si ya está.
-      if (rule.to_notes && original && out.notes.indexOf(original) < 0) {
-        out.notes = out.notes ? original + "\n" + out.notes : original;
-      }
-      out.description = next;
-    }
+    if (next) out.description = next;
   }
   var ruleNotes = String(rule.notes || "").trim();
   if (ruleNotes && out.notes.indexOf(ruleNotes) < 0) out.notes = out.notes ? out.notes + "\n" + ruleNotes : ruleNotes;
@@ -185,7 +179,6 @@ function plain(r) {
     tags: jsonList(r, "tags"),
     description: r.getString("description"),
     notes: r.getString("notes"),
-    to_notes: r.getBool("to_notes"),
     paused: r.getBool("paused"),
   };
   rule.keys = keysOf(rule);

@@ -40,6 +40,19 @@ export function mailMatches(cond: { sender: string; match: string; amount?: numb
   return true;
 }
 
+/** Qué campos de la condición no se cumplen en el correo (uno vacío siempre se cumple). */
+export function mailMisses(cond: { sender: string; match: string; amount?: number }, mail: { sender: string; subject: string; text: string; amount?: number }): { sender: boolean; match: boolean; amount: boolean } {
+  const senders = list(cond.sender);
+  const keys = list(cond.match);
+  const who = norm(mail.sender);
+  const hay = ` ${norm(`${mail.subject}\n${mail.text}`)} `;
+  return {
+    sender: senders.length > 0 && !senders.some((s) => who.includes(s)),
+    match: keys.length > 0 && !keys.some((k) => hay.includes(k)),
+    amount: !!cond.amount && Math.abs(cond.amount - Math.abs(mail.amount ?? 0)) >= 0.005,
+  };
+}
+
 /** La descripción de la regla con sus marcas resueltas; `date` es "AAAA-MM-DD". */
 export function renderDescription(template: string, date: string, original: string): string {
   return template

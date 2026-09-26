@@ -215,6 +215,5 @@ export interface Rule extends RecordModel {
   /** Admite {mes}, {año} y {original}. */
   description: string;
   notes: string;
-  to_notes: boolean;
   paused: boolean;
 }

@@ -36,7 +36,7 @@
     },
     { path: "/cuentas", label: "Cuentas", icon: "wallet-01", mobile: true },
     { path: "/estados", label: "Análisis", icon: "pie-chart", mobile: true },
-    { path: "/bandeja", label: "Bandeja", icon: "mail-01", mobile: false },
+    { path: "/correos", label: "Correos", icon: "mail-01", mobile: false },
     { path: "/ahorros", label: "Ahorros", icon: "piggy-bank", mobile: false },
     {
       path: "/proyeccion",
@@ -52,7 +52,7 @@
     "/movimientos": Transactions,
     "/cuentas": Accounts,
     "/estados": Reports,
-    "/bandeja": Inbox,
+    "/correos": Inbox,
     "/ahorros": Savings,
     "/proyeccion": Plan,
     "/ajustes": Settings,
@@ -63,6 +63,8 @@
   // Importar ahora es la pestaña Gmail de Ajustes; los enlaces viejos y la
   // vuelta de Google (`?gmail=…`) llegan allá.
   $effect(() => {
+    // La bandeja ahora se llama Correos: los enlaces viejos siguen sirviendo.
+    if (route.path === "/bandeja") go("/correos", Object.fromEntries(route.query));
     if (route.path === "/importar")
       go("/ajustes", {
         seccion: "gmail",
@@ -144,7 +146,7 @@
             class:active={route.path === item.path}
           >
             <Icon name={item.icon} size={18} />{item.label}
-            {#if item.path === "/bandeja" && store.inboxPending}<span
+            {#if item.path === "/correos" && store.inboxPending}<span
                 class="nav-count">{store.inboxPending}</span
               >{/if}
           </a>

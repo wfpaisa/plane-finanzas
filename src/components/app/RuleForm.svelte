@@ -14,10 +14,11 @@
   import { untrack } from "svelte";
 
   import { money } from "../../lib/format";
+  import { highlight, type Piece } from "../../lib/highlight";
   import { TX_TYPES } from "../../lib/labels";
   import { notify } from "../../lib/notify.svelte";
   import { pb } from "../../lib/pb.svelte";
-  import { mailMatches, renderDescription } from "../../lib/rules";
+  import { mailMisses, renderDescription } from "../../lib/rules";
   import { reload, store, touchTransactions } from "../../lib/store.svelte";
   import type { InboxRow, Rule, Suggestion } from "../../lib/types";
   import Icon from "../Icon.svelte";
@@ -64,11 +65,12 @@
   let description = $state("");
   let tags = $state<string[]>([]);
   let notes = $state("");
-  let toNotes = $state(true);
   let paused = $state(false);
   let applyNow = $state(true);
   let busy = $state<"" | "rule" | "this">("");
   let confirmDelete = $state(false);
+  /** El nombre de antes: mientras la descripción sea igual a él, lo sigue. */
+  let lastName = "";
 
   $effect(() => {
     if (!open) return;
@@ -89,12 +91,24 @@
       account = rule?.account || tx?.account || "";
       toAccount = rule?.to_account || tx?.to_account || "";
       category = rule?.category || tx?.category || "";
-      description = rule?.description ?? tx?.description ?? "";
-      tags = [...(rule?.tags ?? tx?.tags ?? [])];
+      // Una regla nueva describe sus movimientos con su nombre.
+      description = rule ? rule.description : name;
+      lastName = name;
+      // Las etiquetas no se llenan con las que se leyeron: son solo las que se le pongan.
+      tags = [...(rule?.tags ?? [])];
       notes = rule?.notes ?? "";
-      toNotes = rule ? rule.to_notes : !!mail;
       paused = rule?.paused ?? false;
       applyNow = true;
+    });
+  });
+
+  // Escribir el nombre llena la descripción, salvo que ya diga otra cosa.
+  $effect(() => {
+    const n = name;
+    untrack(() => {
+      if (n === lastName) return;
+      if (!description.trim() || description === lastName) description = n;
+      lastName = n;
     });
   });
 
@@ -112,10 +126,15 @@
 
   /** El valor que trae el correo, sin la regla. */
   const mailAmount = $derived(mail?.suggestion.parsed?.amount ?? 0);
-  const matches = $derived(
-    mail
-      ? mailMatches({ sender, match, amount }, { sender: mail.row.sender, subject: mail.row.subject, text: mail.row.text, amount: mailAmount })
-      : true,
+  const mailFields = $derived(mail ? { sender: mail.row.sender, subject: mail.row.subject, text: mail.row.text, amount: mailAmount } : null);
+  /** Los campos que el correo no cumple, en rojo. */
+  const misses = $derived(mailFields ? mailMisses({ sender, match, amount }, mailFields) : { sender: false, match: false, amount: false });
+  // Arriba del correo, su asunto y remitente con lo que la condición toca en
+  // ellos, del color del campo que lo pide.
+  const mailFrom = $derived(mail ? (/<([^>]+)>/.exec(mail.row.sender)?.[1] ?? mail.row.sender).trim() : "");
+  const fromPieces = $derived(highlight(mailFrom, { keys: sender }));
+  const subjectPieces = $derived(
+    highlight(mail?.row.subject || "Sin asunto", { keys: match, amount: mailAmount, merchant: mail?.suggestion.parsed?.merchant }),
   );
   const date = $derived(mail?.suggestion.tx.date ?? new Date().toISOString().slice(0, 10));
   const original = $derived(mail?.suggestion.parsed?.description || mail?.row.subject || match.split(",")[0]?.trim().toUpperCase() || "GOU PAYMENTS S A");
@@ -140,7 +159,6 @@
       description: description.trim(),
       tags,
       notes: notes.trim(),
-      to_notes: toNotes,
       paused,
     };
   }
@@ -204,36 +222,45 @@
   }
 </script>
 
-<Modal {open} {onClose} {title} width="modal-panel-width-lg">
+<Modal {open} {onClose} {title} width="modal-panel-width-xl">
   <div class="rule-form">
     <section class="rule-when" aria-label="Cuándo se usa">
       <p class="rule-when-lead"><Icon name="flash" size={14} />Aplicar cuando el correo</p>
       <div class="when-grid">
         <Field label="Viene de" tip="Correo o dominio. Déjalo vacío para aceptar cualquier remitente.">
-          <Input bind:value={sender} placeholder="alertas@banco.com" />
+          <div class="dot-field"><Input bind:value={sender} placeholder="alertas@banco.com" aria-invalid={misses.sender || undefined} /><span class="dot hl-sender" aria-hidden="true"></span></div>
         </Field>
         <Field label="Contiene" tip="Separa varias opciones con comas. Basta con que coincida una.">
-          <Input bind:value={match} placeholder="PANADERIA, GOU PAYMENTS" />
+          <div class="dot-field"><Input bind:value={match} placeholder="PANADERIA, GOU PAYMENTS" aria-invalid={misses.match || undefined} /><span class="dot hl-rule" aria-hidden="true"></span></div>
         </Field>
         <Field label="Valor" tip="Opcional. Debe coincidir exactamente.">
-          <MoneyInput bind:value={amount} placeholder="Cualquiera" />
+          <div class="dot-field"><MoneyInput bind:value={amount} placeholder="Cualquiera" invalid={misses.amount} /><span class="dot hl-amount" aria-hidden="true"></span></div>
         </Field>
       </div>
-      {#if mail}
-        <p class="rule-check" class:ok={matches}>
-          <Icon name={matches ? "checkmark-circle-02" : "alert-02"} size={14} />
-          {#if matches}Este correo cumple la condición.{:else}Este correo no coincide. Su movimiento se creará, pero la regla no se aplicará a correos similares.{/if}
-        </p>
+      {#if misses.sender || misses.match || misses.amount}
+        <div class="alert warn">
+          <Icon name="alert-02" />
+          <div>
+            <strong>Este correo no cumple la condición</strong>
+            Revisa los campos en rojo: lo que escribes debe aparecer en el correo para que la regla funcione.
+          </div>
+        </div>
       {/if}
       {#if mail}
+        <hr class="divider" />
+        <div class="rule-mail-head">
+          <span class="rule-mail-subject">{#each subjectPieces as p, i (i)}{@render mark(p)}{/each}</span>
+          <span class="rule-mail-from">{#each fromPieces as p, i (i)}{@render mark(p, "sender")}{/each}</span>
+        </div>
         <MailText
+          legend={false}
           text={mail.row.text || mail.row.subject}
           rich={mail.row.rich}
           html={mail.html}
           amount={mailAmount}
           merchant={mail.suggestion.parsed?.merchant}
           keys={match}
-          maxHeight="9rem"
+          maxHeight="28rem"
         />
       {/if}
       {#if !match.trim() && sender.trim()}
@@ -241,87 +268,91 @@
       {/if}
     </section>
 
-    <Field label="Nombre de la regla">
-      <Input bind:value={name} placeholder="Panadería, arriendo, pago de la tarjeta…" autofocus={!mail} />
-    </Field>
-
-    <p class="rule-template-note">
-      Los correos que coincidan crearán movimientos con estos datos.
-    </p>
-
-    <Segmented bind:value={type} options={types} full label="Tipo" />
-
-    <div class="form-grid">
-      <!-- Sin Field: su <label> no puede envolver al del interruptor, y su
-           estilo de campo estiraría el interruptor. -->
-      <div>
-        <span class="field-label">Cantidad</span>
-        <div class="amount-mode">
-          <Switch bind:checked={autoAmount} label="Usar la del correo" />
-          {#if autoAmount}
-            <span class="muted small">{mail ? (mailAmount > 0 ? money(mailAmount) : "Sin cantidad") : "Cambia en cada correo"}</span>
-          {:else}
-            <div class="amount-value"><MoneyInput bind:value={setAmount} /></div>
-          {/if}
-        </div>
-      </div>
-      <Field label={type === "transfer" ? "Desde" : "Cuenta"}>
-        <AccountSelect bind:value={account} placeholder={mail ? "Elige…" : "La del remitente"} senders={newSenders} />
+    <!-- A la derecha: el movimiento que crea. -->
+    <div class="rule-then">
+      <Field label="Nombre de la regla">
+        <Input bind:value={name} placeholder="Panadería, arriendo, pago de la tarjeta…" autofocus={!mail} />
       </Field>
-      {#if type === "transfer"}
-        <Field label="Hacia" tip="Una transferencia entre tus cuentas no cuenta como gasto ni como ingreso.">
-          <AccountSelect bind:value={toAccount} placeholder="Elige…" exclude={account} />
+
+      <p class="rule-template-note">
+        Los correos que coincidan crearán movimientos con estos datos.
+      </p>
+
+      <Segmented bind:value={type} options={types} full label="Tipo" />
+
+      <div class="form-grid">
+        <!-- Sin Field: su <label> no puede envolver al del interruptor, y su
+             estilo de campo estiraría el interruptor. -->
+        <div>
+          <span class="field-label">Cantidad</span>
+          <div class="amount-mode">
+            <Switch bind:checked={autoAmount} label="Usar la del correo" />
+            {#if autoAmount}
+              <span class="muted small">{mail ? (mailAmount > 0 ? money(mailAmount) : "Sin cantidad") : "Cambia en cada correo"}</span>
+            {:else}
+              <div class="amount-value"><MoneyInput bind:value={setAmount} /></div>
+            {/if}
+          </div>
+        </div>
+        <Field label={type === "transfer" ? "Desde" : "Cuenta"}>
+          <AccountSelect bind:value={account} placeholder={mail ? "Elige…" : "La del remitente"} senders={newSenders} />
         </Field>
-      {:else}
-        <Field label="Categoría">
-          <Select bind:value={category}>
-            <option value="">{type ? "Por palabras clave" : "No cambiarla"}</option>
-            {#each type ? cats : store.categories as c (c.id)}
-              <option value={c.id}>{c.name}</option>
-            {/each}
-          </Select>
-        </Field>
+        {#if type === "transfer"}
+          <Field label="Hacia" tip="Una transferencia entre tus cuentas no cuenta como gasto ni como ingreso.">
+            <AccountSelect bind:value={toAccount} placeholder="Elige…" exclude={account} />
+          </Field>
+        {:else}
+          <Field label="Categoría">
+            <Select bind:value={category}>
+              <option value="">{type ? "Por palabras clave" : "No cambiarla"}</option>
+              {#each type ? cats : store.categories as c (c.id)}
+                <option value={c.id}>{c.name}</option>
+              {/each}
+            </Select>
+          </Field>
+        {/if}
+      </div>
+
+      <Field label="Descripción" tip={"Puedes usar {mes}, {año} y {original}. Vacía, usa la del correo."}>
+        <Input bind:value={description} placeholder={"Arriendo {mes}"} />
+      </Field>
+      {#if description.includes("{")}
+        <p class="rule-preview">
+          <span class="muted">Quedará:</span>
+          <b>{preview}</b>
+        </p>
+      {/if}
+
+      <Field label="Etiquetas">
+        <TagInput bind:value={tags} suggestions={knownTags} />
+      </Field>
+
+      <Field label="Notas">
+        <Textarea bind:value={notes} rows={2} />
+      </Field>
+
+      {#if rule || !mail}
+        <div class="form-switches">
+          {#if rule}<Switch bind:checked={paused} label="En pausa" />{/if}
+          {#if !mail && !paused}<Switch bind:checked={applyNow} label="Aplicar a correos ya importados" />{/if}
+        </div>
+      {/if}
+
+      {#if mail && !usedHere}
+        <p class="rule-outcome">
+          <Icon name="information-circle" size={16} />
+          <span>
+            Al guardar, {mail.row.status === "procesado" ? "se actualizará este movimiento" : "se creará este movimiento"}.
+            La regla también se aplicará a correos pendientes y nuevos.
+          </span>
+        </p>
+      {:else if usedHere}
+        <p class="rule-outcome">
+          <Icon name="information-circle" size={16} />
+          <span>Cambia solo este movimiento o actualiza la regla y todos sus movimientos.</span>
+        </p>
       {/if}
     </div>
-
-    <Field label="Descripción" tip={"Puedes usar {mes}, {año} y {original}. Vacía, usa la del correo."}>
-      <Input bind:value={description} placeholder={"Arriendo {mes}"} />
-    </Field>
-    {#if description.includes("{")}
-      <p class="rule-preview">
-        <span class="muted">Quedará:</span>
-        <b>{preview}</b>
-      </p>
-    {/if}
-
-    <Field label="Etiquetas">
-      <TagInput bind:value={tags} suggestions={knownTags} />
-    </Field>
-
-    <Field label="Notas">
-      <Textarea bind:value={notes} rows={2} />
-    </Field>
-
-    <div class="form-switches">
-      <Switch bind:checked={toNotes} label="Copiar el correo en las notas" />
-      {#if rule}<Switch bind:checked={paused} label="En pausa" />{/if}
-      {#if !mail && !paused}<Switch bind:checked={applyNow} label="Aplicar a correos ya importados" />{/if}
-    </div>
-
-    {#if mail && !usedHere}
-      <p class="rule-outcome">
-        <Icon name="information-circle" size={16} />
-        <span>
-          Al guardar, {mail.row.status === "procesado" ? "se actualizará este movimiento" : "se creará este movimiento"}.
-          La regla también se aplicará a correos pendientes y nuevos.
-        </span>
-      </p>
-    {:else if usedHere}
-      <p class="rule-outcome">
-        <Icon name="information-circle" size={16} />
-        <span>Cambia solo este movimiento o actualiza la regla y todos sus movimientos.</span>
-      </p>
-    {/if}
   </div>
 
   {#snippet footer()}
@@ -341,6 +372,8 @@
   {/snippet}
 </Modal>
 
+{#snippet mark(p: Piece, as?: string)}{#if p.mark}<mark class="hl-{as ?? p.mark}">{p.text}</mark>{:else}{p.text}{/if}{/snippet}
+
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
@@ -351,7 +384,20 @@
 />
 
 <style>
+  /* Dos columnas: a la izquierda cuándo se usa (60 %), a la derecha qué crea (40 %). */
   .rule-form {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: var(--sp-20);
+    align-items: start;
+
+    @media (max-width: 56rem) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-16);
+    }
+  }
+
+  .rule-then {
     display: flex;
     flex-direction: column;
     gap: var(--sp-16);
@@ -365,6 +411,12 @@
     border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent);
     border-radius: var(--radius-md);
     background: color-mix(in oklch, var(--accent) 7%, transparent);
+
+    /* Queda a la vista mientras se baja por la columna de la derecha. */
+    @media (min-width: 56.01rem) {
+      position: sticky;
+      top: 0;
+    }
   }
 
   .rule-when-lead {
@@ -377,14 +429,90 @@
     font-weight: 600;
   }
 
+  /* Remitente y valor arriba; «Contiene», que suele ser largo, a lo ancho. */
   .when-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     gap: var(--sp-12);
+
+    & > :global(:nth-child(2)) {
+      grid-row: 2;
+      grid-column: 1 / -1;
+    }
 
     @media (max-width: 40rem) {
       grid-template-columns: minmax(0, 1fr);
     }
+  }
+
+  /* Cada campo de la condición tiene su color: el del resalte que pide en el correo. */
+  .rule-when {
+    --hl-sender: oklch(0.88 0.08 320);
+    --hl-rule: oklch(0.9 0.1 150);
+    --hl-amount: oklch(0.92 0.11 90);
+    --hl-merchant: oklch(0.9 0.06 250);
+  }
+
+  .hl-sender {
+    background: var(--hl-sender);
+  }
+
+  .hl-rule {
+    background: var(--hl-rule);
+  }
+
+  .hl-amount {
+    background: var(--hl-amount);
+  }
+
+  .hl-merchant {
+    background: var(--hl-merchant);
+  }
+
+  .dot-field {
+    position: relative;
+
+    & :global(input) {
+      padding-right: 1.9rem;
+    }
+  }
+
+  .dot {
+    position: absolute;
+    top: 50%;
+    right: 0.7rem;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px oklch(0 0 0 / 0.12);
+    translate: 0 -50%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Como la cabecera de un correo: asunto arriba, remitente debajo. */
+  .rule-mail-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    font-size: var(--text-sm);
+
+    & mark {
+      padding: 0.05em 0.25em;
+      border-radius: 0.25em;
+      color: oklch(0.22 0.02 250);
+      box-decoration-break: clone;
+    }
+  }
+
+  .rule-mail-subject {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .rule-mail-from {
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
   }
 
   .rule-check {
@@ -394,10 +522,6 @@
     margin: 0;
     color: var(--warning, var(--text-muted));
     font-size: var(--text-xs);
-
-    &.ok {
-      color: var(--success, var(--text-muted));
-    }
   }
 
   .rule-template-note {

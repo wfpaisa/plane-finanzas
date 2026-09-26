@@ -135,9 +135,13 @@ function strip(base) {
   };
 }
 
-/** La plantilla de la regla sobre lo leído del correo; la fecha, la del correo. */
+/**
+ * La plantilla de la regla sobre lo leído del correo; la fecha, la del correo.
+ * Las etiquetas son solo las de la regla: si se le quitaron todas, el
+ * movimiento no lleva ninguna (ni la del banco que se leyó).
+ */
 function withRule(rule, base) {
-  var out = rules.apply(rule, base);
+  var out = rules.apply(rule, Object.assign({}, base, { tags: [] }));
   out.date = base.date;
   out.rule = rule.id || "";
   return out;
@@ -353,7 +357,6 @@ function saveRule(app, userId, body) {
   clean.amount = Math.max(0, +data.amount || 0);
   clean.set_amount = Math.max(0, +data.set_amount || 0);
   clean.tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
-  clean.to_notes = !!data.to_notes;
   clean.paused = !!data.paused;
   if (["income", "expense", "transfer"].indexOf(clean.type) < 0) clean.type = "";
   if (clean.type !== "transfer") clean.to_account = "";

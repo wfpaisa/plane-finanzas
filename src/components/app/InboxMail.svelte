@@ -165,9 +165,6 @@
           text={row.text || row.subject}
           rich={row.rich}
           {html}
-          amount={suggestion.parsed?.amount}
-          merchant={suggestion.parsed?.merchant}
-          keys={suggestion.rule?.match ?? ""}
           maxHeight="24rem"
           legend={false}
           framed={false}
@@ -200,7 +197,7 @@
             <button type="button" class="decide-option danger" disabled={busy} onclick={discard}>
               <Icon name="delete-02" size={20} />
               <b>Descartar</b>
-              <span>Quítalo de la bandeja.</span>
+              <span>Quítalo de Correos.</span>
             </button>
           </div>
         </section>

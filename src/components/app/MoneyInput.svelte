@@ -11,12 +11,15 @@
     placeholder = "0",
     autofocus = false,
     allowNegative = false,
+    invalid = false,
   }: {
     value?: number;
     id?: string;
     placeholder?: string;
     autofocus?: boolean;
     allowNegative?: boolean;
+    /** Marcarlo en rojo. */
+    invalid?: boolean;
   } = $props();
 
   const show = (n: number) => (n ? (n < 0 ? "-" : "") + plainNumber(Math.abs(n)) : "");
@@ -52,6 +55,7 @@
     class="field-control w-full"
     inputmode={allowNegative ? "text" : "numeric"}
     {placeholder}
+    aria-invalid={invalid || undefined}
     value={text}
     {oninput}
   />
