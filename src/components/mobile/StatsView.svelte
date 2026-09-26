@@ -1,5 +1,5 @@
 <!--
-  Estadísticas del celular. Arriba, el mes (o el año) por categoría, en un
+  Análisis del celular. Arriba, el mes (o el año) por categoría, en un
   pastel, o por etiqueta, en lista: un movimiento con varias etiquetas suma
   en cada una y ahí un pastel mentiría. Tocar una parte la abre: sus
   categorías con su porcentaje, cómo vino en los últimos meses y sus

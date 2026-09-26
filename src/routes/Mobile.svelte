@@ -1,6 +1,6 @@
 <!--
   La app del celular (`#/m`), ordenada como las apps de gastos de siempre:
-  abajo cuatro pestañas —Movimientos, Estadísticas, Cuentas y Más— y en
+  abajo cuatro pestañas —Movimientos, Análisis, Cuentas y Más— y en
   Movimientos el mes visto de cinco maneras: diario, calendario, mensual
   (el año mes a mes), total (presupuesto y cuentas) y por nota.
 
@@ -17,6 +17,8 @@
   import MonthlyView from "../components/mobile/MonthlyView.svelte";
   import MonthNav from "../components/mobile/MonthNav.svelte";
   import NotesView from "../components/mobile/NotesView.svelte";
+  import PlanView from "../components/mobile/PlanView.svelte";
+  import SavingsView from "../components/mobile/SavingsView.svelte";
   import StatsView from "../components/mobile/StatsView.svelte";
   import TopBar from "../components/mobile/TopBar.svelte";
   import TotalView from "../components/mobile/TotalView.svelte";
@@ -33,6 +35,7 @@
   import { store, touchTransactions } from "../lib/store.svelte";
   import { theme } from "../lib/theme.svelte";
   import type { Transaction } from "../lib/types";
+  import { route } from "../lib/router.svelte";
   import { txModal } from "../lib/ui.svelte";
 
   type Tx = Pending<Transaction>;
@@ -40,8 +43,8 @@
   type View = "diario" | "calendario" | "mensual" | "total" | "nota";
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "trans", label: "Trans.", icon: "book-open-01" },
-    { id: "stats", label: "Estad.", icon: "chart-column" },
+    { id: "trans", label: "Movimientos", icon: "book-open-01" },
+    { id: "stats", label: "Análisis", icon: "chart-column" },
     { id: "accounts", label: "Cuentas", icon: "wallet-01" },
     { id: "more", label: "Más", icon: "more-horizontal" },
   ];
@@ -237,15 +240,30 @@
   });
 
   const MORE = [
-    { href: "#/ahorros", label: "Ahorros", icon: "piggy-bank" },
-    { href: "#/proyeccion", label: "Plan futuro", icon: "chart-line-data-01" },
+    { href: "#/m?ver=ahorros", label: "Ahorros", icon: "piggy-bank" },
+    { href: "#/m?ver=plan", label: "Plan futuro", icon: "chart-line-data-01" },
     { href: "#/ajustes?seccion=gmail", label: "Gmail", icon: "mail-01" },
     { href: "#/ajustes?seccion=categorias", label: "Ajustes y categorías", icon: "settings-01" },
   ];
+
+  // Ahorros y Plan futuro se abren encima de Más, en la misma ruta
+  // (`#/m?ver=ahorros`): así el botón de atrás del teléfono vuelve a Más.
+  const sub = $derived(route.query.get("ver") === "ahorros" || route.query.get("ver") === "plan" ? route.query.get("ver") : null);
+  $effect(() => {
+    if (sub) tab = "more";
+  });
+  function closeSub() {
+    if (history.length > 1) history.back();
+    else location.replace("#/m");
+  }
 </script>
 
 <div class="m">
-  {#if tab === "trans"}
+  {#if sub === "ahorros"}
+    <SavingsView onBack={closeSub} />
+  {:else if sub === "plan"}
+    <PlanView onBack={closeSub} />
+  {:else if tab === "trans"}
     <TopBar>
       <MonthNav bind:ym yearly={view === "mensual"} />
       {#snippet actions()}
@@ -380,21 +398,21 @@
     </div>
     <ul class="m-menu">
       {#each MORE as item (item.href)}
-        <li><a href={item.href}><Icon name={item.icon} size={20} />{item.label}<Icon name="arrow-right-01" size={16} /></a></li>
+        <li><a href={item.href}><Icon name={item.icon} size={18} />{item.label}<Icon name="arrow-right-01" size={14} /></a></li>
       {/each}
       <li>
         <button type="button" onclick={() => (syncSheet = true)}>
-          <Icon name="cloud-upload" size={20} />Cambios en el teléfono
+          <Icon name="cloud-upload" size={18} />Cambios en el teléfono
           {#if offline.pending || offline.failed.length}<span class="m-count">{offline.pending + offline.failed.length}</span>{/if}
-          <Icon name="arrow-right-01" size={16} />
+          <Icon name="arrow-right-01" size={14} />
         </button>
       </li>
       <li class="m-menu-row">
-        <span><Icon name="moon-02" size={20} />Modo oscuro</span>
+        <span><Icon name="moon-02" size={18} />Modo oscuro</span>
         <ModeToggle dark={theme.name === "dark"} onToggle={(next) => theme.set(next)} />
       </li>
-      <li><a href="#/" onclick={leave}><Icon name="dashboard-square-01" size={20} />Versión completa<Icon name="arrow-right-01" size={16} /></a></li>
-      <li><button type="button" class="danger" onclick={logout}><Icon name="logout-01" size={20} />Salir</button></li>
+      <li><a href="#/" onclick={leave}><Icon name="dashboard-square-01" size={18} />Versión completa<Icon name="arrow-right-01" size={14} /></a></li>
+      <li><button type="button" class="danger" onclick={logout}><Icon name="logout-01" size={18} />Salir</button></li>
     </ul>
   {/if}
 </div>
@@ -406,7 +424,7 @@
   </button>
 {/if}
 
-{#if tab === "trans" || tab === "stats"}
+{#if !sub && (tab === "trans" || tab === "stats")}
   <button type="button" class="m-fab" aria-label="Anotar" onclick={() => openSheet("expense")}>
     <Icon name="add-01" size={28} />
   </button>
@@ -414,7 +432,15 @@
 
 <nav class="m-nav">
   {#each TABS as t (t.id)}
-    <button type="button" class:on={tab === t.id} aria-current={tab === t.id ? "page" : undefined} onclick={() => (tab = t.id)}>
+    <button
+      type="button"
+      class:on={tab === t.id}
+      aria-current={tab === t.id ? "page" : undefined}
+      onclick={() => {
+        tab = t.id;
+        if (sub) location.replace("#/m");
+      }}
+    >
       <Icon name={t.icon} size={22} /><span>{t.label}</span>
     </button>
   {/each}
@@ -789,6 +815,7 @@
   .m-menu {
     margin: 0;
     padding: 0;
+    font-size: var(--text-sm);
     list-style: none;
 
     & a,
@@ -798,7 +825,7 @@
       align-items: center;
       gap: var(--sp-12);
       width: 100%;
-      padding: var(--sp-14, 0.875rem) var(--sp-16);
+      padding: var(--sp-12) var(--sp-16);
       border: 0;
       border-bottom: 1px solid var(--border);
       background: none;
@@ -808,7 +835,7 @@
       text-decoration: none;
       cursor: pointer;
 
-      & > :global(i:last-child) {
+      & > :global(i:last-child:not(:first-child)) {
         margin-left: auto;
         color: var(--text-muted);
       }

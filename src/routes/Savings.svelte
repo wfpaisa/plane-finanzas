@@ -15,12 +15,12 @@
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button, Switch } from "../components/ui";
-  import { alpha, resolveColor, token } from "../lib/colors";
-  import { addMonths, futureValue, monthsToTarget, today } from "../lib/finance";
-  import { dateShort, money, monthLabel, monthsLabel } from "../lib/format";
+  import { addMonths, monthsToTarget, today } from "../lib/finance";
+  import { dateShort, monthLabel, monthsLabel } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
   import { colorOf } from "../lib/palettes";
   import { pb, session } from "../lib/pb.svelte";
+  import { paidAt, savingsHistory, simChart, stateChart, valueAt } from "../lib/savingsCharts";
   import { reload, store } from "../lib/store.svelte";
   import type { Saving, SavingMovement } from "../lib/types";
 
@@ -119,185 +119,21 @@
   const selIds = $derived(new Set(simulated.map((s) => s.id)));
   const selCurrent = $derived(simulated.reduce((a, s) => a + store.savingCurrent(s.id), 0));
 
-  const valueAt = (s: Saving, months: number) =>
-    futureValue(store.savingCurrent(s.id), s.monthly_amount || 0, s.annual_rate || 0, months);
-  const paidAt = (s: Saving, months: number) => store.savingCurrent(s.id) + (s.monthly_amount || 0) * months;
+  const current = (id: string) => store.savingCurrent(id);
   // La gráfica tiene dos vistas: lo que ha tenido cada ahorro (estado) y lo
   // que tendría si sigue aportando (simulación).
   let view = $state<"estado" | "sim">("estado");
 
-  /** Saldo de cada ahorro al cierre de cada mes, desde su primer movimiento
-   *  (y al menos los últimos 6 meses) hasta hoy. */
-  const history = $derived.by(() => {
-    const ids = new Set(simulated.map((s) => s.id));
-    const movs = store.movements.filter((m) => ids.has(m.saving));
-    const first = movs.reduce((a, m) => (m.date.slice(0, 7) < a ? m.date.slice(0, 7) : a), addMonths(ym, -5));
-    const months: string[] = [];
-    for (let m = first; m <= ym; m = addMonths(m, 1)) months.push(m);
-    // Lo de cada mes y luego la suma corrida: una pasada, no una por mes.
-    const lines = simulated.map((s) => {
-      const byMonth = new Map<string, number>();
-      for (const m of movs) {
-        if (m.saving === s.id) byMonth.set(m.date.slice(0, 7), (byMonth.get(m.date.slice(0, 7)) ?? 0) + m.amount);
-      }
-      let sum = 0;
-      return { s, data: months.map((mo) => (sum += byMonth.get(mo) ?? 0)) };
-    });
-    return { months, lines };
-  });
+  const history = $derived(savingsHistory(simulated, store.movements, ym));
   const nowTotal = $derived(simulated.reduce((a, s) => a + store.savingCurrent(s.id), 0));
   const grown = $derived(nowTotal - history.lines.reduce((a, l) => a + l.data[0], 0));
 
   const simMonthly = $derived(simulated.reduce((a, s) => a + (s.monthly_amount || 0), 0));
-  const future = $derived(simulated.reduce((a, s) => a + valueAt(s, horizon), 0));
-  const contributed = $derived(simulated.reduce((a, s) => a + paidAt(s, horizon), 0));
+  const future = $derived(simulated.reduce((a, s) => a + valueAt(s, current(s.id), horizon), 0));
+  const contributed = $derived(simulated.reduce((a, s) => a + paidAt(s, current(s.id), horizon), 0));
 
   const chartConfig = (): ChartConfiguration =>
-    view === "estado" ? stateConfig() : multi ? multiConfig() : singleConfig();
-
-  /** Lo que ha tenido: una línea por ahorro y, con varios, el total. */
-  const stateConfig = (): ChartConfiguration => {
-    const labels = history.months.map((m) => monthLabel(m));
-    const ink = token("--text-primary");
-    const one = history.lines.length === 1;
-    const lines = history.lines.map(({ s, data }) => {
-      const color = resolveColor(colorOf(s.palette));
-      return {
-        label: s.name,
-        data,
-        borderColor: color,
-        backgroundColor: alpha(color, 0.08),
-        fill: one,
-        borderWidth: one ? 2 : 1.75,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        tension: 0,
-      };
-    });
-    const total = labels.map((_, i) => history.lines.reduce((a, l) => a + l.data[i], 0));
-    return {
-      type: "line",
-      data: {
-        labels,
-        datasets: one
-          ? lines
-          : [
-              {
-                label: "Total",
-                data: total,
-                borderColor: ink,
-                backgroundColor: alpha(ink, 0.06),
-                fill: true,
-                borderWidth: 2.5,
-                pointRadius: 0,
-                pointHoverRadius: 5,
-                tension: 0,
-              },
-              ...lines,
-            ],
-      },
-      options: lineOptions(),
-    };
-  };
-
-  const lineOptions = (): ChartConfiguration["options"] => ({
-    interaction: { mode: "index", intersect: false },
-    scales: {
-      x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-      y: { ticks: { callback: (v) => money(Number(v)) }, border: { display: false } },
-    },
-    plugins: {
-      legend: { position: "top", align: "end" },
-      tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${money(Number(c.raw))}` } },
-    },
-  });
-
-  /** Varios ahorros: una línea por cada uno, en su color, y el total encima. */
-  const multiConfig = (): ChartConfiguration => {
-    const labels = Array.from({ length: horizon + 1 }, (_, i) => monthLabel(addMonths(ym, i)));
-    const lines = simulated.map((s) => ({ s, data: labels.map((_, i) => valueAt(s, i)) }));
-    const total = labels.map((_, i) => lines.reduce((a, l) => a + l.data[i], 0));
-    // El total en tinta, no en color: así no se confunde con ningún ahorro.
-    const ink = token("--text-primary");
-    return {
-      type: "line",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "Total",
-            data: total,
-            borderColor: ink,
-            backgroundColor: alpha(ink, 0.06),
-            fill: true,
-            borderWidth: 2.5,
-            pointRadius: 0,
-            pointHoverRadius: 5,
-            tension: 0.25,
-          },
-          ...lines.map(({ s, data }) => ({
-            label: s.name,
-            data,
-            borderColor: resolveColor(colorOf(s.palette)),
-            borderWidth: 1.75,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            tension: 0.25,
-            fill: false,
-          })),
-        ],
-      },
-      options: lineOptions(),
-    };
-  };
-
-  const singleConfig = (): ChartConfiguration => {
-    const s = simulated[0];
-    // El ahorro en su color; la comparación sin intereses y la meta, en
-    // gris, para que no se confundan con él.
-    const c1 = resolveColor(colorOf(s.palette));
-    const c2 = token("--viz-muted");
-    const labels: string[] = [];
-    const withRate: number[] = [];
-    const plain: number[] = [];
-    for (let i = 0; i <= horizon; i++) {
-      labels.push(monthLabel(addMonths(ym, i)));
-      withRate.push(valueAt(s, i));
-      plain.push(paidAt(s, i));
-    }
-    const datasets: ChartConfiguration<"line">["data"]["datasets"] = [
-      {
-        label: s.annual_rate ? `Con interés anual del ${s.annual_rate}%` : "Cantidad estimada",
-        data: withRate,
-        borderColor: c1,
-        backgroundColor: alpha(c1, 0.08),
-        fill: true,
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        tension: 0.25,
-      },
-    ];
-    if (s.annual_rate) {
-      datasets.push({ label: "Sin intereses", data: plain, borderColor: c2, borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false });
-    }
-    if (s.target_amount) {
-      datasets.push({
-        label: "Meta",
-        data: labels.map(() => s.target_amount),
-        borderColor: token("--text-muted"),
-        borderDash: [2, 3],
-        borderWidth: 1.5,
-        pointRadius: 0,
-        fill: false,
-      });
-    }
-    return {
-      type: "line",
-      data: { labels, datasets },
-      options: lineOptions(),
-    };
-  };
+    view === "estado" ? stateChart(history) : simChart(simulated, current, horizon, ym);
 
   async function removeMovement(id: string) {
     try {
