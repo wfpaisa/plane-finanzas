@@ -37,7 +37,8 @@
   import { store, touchTransactions } from "../lib/store.svelte";
   import { theme } from "../lib/theme.svelte";
   import type { Transaction } from "../lib/types";
-  import { route } from "../lib/router.svelte";
+  import { nextDirection, route } from "../lib/router.svelte";
+  import { transition } from "../lib/transition";
   import { txModal } from "../lib/ui.svelte";
 
   type Tx = Pending<Transaction>;
@@ -109,7 +110,11 @@
     return overlay("transactions", serverTxs, offline.items, (t) => {
       const d = t.date.slice(0, 10);
       return d >= from && d < to;
-    }).toSorted((a, b) => b.date.localeCompare(a.date) || String(b.created).localeCompare(String(a.created)));
+    }).toSorted(
+      (a, b) =>
+        b.date.localeCompare(a.date) ||
+        String(b.created).localeCompare(String(a.created)),
+    );
   });
 
   const monthTxs = $derived(txs.filter((t) => t.date.slice(0, 7) === ym));
@@ -120,7 +125,12 @@
 
   /** Una cuenta de Cuentas: sus movimientos del mes, en el buscador y con la cuenta como filtro. */
   function openAccount(id: string) {
-    filters = { ...emptyFilters(), accounts: [id], period: "month", ref: `${thisMonth}-01` };
+    filters = {
+      ...emptyFilters(),
+      accounts: [id],
+      period: "month",
+      ref: `${thisMonth}-01`,
+    };
     location.hash = "#/m?ver=buscar";
   }
 
@@ -132,7 +142,9 @@
 
   // --- Un día del calendario --------------------------------------------
   let daySheet = $state("");
-  const dayTxs = $derived(daySheet ? txs.filter((t) => t.date.slice(0, 10) === daySheet) : []);
+  const dayTxs = $derived(
+    daySheet ? txs.filter((t) => t.date.slice(0, 10) === daySheet) : [],
+  );
 
   // --- Anotar: la pantalla de movimiento (ver mobile/TxScreen.svelte) ------
   function openSheet(type: "expense" | "income", day = today()) {
@@ -156,47 +168,81 @@
 
   const status = $derived.by(() => {
     const n = offline.pending;
-    if (offline.authNeeded && n) return { icon: "alert-02", text: "Entra de nuevo para enviar", tone: "warn" };
+    if (offline.authNeeded && n)
+      return {
+        icon: "alert-02",
+        text: "Entra de nuevo para enviar",
+        tone: "warn",
+      };
     if (offline.failed.length) {
       const f = offline.failed.length;
-      return { icon: "alert-02", text: f === 1 ? "1 cambio sin guardar" : `${f} cambios sin guardar`, tone: "bad" };
+      return {
+        icon: "alert-02",
+        text: f === 1 ? "1 cambio sin guardar" : `${f} cambios sin guardar`,
+        tone: "bad",
+      };
     }
-    if (!offline.online) return { icon: "wifi-off-01", text: n ? `Sin conexión · ${n} por enviar` : "Sin conexión", tone: "" };
+    if (!offline.online)
+      return {
+        icon: "wifi-off-01",
+        text: n ? `Sin conexión · ${n} por enviar` : "Sin conexión",
+        tone: "",
+      };
     if (n) return { icon: "cloud-upload", text: `Enviando ${n}…`, tone: "" };
     return null;
   });
 
-  const OP_LABEL = { create: "Nuevo", update: "Cambio", delete: "Borrado" } as const;
+  const OP_LABEL = {
+    create: "Nuevo",
+    update: "Cambio",
+    delete: "Borrado",
+  } as const;
 
   function describe(item: OutboxItem) {
     const d = { ...item.base, ...item.data } as Partial<Transaction>;
-    const what = d.description || store.category(d.category ?? "")?.name || (d.type === "income" ? "ingreso" : "gasto");
-    return { label: `${OP_LABEL[item.op]}: ${what}`, amount: Number(d.amount) || 0, type: d.type };
+    const what =
+      d.description ||
+      store.category(d.category ?? "")?.name ||
+      (d.type === "income" ? "ingreso" : "gasto");
+    return {
+      label: `${OP_LABEL[item.op]}: ${what}`,
+      amount: Number(d.amount) || 0,
+      type: d.type,
+    };
   }
 
   // --- Posibles repetidos: lo anotado a mano contra lo del banco --------
   const dupes = $derived(monthTxs.filter((t) => t.dup_of));
   let merging = $state("");
 
-  const twinOf = (t: Tx): Transaction | undefined => t.expand?.dup_of ?? txs.find((x) => x.id === t.dup_of);
+  const twinOf = (t: Tx): Transaction | undefined =>
+    t.expand?.dup_of ?? txs.find((x) => x.id === t.dup_of);
 
   /** El par ordenado: lo que anotó la persona y lo que trajo el banco. */
   function pairOf(t: Tx) {
     const twin = twinOf(t);
     if (!twin) return null;
-    return t.source === "manual" || !t.source ? { mine: t, bank: twin } : { mine: twin, bank: t };
+    return t.source === "manual" || !t.source
+      ? { mine: t, bank: twin }
+      : { mine: twin, bank: t };
   }
 
   async function merge(t: Tx) {
-    if (!offline.online) return notify.fail(new Error("Para unirlos hace falta conexión."));
+    if (!offline.online)
+      return notify.fail(new Error("Para unirlos hace falta conexión."));
     merging = t.id;
     try {
       // Si alguno tiene cambios sin enviar, primero esos.
       await offline.sync();
       if (offline.items.some((i) => i.id === t.id || i.id === t.dup_of)) {
-        throw new Error("Aún hay cambios de este movimiento sin enviar. Intenta en un momento.");
+        throw new Error(
+          "Aún hay cambios de este movimiento sin enviar. Intenta en un momento.",
+        );
       }
-      await pb.send("/api/finanzas/tx/merge", { method: "POST", body: { id: t.id } });
+      await pb.send("/api/finanzas/tx/merge", {
+        method: "POST",
+        body: { id: t.id },
+      });
       touchTransactions();
       notify.done("Listo: quedó uno solo");
     } catch (err) {
@@ -234,13 +280,19 @@
     { href: "#/m?ver=ahorros", label: "Ahorros", icon: "piggy-bank" },
     { href: "#/m?ver=plan", label: "Plan futuro", icon: "chart-line-data-01" },
     { href: "#/ajustes?seccion=gmail", label: "Gmail", icon: "mail-01" },
-    { href: "#/ajustes?seccion=categorias", label: "Ajustes y categorías", icon: "settings-01" },
+    {
+      href: "#/ajustes?seccion=categorias",
+      label: "Ajustes y categorías",
+      icon: "settings-01",
+    },
   ];
 
   // Ahorros y Plan futuro se abren encima de Más, en la misma ruta
   // (`#/m?ver=ahorros`): así el botón de atrás del teléfono vuelve a Más.
   const SUBS = ["ahorros", "plan", "buscar"];
-  const sub = $derived(SUBS.includes(route.query.get("ver") ?? "") ? route.query.get("ver") : null);
+  const sub = $derived(
+    SUBS.includes(route.query.get("ver") ?? "") ? route.query.get("ver") : null,
+  );
   // Mientras está abierta se marca su pestaña; al cerrarla se vuelve a la
   // de antes (de una cuenta, a Cuentas).
   let tabBefore: Tab | null = null;
@@ -270,8 +322,13 @@
     <TopBar>
       <MonthNav bind:ym yearly={view === "mensual"} />
       {#snippet actions()}
-        <a href="#/m?ver=buscar" class="btn-icon sm m-search-btn" class:on={searching} aria-label={searching ? "Buscar (con filtros puestos)" : "Buscar"}>
-          <Icon name="search-01" size={20} />
+        <a
+          href="#/m?ver=buscar"
+          class="btn-icon sm m-search-btn"
+          class:on={searching}
+          aria-label={searching ? "Buscar (con filtros puestos)" : "Buscar"}
+        >
+          <Icon name="search-01" size={18} />
           {#if searching}<i class="m-dot"></i>{/if}
         </a>
       {/snippet}
@@ -279,7 +336,13 @@
 
     <div class="m-views" role="tablist">
       {#each VIEWS as v (v.id)}
-        <button type="button" role="tab" aria-selected={view === v.id} class:on={view === v.id} onclick={() => (view = v.id)}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === v.id}
+          class:on={view === v.id}
+          onclick={() => (view = v.id)}
+        >
           {v.label}
         </button>
       {/each}
@@ -304,19 +367,42 @@
             <div class="m-dupe-pair">
               <div>
                 <span class="m-label">{dupeSide(pair.mine)}</span>
-                <span class="m-desc">{pair.mine.description || store.category(pair.mine.category)?.name || "Sin descripción"}</span>
-                <span class="m-sub">{dateShort(pair.mine.date.slice(0, 10))} · {store.account(pair.mine.account)?.name ?? ""}</span>
+                <span class="m-desc"
+                  >{pair.mine.description ||
+                    store.category(pair.mine.category)?.name ||
+                    "Sin descripción"}</span
+                >
+                <span class="m-sub"
+                  >{dateShort(pair.mine.date.slice(0, 10))} · {store.account(
+                    pair.mine.account,
+                  )?.name ?? ""}</span
+                >
               </div>
               <div>
                 <span class="m-label">{dupeSide(pair.bank)}</span>
-                <span class="m-desc">{pair.bank.description || "Sin descripción"}</span>
-                <span class="m-sub">{dateShort(pair.bank.date.slice(0, 10))} · {store.account(pair.bank.account)?.name ?? ""}</span>
+                <span class="m-desc"
+                  >{pair.bank.description || "Sin descripción"}</span
+                >
+                <span class="m-sub"
+                  >{dateShort(pair.bank.date.slice(0, 10))} · {store.account(
+                    pair.bank.account,
+                  )?.name ?? ""}</span
+                >
               </div>
             </div>
             <div class="m-dupe-foot">
-              <button type="button" class="btn sm" onclick={() => distinct(t)}>Son distintos</button>
-              <button type="button" class="btn sm btn-primary" disabled={merging === t.id} onclick={() => merge(t)}>
-                <Icon name="git-merge" />{merging === t.id ? "Uniendo…" : "Es el mismo: unir"}
+              <button type="button" class="btn sm" onclick={() => distinct(t)}
+                >Son distintos</button
+              >
+              <button
+                type="button"
+                class="btn sm btn-primary"
+                disabled={merging === t.id}
+                onclick={() => merge(t)}
+              >
+                <Icon name="git-merge" />{merging === t.id
+                  ? "Uniendo…"
+                  : "Es el mismo: unir"}
               </button>
             </div>
           </section>
@@ -328,11 +414,11 @@
         empty={loading ? "" : `Sin movimientos en ${monthLabel(ym, true)}.`}
       />
     {:else if view === "calendario"}
-      <CalendarView {ym} txs={txs} onPick={(d) => (daySheet = d)} />
+      <CalendarView {ym} {txs} onPick={(d) => (daySheet = d)} />
     {:else if view === "mensual"}
       <MonthlyView
         {ym}
-        txs={txs}
+        {txs}
         onPick={(m) => {
           ym = m;
           view = "diario";
@@ -350,7 +436,11 @@
   {:else}
     <TopBar><span>Más</span></TopBar>
     <div class="m-me">
-      <span class="m-avatar">{(session.user?.name || session.user?.email || "?").slice(0, 1).toUpperCase()}</span>
+      <span class="m-avatar"
+        >{(session.user?.name || session.user?.email || "?")
+          .slice(0, 1)
+          .toUpperCase()}</span
+      >
       <span class="m-txt">
         <span class="m-desc">{session.user?.name || "Tú"}</span>
         <span class="m-sub">{session.user?.email}</span>
@@ -358,34 +448,66 @@
     </div>
     <ul class="m-menu">
       {#each MORE as item (item.href)}
-        <li><a href={item.href}><Icon name={item.icon} size={18} />{item.label}<Icon name="arrow-right-01" size={14} /></a></li>
+        <li>
+          <a href={item.href}
+            ><Icon name={item.icon} size={18} />{item.label}<Icon
+              name="arrow-right-01"
+              size={14}
+            /></a
+          >
+        </li>
       {/each}
       <li>
         <button type="button" onclick={() => (syncSheet = true)}>
           <Icon name="cloud-upload" size={18} />Cambios en el teléfono
-          {#if offline.pending || offline.failed.length}<span class="m-count">{offline.pending + offline.failed.length}</span>{/if}
+          {#if offline.pending || offline.failed.length}<span class="m-count"
+              >{offline.pending + offline.failed.length}</span
+            >{/if}
           <Icon name="arrow-right-01" size={14} />
         </button>
       </li>
       <li class="m-menu-row">
         <span><Icon name="moon-02" size={18} />Modo oscuro</span>
-        <ModeToggle dark={theme.name === "dark"} onToggle={(next) => theme.set(next)} />
+        <ModeToggle
+          dark={theme.name === "dark"}
+          onToggle={(next) => theme.set(next)}
+        />
       </li>
-      <li><a href="#/" onclick={leave}><Icon name="dashboard-square-01" size={18} />Versión completa<Icon name="arrow-right-01" size={14} /></a></li>
-      <li><button type="button" class="danger" onclick={logout}><Icon name="logout-01" size={18} />Salir</button></li>
+      <li>
+        <a href="#/" onclick={leave}
+          ><Icon name="dashboard-square-01" size={18} />Versión completa<Icon
+            name="arrow-right-01"
+            size={14}
+          /></a
+        >
+      </li>
+      <li>
+        <button type="button" class="danger" onclick={logout}
+          ><Icon name="logout-01" size={18} />Salir</button
+        >
+      </li>
     </ul>
   {/if}
 </div>
 
 {#if status}
-  <button type="button" class="m-sync {status.tone}" onclick={() => (syncSheet = true)}>
+  <button
+    type="button"
+    class="m-sync {status.tone}"
+    onclick={() => (syncSheet = true)}
+  >
     <Icon name={status.icon} size={16} />{status.text}
     <Icon name="arrow-right-01" size={14} />
   </button>
 {/if}
 
 {#if !sub && (tab === "trans" || tab === "stats")}
-  <button type="button" class="m-fab" aria-label="Anotar" onclick={() => openSheet("expense")}>
+  <button
+    type="button"
+    class="m-fab"
+    aria-label="Anotar"
+    onclick={() => openSheet("expense")}
+  >
     <Icon name="add-01" size={28} />
   </button>
 {/if}
@@ -397,9 +519,14 @@
       class:on={tab === t.id}
       aria-current={tab === t.id ? "page" : undefined}
       onclick={() => {
-        tab = t.id;
+        if (tab === t.id && !sub) return;
         tabBefore = null;
-        if (sub) location.replace("#/m");
+        // Con una subpantalla abierta la anima el cambio de ruta.
+        if (sub) {
+          tab = t.id;
+          nextDirection("lado");
+          location.replace("#/m");
+        } else transition(() => (tab = t.id));
       }}
     >
       <Icon name={t.icon} size={22} /><span>{t.label}</span>
@@ -412,7 +539,12 @@
   <div class="m-sheet flush" role="dialog" aria-label={dateLong(daySheet)}>
     <div class="m-sheet-head pad">
       <strong class="m-cap">{dateLong(daySheet)}</strong>
-      <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (daySheet = "")}>
+      <button
+        type="button"
+        class="btn-icon sm"
+        aria-label="Cerrar"
+        onclick={() => (daySheet = "")}
+      >
         <Icon name="cancel-01" size={16} />
       </button>
     </div>
@@ -425,39 +557,76 @@
       empty="Nada este día."
     />
     <div class="m-sheet-foot pad">
-      <button type="button" class="m-btn in" onclick={() => openSheet("income", daySheet)}><Icon name="add-01" size={18} />Ingreso</button>
-      <button type="button" class="m-btn out" onclick={() => openSheet("expense", daySheet)}><Icon name="remove-01" size={18} />Gasto</button>
+      <button
+        type="button"
+        class="m-btn in"
+        onclick={() => openSheet("income", daySheet)}
+        ><Icon name="add-01" size={18} />Ingreso</button
+      >
+      <button
+        type="button"
+        class="m-btn out"
+        onclick={() => openSheet("expense", daySheet)}
+        ><Icon name="remove-01" size={18} />Gasto</button
+      >
     </div>
   </div>
 {/if}
 
 {#if syncSheet}
-  <div class="m-veil" role="presentation" onclick={() => (syncSheet = false)}></div>
-  <div class="m-sheet" role="dialog" aria-label="Cambios guardados en el teléfono">
+  <div
+    class="m-veil"
+    role="presentation"
+    onclick={() => (syncSheet = false)}
+  ></div>
+  <div
+    class="m-sheet"
+    role="dialog"
+    aria-label="Cambios guardados en el teléfono"
+  >
     <div class="m-sheet-head">
       <strong>Cambios en el teléfono</strong>
-      <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (syncSheet = false)}>
+      <button
+        type="button"
+        class="btn-icon sm"
+        aria-label="Cerrar"
+        onclick={() => (syncSheet = false)}
+      >
         <Icon name="cancel-01" size={16} />
       </button>
     </div>
 
     {#if offline.authNeeded}
-      <p class="m-note">Tu sesión venció. Entra de nuevo para enviar lo pendiente; no se pierde nada.</p>
-      <button type="button" class="btn btn-primary" onclick={reauth}>Entrar de nuevo</button>
+      <p class="m-note">
+        Tu sesión venció. Entra de nuevo para enviar lo pendiente; no se pierde
+        nada.
+      </p>
+      <button type="button" class="btn btn-primary" onclick={reauth}
+        >Entrar de nuevo</button
+      >
     {:else if !offline.online}
-      <p class="m-note">Sin conexión. Lo que anotes queda guardado aquí y se envía solo cuando vuelva la señal.</p>
+      <p class="m-note">
+        Sin conexión. Lo que anotes queda guardado aquí y se envía solo cuando
+        vuelva la señal.
+      </p>
     {/if}
 
     {#if offline.pending}
       <div class="m-sheet-foot">
-        <span>{offline.pending === 1 ? "1 cambio por enviar" : `${offline.pending} cambios por enviar`}</span>
+        <span
+          >{offline.pending === 1
+            ? "1 cambio por enviar"
+            : `${offline.pending} cambios por enviar`}</span
+        >
         <button
           type="button"
           class="btn sm"
           disabled={offline.syncing || !offline.online || offline.authNeeded}
           onclick={() => void offline.sync()}
         >
-          <Icon name="refresh" />{offline.syncing ? "Enviando…" : "Enviar ahora"}
+          <Icon name="refresh" />{offline.syncing
+            ? "Enviando…"
+            : "Enviar ahora"}
         </button>
       </div>
     {:else if !offline.failed.length}
@@ -465,7 +634,10 @@
     {/if}
 
     {#if offline.failed.length}
-      <p class="m-note">El servidor no aceptó estos cambios. Puedes intentar otra vez o descartarlos.</p>
+      <p class="m-note">
+        El servidor no aceptó estos cambios. Puedes intentar otra vez o
+        descartarlos.
+      </p>
       <ul class="m-list">
         {#each offline.failed as item (item.seq)}
           {@const d = describe(item)}
@@ -476,8 +648,18 @@
             </div>
             <Money value={d.amount} tone={d.type} />
             <div class="m-failed-actions">
-              <button type="button" class="btn sm" onclick={() => void offline.discard(item.seq!)}>Descartar</button>
-              <button type="button" class="btn sm" disabled={!offline.online} onclick={() => void offline.retry(item.seq!)}>
+              <button
+                type="button"
+                class="btn sm"
+                onclick={() => void offline.discard(item.seq!)}
+                >Descartar</button
+              >
+              <button
+                type="button"
+                class="btn sm"
+                disabled={!offline.online}
+                onclick={() => void offline.retry(item.seq!)}
+              >
                 Reintentar
               </button>
             </div>
@@ -599,7 +781,11 @@
     }
 
     &.warn {
-      border-color: color-mix(in oklch, var(--warning, var(--danger)) 50%, var(--border));
+      border-color: color-mix(
+        in oklch,
+        var(--warning, var(--danger)) 50%,
+        var(--border)
+      );
       color: var(--text-primary);
     }
 
@@ -615,7 +801,8 @@
     gap: var(--sp-10);
     margin: var(--sp-12) var(--sp-16) 0;
     padding: var(--sp-12) var(--sp-16);
-    border: 1px solid color-mix(in oklch, var(--warning, var(--accent)) 45%, var(--border));
+    border: 1px solid
+      color-mix(in oklch, var(--warning, var(--accent)) 45%, var(--border));
     border-radius: var(--radius-xl);
     background: var(--bg-field);
   }
@@ -818,8 +1005,10 @@
     padding: var(--sp-4) 0 calc(var(--sp-4) + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     background: var(--glass-2, var(--bg-level1));
-    -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
-    backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 16px))
+      saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur, 16px))
+      saturate(var(--glass-sat, 170%));
 
     & button {
       display: flex;
@@ -874,11 +1063,14 @@
     max-width: 40rem;
     max-height: 90dvh;
     margin: 0 auto;
-    padding: var(--sp-16) var(--sp-16) calc(var(--sp-16) + env(safe-area-inset-bottom));
+    padding: var(--sp-16) var(--sp-16)
+      calc(var(--sp-16) + env(safe-area-inset-bottom));
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     background: var(--glass-2, var(--bg-level2));
-    -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
-    backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 16px))
+      saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur, 16px))
+      saturate(var(--glass-sat, 170%));
     box-shadow: var(--shadow-xl);
     overflow-y: auto;
     /* Al llegar al final de la hoja, el gesto no pasa a la página. */
@@ -961,5 +1153,4 @@
       opacity: 0.6;
     }
   }
-
 </style>

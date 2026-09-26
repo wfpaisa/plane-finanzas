@@ -1,0 +1,152 @@
+/*
+ * El paso entre pantallas (ver `lib/transition.ts`). Mientras dura, `html`
+ * lleva `data-vt` con la dirección y los nombres se ponen solo entonces: un
+ * `view-transition-name` fijo aislaría el desenfoque de las barras.
+ *
+ * Lo que tiene nombre se anima aparte y se pinta encima de lo demás, en el
+ * orden de la página; por eso las barras y los botones flotantes también
+ * llevan el suyo: si no, la pantalla que se mueve pasaría por encima.
+ */
+
+:root {
+  --vt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* El resto de la página no se anima: se ve de una vez la de después. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* --- Escritorio: la hoja de contenido aparece suave, el menú no se mueve -- */
+
+html[data-vt] .shell > .main {
+  view-transition-name: pagina;
+}
+
+html[data-vt] .shell > .fab {
+  view-transition-name: fab;
+}
+
+html[data-vt] .shell > .keys-fab {
+  view-transition-name: atajos;
+}
+
+html[data-vt] .shell > .bottom-nav {
+  view-transition-name: barra;
+}
+
+::view-transition-group(pagina) {
+  animation-duration: 0.24s;
+  animation-timing-function: var(--vt-ease);
+}
+
+::view-transition-old(pagina) {
+  animation: vt-sale 0.12s ease-out both;
+}
+
+::view-transition-new(pagina) {
+  animation: vt-entra 0.24s var(--vt-ease) 0.04s both;
+}
+
+/* --- Celular: entrar desliza hacia la izquierda, volver hacia la derecha -- */
+
+html.m-app[data-vt] .m {
+  view-transition-name: pantalla;
+}
+
+html.m-app[data-vt] .m-fab {
+  view-transition-name: m-fab;
+}
+
+html.m-app[data-vt] .m-nav {
+  view-transition-name: m-nav;
+}
+
+/* Cambiar de pestaña: un fundido corto. */
+::view-transition-group(pantalla) {
+  animation-duration: 0.2s;
+}
+
+/* Las dos pantallas van pegadas, una empuja a la otra: no se tapan, así que
+   no hace falta que tengan fondo. */
+html[data-vt="adelante"],
+html[data-vt="atras"] {
+  &::view-transition-group(pantalla) {
+    animation-duration: 0.32s;
+    animation-timing-function: var(--vt-ease);
+  }
+
+  &::view-transition-old(pantalla),
+  &::view-transition-new(pantalla) {
+    mix-blend-mode: normal;
+    animation-duration: 0.32s;
+    animation-timing-function: var(--vt-ease);
+    animation-fill-mode: both;
+  }
+}
+
+html[data-vt="adelante"] {
+  &::view-transition-old(pantalla) {
+    animation-name: vt-a-izquierda;
+  }
+
+  &::view-transition-new(pantalla) {
+    animation-name: vt-desde-derecha;
+  }
+}
+
+html[data-vt="atras"] {
+  &::view-transition-old(pantalla) {
+    animation-name: vt-a-derecha;
+  }
+
+  &::view-transition-new(pantalla) {
+    animation-name: vt-desde-izquierda;
+  }
+}
+
+@keyframes vt-sale {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-entra {
+  from {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+}
+
+@keyframes vt-a-izquierda {
+  to {
+    translate: -100% 0;
+  }
+}
+
+@keyframes vt-desde-derecha {
+  from {
+    translate: 100% 0;
+  }
+}
+
+@keyframes vt-a-derecha {
+  to {
+    translate: 100% 0;
+  }
+}
+
+@keyframes vt-desde-izquierda {
+  from {
+    translate: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
