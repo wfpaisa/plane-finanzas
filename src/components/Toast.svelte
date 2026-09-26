@@ -175,7 +175,24 @@
     }
   }
 
+  .notice-toast.ok {
+    background: linear-gradient(var(--success-bg) 0 0), var(--toast-base);
+  }
+
+  .notice-toast.danger {
+    background: linear-gradient(var(--danger-bg) 0 0), var(--toast-base);
+  }
+
+  .notice-toast.warn {
+    background: linear-gradient(var(--warning-bg) 0 0), var(--toast-base);
+  }
+
+  .notice-toast.info {
+    background: linear-gradient(var(--accent-soft) 0 0), var(--toast-base);
+  }
+
   .notice-toast {
+    --toast-base: oklch(from var(--bg-level1) l c h / 0.9);
     max-width: 24rem;
     padding: var(--sp-8) var(--sp-12);
     /* Mas grande que el `.alert` del catálogo (--text-xs) a propósito: este se
@@ -185,6 +202,10 @@
     line-height: var(--text-base--line-height);
     box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 0.18);
     pointer-events: auto;
+    /* El tono del aviso es casi transparente: debajo, vidrio desenfocado y
+       casi opaco, para que no se confunda con lo que tapa. */
+    -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
 
     /* El alto del primer renglon del mensaje. Es la medida contra la que se
        centran el icono y la equis, y sale de la letra del aviso: si manana

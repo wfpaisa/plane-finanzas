@@ -15,7 +15,7 @@
   import { today } from "../../lib/finance";
   import { colorsFor } from "../../lib/colors";
   import { money, plainNumber } from "../../lib/format";
-  import { SOURCE_LABEL } from "../../lib/labels";
+  import { SOURCE_LABEL, TX_TYPES } from "../../lib/labels";
   import { notify } from "../../lib/notify.svelte";
   import { offline } from "../../lib/offline.svelte";
   import { colorOf } from "../../lib/palettes";
@@ -24,6 +24,7 @@
   import type { Transaction } from "../../lib/types";
   import type { TxPreset } from "../../lib/ui.svelte";
   import Icon from "../Icon.svelte";
+  import Segmented from "../app/Segmented.svelte";
   import { ConfirmDialog } from "../ui";
 
   let {
@@ -40,11 +41,6 @@
 
   type Panel = "account" | "to" | "category" | "amount" | null;
 
-  const TYPES: { id: TxType; label: string }[] = [
-    { id: "income", label: "Ingreso" },
-    { id: "expense", label: "Gasto" },
-    { id: "transfer", label: "Transferencia" },
-  ];
   const TITLE: Record<TxType, string> = { income: "Ingreso", expense: "Gasto", transfer: "Transferencia" };
   const DAYS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
@@ -309,12 +305,8 @@
     </header>
 
     <div class="ts-body" class:padded={!!panel} bind:this={bodyEl} lang="es">
-      <div class="ts-types" role="radiogroup" aria-label="Tipo">
-        {#each TYPES as t (t.id)}
-          <button type="button" role="radio" aria-checked={type === t.id} class:on={type === t.id} data-type={t.id} onclick={() => setType(t.id)}>
-            {t.label}
-          </button>
-        {/each}
+      <div class="ts-types">
+        <Segmented value={type} options={TX_TYPES} full label="Tipo" onchange={setType} />
       </div>
 
       <div class="ts-rows">
@@ -493,6 +485,7 @@
     margin: 0 auto;
     overflow: hidden;
     background: var(--bg-level1, var(--bg-card));
+    font-size: var(--text-sm);
     animation: in 0.18s ease-out;
 
     &[data-type="income"] {
@@ -515,9 +508,9 @@
     display: flex;
     align-items: center;
     gap: var(--sp-8);
-    min-height: 3.5rem;
-    padding: calc(var(--sp-6) + env(safe-area-inset-top)) var(--sp-12) var(--sp-6) var(--sp-6);
-    font-size: 1.125rem;
+    min-height: 3rem;
+    padding: calc(var(--sp-4) + env(safe-area-inset-top)) var(--sp-12) var(--sp-4) var(--sp-6);
+    font-size: var(--text-base, 1rem);
   }
 
   .ts-body {
@@ -534,31 +527,9 @@
     }
   }
 
-  /* --- El tipo --- */
+  /* --- El tipo: el mismo selector de escritorio --- */
   .ts-types {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-8);
-    padding: var(--sp-4) var(--sp-16) var(--sp-12);
-
-    & button {
-      min-height: 2.75rem;
-      padding: 0 var(--sp-4);
-      border: 1.5px solid var(--border);
-      border-radius: var(--radius-md, 0.625rem);
-      background: var(--bg-field);
-      font: inherit;
-      font-size: var(--text-sm);
-      color: var(--text-secondary);
-      cursor: pointer;
-
-      &.on {
-        border-color: var(--tone);
-        background: color-mix(in oklch, var(--tone) 10%, var(--bg-field));
-        color: var(--tone);
-        font-weight: 600;
-      }
-    }
+    padding: 0 var(--sp-16) var(--sp-8);
   }
 
   /* --- Las filas --- */
@@ -569,16 +540,16 @@
   .ts-row {
     position: relative;
     display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+    grid-template-columns: 5rem minmax(0, 1fr) auto;
     align-items: center;
-    min-height: 3.25rem;
+    min-height: 2.75rem;
     /* Al abrir su panel, la fila sube hasta quedar por encima de él. */
     scroll-margin-bottom: 56dvh;
     cursor: pointer;
   }
 
   .ts-label {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     color: var(--text-muted);
   }
 
@@ -621,7 +592,7 @@
   /* El selector de fecha del teléfono, invisible encima de la fila. */
   .ts-date {
     position: absolute;
-    inset: 0 0 0 5.5rem;
+    inset: 0 0 0 5rem;
     opacity: 0;
     cursor: pointer;
 
@@ -656,7 +627,6 @@
 
   .ts-amount {
     font-family: var(--font-num);
-    font-size: 1.125rem;
     font-weight: 600;
     color: var(--tone);
   }
@@ -670,9 +640,9 @@
 
   /* --- Descripción, fotos y origen --- */
   .ts-extra {
-    margin-top: var(--sp-16);
-    padding: var(--sp-8) var(--sp-16) 0;
-    border-top: 0.5rem solid var(--bg-hover);
+    margin-top: var(--sp-12);
+    padding: var(--sp-4) var(--sp-16) 0;
+    border-top: 0.375rem solid var(--bg-hover);
   }
 
   .ts-notes {
@@ -683,8 +653,8 @@
 
     & textarea {
       flex: 1;
-      min-height: 3rem;
-      padding: var(--sp-12) var(--sp-4);
+      min-height: 2.5rem;
+      padding: var(--sp-10) var(--sp-4);
       border: 0;
       outline: 0;
       background: none;
@@ -757,7 +727,7 @@
   .ts-actions {
     display: flex;
     gap: var(--sp-10);
-    padding: var(--sp-20) var(--sp-16) 0;
+    padding: var(--sp-16) var(--sp-16) 0;
   }
 
   .ts-btn {
@@ -767,10 +737,10 @@
     justify-content: center;
     gap: var(--sp-6);
     min-width: 0;
-    min-height: 3rem;
+    min-height: 2.5rem;
     padding: 0 var(--sp-8);
     border: 1px solid var(--border-strong, var(--border));
-    border-radius: var(--radius-md, 0.625rem);
+    border-radius: var(--radius-pill, 99px);
     background: none;
     font: inherit;
     font-size: var(--text-sm);
@@ -807,14 +777,16 @@
     flex-direction: column;
     max-height: 55dvh;
     padding-bottom: env(safe-area-inset-bottom);
-    /* En los temas de vidrio el nivel 2 es translúcido: va sobre el fondo opaco. */
-    background: linear-gradient(var(--bg-level2) 0 0), var(--bg-level1);
+    /* Vidrio, pero sin que lo de atrás se lea: el velo del nivel 2 y un buen desenfoque. */
+    background: var(--glass-2, var(--bg-level2));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
     box-shadow: 0 -10px 30px oklch(0 0 0 / 0.18);
     animation: up 0.18s ease-out;
   }
 
   :global([data-theme="dark"]) .ts-panel {
-    background: oklch(0.23 0 0);
+    background: oklch(0.23 0 0 / 0.82);
     border-top: 1px solid oklch(1 0 0 / 0.12);
   }
 
@@ -828,7 +800,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-16);
+    padding: var(--sp-4) var(--sp-8) var(--sp-4) var(--sp-16);
     border-bottom: 1px solid var(--border);
     background: var(--bg-hover);
     color: var(--text-secondary);
@@ -846,14 +818,14 @@
       align-items: center;
       justify-content: center;
       gap: var(--sp-4);
-      min-height: 4rem;
-      padding: var(--sp-8) var(--sp-6);
+      min-height: 3.25rem;
+      padding: var(--sp-6) var(--sp-4);
       border: 0;
       border-right: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
       background: none;
       font: inherit;
-      font-size: var(--text-sm);
+      font-size: var(--text-xs);
       line-height: 1.2;
       color: var(--text-primary);
       text-align: center;
@@ -889,13 +861,13 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
 
     & button {
-      min-height: 3.5rem;
+      min-height: 3rem;
       border: 0;
       border-right: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
       background: none;
       font-family: var(--font-num);
-      font-size: 1.375rem;
+      font-size: 1.125rem;
       color: var(--text-primary);
       cursor: pointer;
       touch-action: manipulation;
@@ -912,7 +884,7 @@
         border: 0;
         background: var(--tone);
         font-family: inherit;
-        font-size: var(--text-base, 1rem);
+        font-size: var(--text-sm);
         font-weight: 600;
         color: #fff;
       }

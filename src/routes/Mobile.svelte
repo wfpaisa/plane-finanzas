@@ -229,6 +229,13 @@
     } catch {}
   });
 
+  // En el celular la letra va un 10 % más chica que en escritorio (ver `.m-app`).
+  $effect(() => {
+    const root = document.documentElement;
+    root.classList.add("m-app");
+    return () => root.classList.remove("m-app");
+  });
+
   const MORE = [
     { href: "#/ahorros", label: "Ahorros", icon: "piggy-bank" },
     { href: "#/proyeccion", label: "Plan futuro", icon: "chart-line-data-01" },
@@ -495,6 +502,10 @@
 {/if}
 
 <style>
+  :global(html.m-app) {
+    font-size: 99%; /* el 110 % de escritorio, menos un 10 % */
+  }
+
   /* Toda la pantalla, sin márgenes: las listas van de borde a borde como en
      las apps del teléfono. En pantallas grandes se centra en una columna. */
   .m {
@@ -918,7 +929,9 @@
     margin: 0 auto;
     padding: var(--sp-16) var(--sp-16) calc(var(--sp-16) + env(safe-area-inset-bottom));
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    background: var(--bg-level2, var(--bg-card));
+    background: var(--glass-2, var(--bg-level2));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
     box-shadow: var(--shadow-xl);
     overflow-y: auto;
     /* Al llegar al final de la hoja, el gesto no pasa a la página. */
@@ -934,7 +947,7 @@
   /* En oscuro el lienzo y la hoja son casi del mismo gris: un filo claro
      arriba y una sombra más honda la separan de lo que tapa. */
   :global([data-theme="dark"]) .m-sheet {
-    background: oklch(0.23 0 0);
+    background: oklch(0.23 0 0 / 0.85);
     border-top: 1px solid oklch(1 0 0 / 0.14);
     box-shadow:
       0 -1px 0 oklch(1 0 0 / 0.04),
