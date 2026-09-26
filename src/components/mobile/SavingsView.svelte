@@ -13,6 +13,7 @@
   import SavingForm from "../app/SavingForm.svelte";
   import Segmented from "../app/Segmented.svelte";
   import { Button } from "../ui";
+  import SlideIn from "./SlideIn.svelte";
   import TopBar from "./TopBar.svelte";
   import { addMonths, monthsToTarget, today } from "../../lib/finance";
   import { dateShort, monthLabel, monthsLabel } from "../../lib/format";
@@ -195,23 +196,25 @@
 
 {#if active.length}
   <section class="sv-chart">
-    <Segmented bind:value={view} options={VIEWS} full label="Vista de la gráfica" />
-    {#if view === "estado"}
-      <div class="sv-result">
-        <Money value={totalSaved} />
-        {#if grown}<span class="sv-sub">{grown > 0 ? "Creció" : "Bajó"} <Money value={Math.abs(grown)} /> desde {monthLabel(history.months[0], true)}</span>{/if}
-      </div>
-    {:else}
-      <label class="sv-slider">
-        <span>En <b>{monthsLabel(horizon)}</b> ({monthLabel(addMonths(ym, horizon), true)})</span>
-        <input type="range" class="field-control" min="1" max="120" bind:value={horizon} />
-      </label>
-      <div class="sv-result">
-        <Money value={future} />
-        {#if future > contributed + 1}<span class="sv-sub">Incluye <Money value={future - contributed} /> de intereses estimados</span>{/if}
-      </div>
-    {/if}
-    <Chart config={chartConfig} height={220} label={view === "estado" ? "Dinero ahorrado mes a mes" : "Cálculo del ahorro a futuro"} />
+    <Segmented bind:value={view} options={VIEWS} tabs full label="Vista de la gráfica" />
+    <SlideIn key={view} order={VIEWS.map((v) => v.id)}>
+      {#if view === "estado"}
+        <div class="sv-result">
+          <Money value={totalSaved} />
+          {#if grown}<span class="sv-sub">{grown > 0 ? "Creció" : "Bajó"} <Money value={Math.abs(grown)} /> desde {monthLabel(history.months[0], true)}</span>{/if}
+        </div>
+      {:else}
+        <label class="sv-slider">
+          <span>En <b>{monthsLabel(horizon)}</b> ({monthLabel(addMonths(ym, horizon), true)})</span>
+          <input type="range" class="field-control" min="1" max="120" bind:value={horizon} />
+        </label>
+        <div class="sv-result">
+          <Money value={future} />
+          {#if future > contributed + 1}<span class="sv-sub">Incluye <Money value={future - contributed} /> de intereses estimados</span>{/if}
+        </div>
+      {/if}
+      <Chart config={chartConfig} height={220} label={view === "estado" ? "Dinero ahorrado mes a mes" : "Cálculo del ahorro a futuro"} />
+    </SlideIn>
   </section>
 {/if}
 
@@ -435,6 +438,13 @@
     gap: var(--sp-12);
     padding: var(--sp-16);
     border-top: 0.5rem solid var(--bg-hover);
+
+    /* Lo que entra al cambiar de vista (ver SlideIn) sigue la misma columna. */
+    & :global(.si-page) {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-12);
+    }
   }
 
   .sv-result {

@@ -12,6 +12,7 @@
   import RecurringForm from "../app/RecurringForm.svelte";
   import Segmented from "../app/Segmented.svelte";
   import { Field } from "../ui";
+  import SlideIn from "./SlideIn.svelte";
   import TopBar from "./TopBar.svelte";
   import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../../lib/finance";
   import { monthLabel, monthName, monthsLabel } from "../../lib/format";
@@ -119,32 +120,34 @@
 </section>
 
 <section class="pl-block">
-  <Segmented bind:value={kind} options={KINDS} full label="Frecuentes" />
-  <ul class="pl-list">
-    {#each items as r (r.id)}
-      {@const out = outOfPlan(r)}
-      <li>
-        <button type="button" class:paused={r.paused || !!out} onclick={() => edit(r)}>
-          <span class="pl-main">
-            <span class="pl-name">{r.name}</span>
-            <span class="pl-sub">
-              {freqLabel(r)}{#if r.auto_create} · automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
+  <Segmented bind:value={kind} options={KINDS} tabs full label="Frecuentes" />
+  <SlideIn key={kind} order={KINDS.map((k) => k.id)}>
+    <ul class="pl-list">
+      {#each items as r (r.id)}
+        {@const out = outOfPlan(r)}
+        <li>
+          <button type="button" class:paused={r.paused || !!out} onclick={() => edit(r)}>
+            <span class="pl-main">
+              <span class="pl-name">{r.name}</span>
+              <span class="pl-sub">
+                {freqLabel(r)}{#if r.auto_create} · automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
+              </span>
+              {#if r.category}<CategoryPill id={r.category} />{/if}
             </span>
-            {#if r.category}<CategoryPill id={r.category} />{/if}
-          </span>
-          <span class="pl-amt">
-            <Money value={r.amount} tone={r.kind} />
-            {#if r.frequency === "yearly"}<span class="pl-sub"><Money value={monthlyEquivalent(r)} />/mes</span>{/if}
-          </span>
-        </button>
-      </li>
-    {:else}
-      <li class="pl-empty">{kind === "income" ? "Agrega tu sueldo u otros ingresos." : "Crédito, servicios, administración…"}</li>
-    {/each}
-  </ul>
-  <button type="button" class="pl-add" onclick={() => edit(null)}>
-    <Icon name="add-circle" />{kind === "income" ? "Ingreso frecuente" : "Gasto frecuente"}
-  </button>
+            <span class="pl-amt">
+              <Money value={r.amount} tone={r.kind} />
+              {#if r.frequency === "yearly"}<span class="pl-sub"><Money value={monthlyEquivalent(r)} />/mes</span>{/if}
+            </span>
+          </button>
+        </li>
+      {:else}
+        <li class="pl-empty">{kind === "income" ? "Agrega tu sueldo u otros ingresos." : "Crédito, servicios, administración…"}</li>
+      {/each}
+    </ul>
+    <button type="button" class="pl-add" onclick={() => edit(null)}>
+      <Icon name="add-circle" />{kind === "income" ? "Ingreso frecuente" : "Gasto frecuente"}
+    </button>
+  </SlideIn>
 </section>
 
 <section class="pl-block">
@@ -302,6 +305,13 @@
     gap: var(--sp-10);
     padding: var(--sp-16);
     border-top: 0.5rem solid var(--bg-hover);
+
+    /* Lo que entra al cambiar de pestaña (ver SlideIn) sigue la misma columna. */
+    & :global(.si-page) {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-10);
+    }
 
     & h3 {
       margin: 0;

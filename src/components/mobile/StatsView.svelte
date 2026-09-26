@@ -15,6 +15,7 @@
   import DayList from "./DayList.svelte";
   import MonthNav from "./MonthNav.svelte";
   import MonthSwipe from "./MonthSwipe.svelte";
+  import SlideIn from "./SlideIn.svelte";
   import TopBar from "./TopBar.svelte";
   import { resolveColor } from "../../lib/colors";
   import { addMonths, today } from "../../lib/finance";
@@ -231,13 +232,17 @@
   </TopBar>
 
   <MonthSwipe bind:ym step={yearly ? 12 : 1}>
-    <div class="st-tabs" role="tablist">
-      <button type="button" role="tab" aria-selected={kind === "income"} class:on={kind === "income"} onclick={() => (kind = "income")}>
-        Ingresos <Money value={incomeTotal} />
-      </button>
-      <button type="button" role="tab" aria-selected={kind === "expense"} class:on={kind === "expense"} onclick={() => (kind = "expense")}>
-        Gastos <Money value={expenseTotal} />
-      </button>
+    <div class="st-tabs">
+      <Segmented
+        bind:value={kind}
+        tabs
+        full
+        label="Tipo"
+        options={[
+          { id: "income", label: "Ingresos", sub: money(incomeTotal) },
+          { id: "expense", label: "Gastos", sub: money(expenseTotal) },
+        ]}
+      />
     </div>
 
     <div class="st-by">
@@ -253,27 +258,31 @@
       {#if byTags}<p>Un movimiento con varias etiquetas suma en cada una.</p>{/if}
     </div>
 
-    {#if slices.length && !byTags}
-      <div class="st-pie">
-        {#key `${kind}${ym}${yearly}${by}`}
-          <Chart config={pieConfig} height={240} label="Reparto del periodo" />
-        {/key}
-      </div>
-    {/if}
+    <SlideIn key={kind} order={["income", "expense"]}>
+      <SlideIn key={by} order={["category", "tag"]}>
+        {#if slices.length && !byTags}
+          <div class="st-pie">
+            {#key `${kind}${ym}${yearly}${by}`}
+              <Chart config={pieConfig} height={240} label="Reparto del periodo" />
+            {/key}
+          </div>
+        {/if}
 
-    <ul class="st-list">
-      {#each slices as s (s.key)}
-        <li>
-          <button type="button" onclick={() => pick(s.key)}>
-            <span class="st-pill" style:--c={s.color}>{pctLabel(s.pct)}</span>
-            <span class="st-name">{s.label}</span>
-            <Money value={s.total} />
-          </button>
-        </li>
-      {:else}
-        {#if !loading}<li class="st-empty">Nada en este periodo.</li>{/if}
-      {/each}
-    </ul>
+        <ul class="st-list">
+          {#each slices as s (s.key)}
+            <li>
+              <button type="button" onclick={() => pick(s.key)}>
+                <span class="st-pill" style:--c={s.color}>{pctLabel(s.pct)}</span>
+                <span class="st-name">{s.label}</span>
+                <Money value={s.total} />
+              </button>
+            </li>
+          {:else}
+            {#if !loading}<li class="st-empty">Nada en este periodo.</li>{/if}
+          {/each}
+        </ul>
+      </SlideIn>
+    </SlideIn>
   </MonthSwipe>
 {:else}
   <TopBar>
@@ -325,30 +334,7 @@
   }
 
   .st-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-bottom: 1px solid var(--border);
-
-    & button {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: var(--sp-6);
-      padding: var(--sp-12) var(--sp-8);
-      border: 0;
-      border-bottom: 3px solid transparent;
-      background: none;
-      font: inherit;
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      cursor: pointer;
-
-      &.on {
-        border-bottom-color: var(--accent);
-        color: var(--text-primary);
-        font-weight: 600;
-      }
-    }
+    padding: var(--sp-8) var(--sp-16) 0;
   }
 
   .st-by {

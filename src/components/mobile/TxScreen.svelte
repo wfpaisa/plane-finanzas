@@ -484,7 +484,8 @@
     max-width: 40rem;
     margin: 0 auto;
     overflow: hidden;
-    background: var(--bg-level1, var(--bg-card));
+    /* El lienzo de escritorio, con su degradado. */
+    background: var(--canvas-wash), var(--canvas);
     font-size: var(--text-sm);
     animation: in 0.18s ease-out;
 
@@ -532,9 +533,11 @@
     padding: 0 var(--sp-16) var(--sp-8);
   }
 
-  /* --- Las filas --- */
+  /* --- Las filas: etiqueta a la izquierda y el campo hundido de escritorio --- */
   .ts-rows {
-    padding: 0 var(--sp-16);
+    display: grid;
+    gap: var(--sp-6);
+    padding: var(--sp-4) var(--sp-16) 0;
   }
 
   .ts-row {
@@ -542,7 +545,7 @@
     display: grid;
     grid-template-columns: 5rem minmax(0, 1fr) auto;
     align-items: center;
-    min-height: 2.75rem;
+    min-height: 2.375rem;
     /* Al abrir su panel, la fila sube hasta quedar por encima de él. */
     scroll-margin-bottom: 56dvh;
     cursor: pointer;
@@ -559,34 +562,50 @@
     gap: var(--sp-8);
     align-self: stretch;
     min-width: 0;
-    padding: 0 var(--sp-4);
+    min-height: 2.375rem;
+    padding: 0 var(--sp-16);
     border: 0;
-    border-bottom: 1px solid var(--border);
-    background: none;
+    border-radius: var(--radius-pill);
+    background: var(--field-bg);
+    box-shadow: var(--field-shadow);
     font: inherit;
+    font-weight: 500;
     color: var(--text-primary);
     text-align: left;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition:
+      background 0.15s,
+      box-shadow 0.15s;
   }
 
-  .ts-row:has(.ts-swap) .ts-value,
   .ts-row:has(.ts-date) .ts-value {
     grid-column: 2 / -1;
   }
 
-  .ts-row.focus .ts-value,
+  /* Sin anillo de foco, como en escritorio: el campo se aclara, y el del
+     panel abierto lleva un filo del color del tipo. */
   .ts-row:focus-within .ts-value {
-    border-bottom: 2px solid var(--tone);
+    background: var(--field-bg-focus);
+  }
+
+  .ts-row.focus .ts-value {
+    background: var(--field-bg-focus);
+    box-shadow:
+      var(--field-shadow),
+      inset 0 0 0 1.5px var(--tone);
   }
 
   .ts-input {
     grid-column: 2 / -1;
     outline: 0;
     cursor: text;
+  }
+
+  .ts-row:not(:has(.ts-swap)) .ts-value {
+    grid-column: 2 / -1;
   }
 
   /* El selector de fecha del teléfono, invisible encima de la fila. */
@@ -606,15 +625,14 @@
   }
 
   .ts-swap {
-    position: absolute;
-    top: -0.9rem;
-    right: 0;
     display: flex;
     flex-direction: column;
     gap: 0;
+    margin-left: var(--sp-6);
     line-height: 0.6;
     color: var(--text-secondary);
-    background: var(--bg-level1, var(--bg-card));
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
   }
 
   .ts-dot {
@@ -640,34 +658,46 @@
 
   /* --- Notas, fotos y origen --- */
   .ts-extra {
-    margin-top: var(--sp-12);
-    padding: var(--sp-4) var(--sp-16) 0;
-    border-top: 0.375rem solid var(--bg-hover);
+    margin-top: var(--sp-16);
+    padding: 0 var(--sp-16);
   }
 
   .ts-notes {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sp-8);
-    border-bottom: 1px solid var(--border);
 
     & textarea {
       flex: 1;
-      min-height: 2.5rem;
-      padding: var(--sp-10) var(--sp-4);
+      min-height: 3rem;
+      padding: var(--sp-10) var(--sp-16);
       border: 0;
+      border-radius: 1.375rem;
       outline: 0;
-      background: none;
+      background: var(--field-bg);
+      box-shadow: var(--field-shadow);
       font: inherit;
+      font-weight: 500;
       color: var(--text-primary);
       field-sizing: content;
       resize: none;
+
+      &:focus {
+        background: var(--field-bg-focus);
+      }
+
+      &::placeholder {
+        color: var(--text-subtle, var(--text-muted));
+        font-weight: 450;
+      }
     }
   }
 
   .ts-photo {
     flex: none;
-    color: var(--text-muted);
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
+    color: var(--text-secondary);
     cursor: pointer;
 
     & input {
@@ -739,18 +769,28 @@
     min-width: 0;
     min-height: 2.5rem;
     padding: 0 var(--sp-8);
-    border: 1px solid var(--border-strong, var(--border));
+    border: 0;
     border-radius: var(--radius-pill, 99px);
-    background: none;
+    /* Los botones de escritorio: sobresalen con la almohada. */
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
     font: inherit;
     font-size: var(--text-sm);
+    font-weight: 500;
     color: var(--text-primary);
     white-space: nowrap;
     cursor: pointer;
+    transition: transform 0.15s;
+
+    &:active {
+      transform: scale(0.97);
+    }
 
     &.main {
-      border-color: transparent;
       background: var(--tone);
+      box-shadow:
+        inset 0 1px 0 oklch(1 0 0 / 0.16),
+        0 10px 22px -12px oklch(from var(--tone) l c h / 0.8);
       color: #fff;
       font-weight: 600;
     }
@@ -777,17 +817,21 @@
     flex-direction: column;
     max-height: 55dvh;
     padding-bottom: env(safe-area-inset-bottom);
-    /* Vidrio, pero sin que lo de atrás se lea: el velo del nivel 2 y un buen desenfoque. */
-    background: var(--glass-2, var(--bg-level2));
-    -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
-    backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-sat, 170%));
-    box-shadow: 0 -10px 30px oklch(0 0 0 / 0.18);
+    overflow: hidden;
+    /* Vidrio de verdad: el velo del nivel 2 más ralo que en los menús, para
+       que se adivine el formulario detrás, y mucho desenfoque para que no
+       se lea. */
+    border-top: 1px solid var(--glass-rim, var(--border));
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--glass-sheen, none), oklch(from var(--glass-2, var(--bg-level2)) l c h / 0.5);
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 1.2)) saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(calc(var(--glass-blur, 16px) * 1.2)) saturate(var(--glass-sat, 170%));
+    box-shadow:
+      var(--glass-spec, none),
+      0 -12px 32px oklch(0 0 0 / 0.2);
+    /* Las rayas de la cuadrícula, del mismo vidrio. */
+    --line: oklch(from var(--text-primary) l c h / 0.08);
     animation: up 0.18s ease-out;
-  }
-
-  :global([data-theme="dark"]) .ts-panel {
-    background: oklch(0.23 0 0 / 0.82);
-    border-top: 1px solid oklch(1 0 0 / 0.12);
   }
 
   @keyframes up {
@@ -801,8 +845,7 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--sp-4) var(--sp-8) var(--sp-4) var(--sp-16);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-hover);
+    border-bottom: 1px solid var(--line);
     color: var(--text-secondary);
   }
 
@@ -821,8 +864,8 @@
       min-height: 3.25rem;
       padding: var(--sp-6) var(--sp-4);
       border: 0;
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
       background: none;
       font: inherit;
       font-size: var(--text-xs);
@@ -863,8 +906,8 @@
     & button {
       min-height: 3rem;
       border: 0;
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
       background: none;
       font-family: var(--font-num);
       font-size: 1.125rem;

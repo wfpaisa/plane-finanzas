@@ -6,6 +6,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
 
+  import SlideIn from "./SlideIn.svelte";
   import { addMonths } from "../../lib/finance";
 
   let {
@@ -13,16 +14,6 @@
     step = 1,
     children,
   }: { ym: string; step?: number; children: Snippet } = $props();
-
-  // De dónde entra el mes nuevo: 1 de la derecha (siguiente), -1 de la izquierda.
-  let dir = $state(0);
-  let prev = ym;
-  $effect.pre(() => {
-    if (ym !== prev) {
-      dir = ym > prev ? 1 : -1;
-      prev = ym;
-    }
-  });
 
   let start: { x: number; y: number; t: number } | null = null;
 
@@ -55,34 +46,12 @@
 
 <!-- El gesto repite las flechas de MonthNav: no hace falta que sea un control. -->
 <div class="ms" role="presentation" ontouchstart={onStart} ontouchend={onEnd} ontouchcancel={() => (start = null)}>
-  {#key ym}
-    <div class="ms-page" class:slide={dir !== 0} style:--dir={dir}>
-      {@render children()}
-    </div>
-  {/key}
+  <SlideIn key={ym}>{@render children()}</SlideIn>
 </div>
 
 <style>
   /* Alto de sobra para poder deslizar aunque el mes esté vacío. */
   .ms {
     min-height: 60dvh;
-    overflow-x: clip;
-  }
-
-  .ms-page.slide {
-    animation: ms-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
-  @keyframes ms-in {
-    from {
-      opacity: 0;
-      translate: calc(var(--dir) * 3rem) 0;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ms-page.slide {
-      animation: none;
-    }
   }
 </style>

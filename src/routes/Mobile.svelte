@@ -1,8 +1,8 @@
 <!--
   La app del celular (`#/m`), ordenada como las apps de gastos de siempre:
   abajo cuatro pestañas —Movimientos, Análisis, Cuentas y Más— y en
-  Movimientos el mes visto de cinco maneras: diario, calendario, mensual
-  (el año mes a mes), total (presupuesto y cuentas) y por descripción.
+  Movimientos el mes visto de cuatro maneras: diario, calendario, mensual
+  (el año mes a mes) y total (presupuesto y cuentas).
 
   Funciona sin internet: lo anotado se guarda en el teléfono y se envía solo
   al volver la conexión (ver lib/offline.svelte.ts). Y si lo que anotaste a
@@ -13,16 +13,17 @@
 
   import Icon from "../components/Icon.svelte";
   import Money from "../components/app/Money.svelte";
+  import Segmented from "../components/app/Segmented.svelte";
   import AccountsView from "../components/mobile/AccountsView.svelte";
   import CalendarView from "../components/mobile/CalendarView.svelte";
   import DayList from "../components/mobile/DayList.svelte";
   import MonthlyView from "../components/mobile/MonthlyView.svelte";
   import MonthNav from "../components/mobile/MonthNav.svelte";
   import MonthSwipe from "../components/mobile/MonthSwipe.svelte";
-  import NotesView from "../components/mobile/NotesView.svelte";
   import PlanView from "../components/mobile/PlanView.svelte";
   import SavingsView from "../components/mobile/SavingsView.svelte";
   import SearchScreen from "../components/mobile/SearchScreen.svelte";
+  import SlideIn from "../components/mobile/SlideIn.svelte";
   import StatsView from "../components/mobile/StatsView.svelte";
   import TopBar from "../components/mobile/TopBar.svelte";
   import TotalView from "../components/mobile/TotalView.svelte";
@@ -44,7 +45,7 @@
 
   type Tx = Pending<Transaction>;
   type Tab = "trans" | "stats" | "accounts" | "more";
-  type View = "diario" | "calendario" | "mensual" | "total" | "nota";
+  type View = "diario" | "calendario" | "mensual" | "total";
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: "trans", label: "Movimientos", icon: "book-open-01" },
@@ -57,7 +58,6 @@
     { id: "calendario", label: "Calendario" },
     { id: "mensual", label: "Mensual" },
     { id: "total", label: "Total" },
-    { id: "nota", label: "Descripción" },
   ];
 
   const thisMonth = today().slice(0, 7);
@@ -132,12 +132,6 @@
       period: "month",
       ref: `${thisMonth}-01`,
     };
-    location.hash = "#/m?ver=buscar";
-  }
-
-  /** Una descripción de esa vista: sus movimientos de ese mes, en el buscador. */
-  function findNote(text: string) {
-    filters = { ...emptyFilters(), text, period: "month", ref: `${ym}-01` };
     location.hash = "#/m?ver=buscar";
   }
 
@@ -307,18 +301,8 @@
       {/snippet}
     </TopBar>
 
-    <div class="m-views" role="tablist">
-      {#each VIEWS as v (v.id)}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === v.id}
-          class:on={view === v.id}
-          onclick={() => (view = v.id)}
-        >
-          {v.label}
-        </button>
-      {/each}
+    <div class="m-views">
+      <Segmented bind:value={view} options={VIEWS} tabs full label="Vista" />
     </div>
 
     <MonthSwipe bind:ym step={view === "mensual" ? 12 : 1}>
@@ -328,81 +312,81 @@
         <div><span>Balance</span><Money value={income - expense} /></div>
       </div>
 
-      {#if view === "diario"}
-        {#each dupes as t (t.id)}
-          {@const pair = pairOf(t)}
-          {#if pair}
-            <section class="m-dupe" aria-label="Posible movimiento repetido">
-              <div class="m-dupe-head">
-                <Icon name="copy-01" size={16} />
-                <strong>¿Es el mismo movimiento?</strong>
-                <Money value={t.amount} tone={t.type} />
-              </div>
-              <div class="m-dupe-pair">
-                <div>
-                  <span class="m-label">{dupeSide(pair.mine)}</span>
-                  <span class="m-desc"
-                    >{pair.mine.description ||
-                      store.category(pair.mine.category)?.name ||
-                      "Sin descripción"}</span
-                  >
-                  <span class="m-sub"
-                    >{dateShort(pair.mine.date.slice(0, 10))} · {store.account(
-                      pair.mine.account,
-                    )?.name ?? ""}</span
-                  >
+      <SlideIn key={view} order={VIEWS.map((v) => v.id)}>
+        {#if view === "diario"}
+          {#each dupes as t (t.id)}
+            {@const pair = pairOf(t)}
+            {#if pair}
+              <section class="m-dupe" aria-label="Posible movimiento repetido">
+                <div class="m-dupe-head">
+                  <Icon name="copy-01" size={16} />
+                  <strong>¿Es el mismo movimiento?</strong>
+                  <Money value={t.amount} tone={t.type} />
                 </div>
-                <div>
-                  <span class="m-label">{dupeSide(pair.bank)}</span>
-                  <span class="m-desc"
-                    >{pair.bank.description || "Sin descripción"}</span
-                  >
-                  <span class="m-sub"
-                    >{dateShort(pair.bank.date.slice(0, 10))} · {store.account(
-                      pair.bank.account,
-                    )?.name ?? ""}</span
-                  >
+                <div class="m-dupe-pair">
+                  <div>
+                    <span class="m-label">{dupeSide(pair.mine)}</span>
+                    <span class="m-desc"
+                      >{pair.mine.description ||
+                        store.category(pair.mine.category)?.name ||
+                        "Sin descripción"}</span
+                    >
+                    <span class="m-sub"
+                      >{dateShort(pair.mine.date.slice(0, 10))} · {store.account(
+                        pair.mine.account,
+                      )?.name ?? ""}</span
+                    >
+                  </div>
+                  <div>
+                    <span class="m-label">{dupeSide(pair.bank)}</span>
+                    <span class="m-desc"
+                      >{pair.bank.description || "Sin descripción"}</span
+                    >
+                    <span class="m-sub"
+                      >{dateShort(pair.bank.date.slice(0, 10))} · {store.account(
+                        pair.bank.account,
+                      )?.name ?? ""}</span
+                    >
+                  </div>
                 </div>
-              </div>
-              <div class="m-dupe-foot">
-                <button type="button" class="btn sm" onclick={() => distinct(t)}
-                  >Son distintos</button
-                >
-                <button
-                  type="button"
-                  class="btn sm btn-primary"
-                  disabled={merging === t.id}
-                  onclick={() => merge(t)}
-                >
-                  <Icon name="git-merge" />{merging === t.id
-                    ? "Uniendo…"
-                    : "Es el mismo: unir"}
-                </button>
-              </div>
-            </section>
-          {/if}
-        {/each}
-        <DayList
-          txs={monthTxs}
-          onOpen={(t) => txModal.edit(t)}
-          empty={loading ? "" : `Sin movimientos en ${monthLabel(ym, true)}.`}
-        />
-      {:else if view === "calendario"}
-        <CalendarView {ym} {txs} onPick={(d) => (daySheet = d)} />
-      {:else if view === "mensual"}
-        <MonthlyView
-          {ym}
-          {txs}
-          onPick={(m) => {
-            ym = m;
-            view = "diario";
-          }}
-        />
-      {:else if view === "total"}
-        <TotalView {ym} txs={monthTxs} />
-      {:else}
-        <NotesView txs={monthTxs} onPick={findNote} />
-      {/if}
+                <div class="m-dupe-foot">
+                  <button type="button" class="btn sm" onclick={() => distinct(t)}
+                    >Son distintos</button
+                  >
+                  <button
+                    type="button"
+                    class="btn sm btn-primary"
+                    disabled={merging === t.id}
+                    onclick={() => merge(t)}
+                  >
+                    <Icon name="git-merge" />{merging === t.id
+                      ? "Uniendo…"
+                      : "Es el mismo: unir"}
+                  </button>
+                </div>
+              </section>
+            {/if}
+          {/each}
+          <DayList
+            txs={monthTxs}
+            onOpen={(t) => txModal.edit(t)}
+            empty={loading ? "" : `Sin movimientos en ${monthLabel(ym, true)}.`}
+          />
+        {:else if view === "calendario"}
+          <CalendarView {ym} {txs} onPick={(d) => (daySheet = d)} />
+        {:else if view === "mensual"}
+          <MonthlyView
+            {ym}
+            {txs}
+            onPick={(m) => {
+              ym = m;
+              view = "diario";
+            }}
+          />
+        {:else}
+          <TotalView {ym} txs={monthTxs} />
+        {/if}
+      </SlideIn>
     </MonthSwipe>
   {:else if tab === "stats"}
     <StatsView onOpen={(t) => txModal.edit(t)} />
@@ -660,28 +644,7 @@
   }
 
   .m-views {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
-
-    & button {
-      flex: 1 0 auto;
-      padding: var(--sp-12) var(--sp-10);
-      border: 0;
-      border-bottom: 3px solid transparent;
-      background: none;
-      font: inherit;
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      cursor: pointer;
-
-      &.on {
-        border-bottom-color: var(--accent);
-        color: var(--text-primary);
-        font-weight: 600;
-      }
-    }
+    padding: var(--sp-8) var(--sp-16) var(--sp-4);
   }
 
   .m-sum {
