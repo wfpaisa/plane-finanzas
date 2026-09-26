@@ -462,7 +462,7 @@
       border-bottom: var(--border-width) solid var(--border);
       color: var(--text-muted);
       font-size: var(--text-xs);
-      font-weight: 600;
+      font-weight: 500;
       text-align: left;
       white-space: nowrap;
     }
@@ -500,14 +500,14 @@
       background: var(--bg-field);
       color: var(--text-muted);
       font-size: var(--text-xs);
-      font-weight: 600;
+      font-weight: 500;
     }
 
     & .num {
       text-align: right;
 
       & :global(.money) {
-        font-weight: 600;
+        font-weight: 500;
       }
     }
   }
@@ -541,7 +541,10 @@
      pastillas `.tint-N` (components.css). */
   .tx-cat {
     --tinta: color-mix(in oklab, var(--tinte) 72%, var(--text-primary));
-    color: light-dark(oklch(from var(--tinta) min(l, 0.48) c h), oklch(from var(--tinta) max(l, 0.72) c h));
+    color: light-dark(
+      oklch(from var(--tinta) min(l, 0.48) c h),
+      oklch(from var(--tinta) max(l, 0.72) c h)
+    );
     font-weight: 500;
   }
 
@@ -598,7 +601,7 @@
     gap: var(--sp-10);
     padding: 0 var(--sp-4) var(--sp-6);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text-muted);
 
     & .tx-day-label {
@@ -655,7 +658,7 @@
     cursor: pointer;
 
     & > :global(.money) {
-      font-weight: 600;
+      font-weight: 500;
       font-size: var(--text-sm);
     }
   }
@@ -680,7 +683,7 @@
   .tx-title {
     overflow: hidden;
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
     text-overflow: ellipsis;
   }

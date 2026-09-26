@@ -3,7 +3,10 @@ import type { Transaction } from "./types";
 
 let open = $state(false);
 let tx = $state<Transaction | null>(null);
-let preset = $state<Partial<Pick<Transaction, "type" | "account" | "category">> | undefined>(undefined);
+/** Valores de partida para uno nuevo. `date` solo lo usa la pantalla del celular. */
+export type TxPreset = Partial<Pick<Transaction, "type" | "account" | "category"> & { date: string }>;
+
+let preset = $state<TxPreset | undefined>(undefined);
 
 export const txModal = {
   get open() {
@@ -15,7 +18,7 @@ export const txModal = {
   get preset() {
     return preset;
   },
-  new(p?: Partial<Pick<Transaction, "type" | "account" | "category">>) {
+  new(p?: TxPreset) {
     tx = null;
     preset = p;
     open = true;

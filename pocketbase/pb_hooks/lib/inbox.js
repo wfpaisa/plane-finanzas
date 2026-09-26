@@ -405,6 +405,7 @@ function saveRule(app, userId, body) {
     return { rule: "", created: 1, updated: 0, pending: 0 };
   }
 
+  if (!clean.name) throw new BadRequestError("Escribe el nombre de la regla.");
   if (!clean.sender && !clean.match) throw new BadRequestError("Escribe el remitente o un texto que deba tener el correo.");
   var existed = !!data.id;
   var rec = existed ? mine(app, "rules", String(data.id), userId) : new Record(app.findCollectionByNameOrId("rules"));

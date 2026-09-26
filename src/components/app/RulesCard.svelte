@@ -4,17 +4,23 @@
 -->
 <script lang="ts">
   import { money } from "../../lib/format";
-  import { txTypeLabel } from "../../lib/labels";
   import { notify } from "../../lib/notify.svelte";
   import { tintFor } from "../../lib/palettes";
   import { pb } from "../../lib/pb.svelte";
-  import { ruleLabel } from "../../lib/rules";
   import { store, touchTransactions } from "../../lib/store.svelte";
   import type { Rule } from "../../lib/types";
   import Icon from "../Icon.svelte";
   import { Button } from "../ui";
   import Tag, { type Tone } from "../ui/Tag.svelte";
   import RuleForm from "./RuleForm.svelte";
+
+  /** Cómo se ve cada tipo de regla: su ícono y su color. */
+  const KIND: Record<string, { label: string; icon: string; tone: string }> = {
+    expense: { label: "Gasto", icon: "money-send-01", tone: "k-expense" },
+    income: { label: "Ingreso", icon: "money-receive-01", tone: "k-income" },
+    transfer: { label: "Transferencia", icon: "arrow-data-transfer-horizontal", tone: "k-transfer" },
+    discard: { label: "Descarta", icon: "delete-02", tone: "k-discard" },
+  };
 
   let { initialMatch = "" }: { initialMatch?: string } = $props();
 
@@ -87,22 +93,33 @@
           {@const cat = store.category(r.category)}
           {@const acc = store.account(r.account)}
           {@const to = store.account(r.to_account)}
+          {@const kind = KIND[r.type || "expense"] ?? KIND.expense}
           <li>
             <button type="button" class="rule-item" class:paused={r.paused} onclick={() => openRule(r)}>
-              <span class="rule-when">
-                <b class="rule-name">{ruleLabel(r)}</b>
-                <span class="rule-match">{[r.sender, r.match].filter(Boolean).join(" · ")}</span>
+              <span class="rule-icon {kind.tone}" data-tip={kind.label}><Icon name={kind.icon} size={16} /></span>
+              <span class="rule-main">
+                <span class="rule-top">
+                  {#if r.name.trim()}<b class="rule-name">{r.name}</b>{:else}<b class="rule-name unnamed">Sin nombre</b>{/if}
+                  {#if r.paused}<Tag tone="off">En pausa</Tag>{/if}
+                </span>
+                <span class="rule-cond">
+                  {#if r.sender}<span class="cond"><i class="dot hl-sender"></i>De <b>{r.sender}</b></span>{/if}
+                  {#if r.match}<span class="cond"><i class="dot hl-rule"></i>Contiene <b>{r.match}</b></span>{/if}
+                  {#if r.amount}<span class="cond"><i class="dot hl-amount"></i>Valor <b>{money(r.amount)}</b></span>{/if}
+                </span>
+                <span class="rule-result">
+                  {#if r.type === "discard"}
+                    <span>Descarta el correo</span>
+                  {:else}
+                    <span class="rule-type">{kind.label}</span>
+                    {#if acc}<span>{acc.name}{#if to} → {to.name}{/if}</span>{/if}
+                    {#if cat}<span>{cat.name}</span>{/if}
+                    {#if r.description && r.description !== r.name}<span>«{r.description}»</span>{/if}
+                    {#each r.tags ?? [] as t (t)}<Tag tone={tintFor(t) as Tone}>#{t}</Tag>{/each}
+                  {/if}
+                </span>
               </span>
-              {#if r.amount}<span class="rule-amount">{money(r.amount)}</span>{/if}
-              <Icon name="arrow-right-02" size={14} />
-              <span class="rule-result">
-                {#if r.type}<span>{r.type === "discard" ? "Descarta" : txTypeLabel(r.type)}</span>{/if}
-                {#if acc}<span class="muted">{acc.name}{#if to} → {to.name}{/if}</span>{/if}
-                {#if r.description}<b>{r.description}</b>{/if}
-                {#if cat}<span class="muted">{cat.name}</span>{/if}
-                {#each r.tags ?? [] as t (t)}<Tag tone={tintFor(t) as Tone}>#{t}</Tag>{/each}
-                {#if r.paused}<span class="muted small">en pausa</span>{/if}
-              </span>
+              <Icon name="arrow-right-01" size={14} />
             </button>
           </li>
         {/each}
@@ -134,10 +151,11 @@
   .rule-item {
     display: flex;
     align-items: center;
-    gap: var(--sp-10);
+    gap: var(--sp-12);
     width: 100%;
-    padding: var(--sp-10) var(--sp-4);
+    padding: var(--sp-12) var(--sp-8);
     border: 0;
+    border-radius: var(--radius-md);
     background: transparent;
     color: var(--text-muted);
     font: inherit;
@@ -149,53 +167,134 @@
       background: var(--bg-hover);
     }
 
-    &.paused {
+    &.paused .rule-icon,
+    &.paused .rule-cond,
+    &.paused .rule-result {
       opacity: 0.55;
     }
   }
 
-  .rule-when {
-    display: flex;
+  /* El tipo de la regla, en su color: como los montos de los movimientos. */
+  .rule-icon {
+    display: grid;
     flex: none;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: color-mix(in oklch, var(--k) 16%, transparent);
+    color: var(--k);
+
+    &.k-expense {
+      --k: var(--danger);
+    }
+
+    &.k-income {
+      --k: var(--success);
+    }
+
+    &.k-transfer {
+      --k: var(--accent);
+    }
+
+    &.k-discard {
+      --k: var(--text-muted);
+    }
+  }
+
+  .rule-main {
+    display: flex;
+    flex: 1;
     flex-direction: column;
-    max-width: 40%;
+    gap: var(--sp-4);
     min-width: 0;
+  }
+
+  .rule-top {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    min-width: 0;
+  }
+
+  .rule-name.unnamed {
+    color: var(--text-muted);
+    font-style: italic;
   }
 
   .rule-name {
     overflow: hidden;
     color: var(--text-primary);
+    font-size: var(--text-base);
     font-weight: 600;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .rule-match {
-    overflow: hidden;
-    font-family: var(--font-mono);
+  /* La condición con los colores del formulario de la regla. */
+  .rule-cond {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4) var(--sp-12);
     font-size: var(--text-xs);
-    white-space: nowrap;
-    text-overflow: ellipsis;
+
+    &:empty {
+      display: none;
+    }
   }
 
-  .rule-amount {
+  .cond {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-6);
+    min-width: 0;
+    max-width: 100%;
+
+    & b {
+      overflow: hidden;
+      color: var(--text-secondary);
+      font-weight: 500;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .dot {
     flex: none;
-    color: var(--text-primary);
-    font-variant-numeric: tabular-nums;
-    font-size: var(--text-xs);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+  }
+
+  .hl-sender {
+    background: oklch(0.88 0.08 320);
+  }
+
+  .hl-rule {
+    background: oklch(0.9 0.1 150);
+  }
+
+  .hl-amount {
+    background: oklch(0.92 0.11 90);
   }
 
   .rule-result {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-4) var(--sp-8);
-    min-width: 0;
+    gap: var(--sp-4) var(--sp-6);
+    font-size: var(--text-xs);
 
-    & b {
-      color: var(--text-primary);
-      font-weight: 600;
+    & > span:not(:global(.tag)) + span:not(:global(.tag))::before {
+      content: "·";
+      margin-right: var(--sp-6);
+      color: var(--text-muted);
     }
+  }
+
+  .rule-type {
+    color: var(--text-secondary);
+    font-weight: 600;
   }
 
   .empty {

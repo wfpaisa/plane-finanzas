@@ -11,7 +11,6 @@
 <script lang="ts">
   import Icon from "../components/Icon.svelte";
   import Money from "../components/app/Money.svelte";
-  import Segmented from "../components/app/Segmented.svelte";
   import AccountsView from "../components/mobile/AccountsView.svelte";
   import CalendarView from "../components/mobile/CalendarView.svelte";
   import DayList from "../components/mobile/DayList.svelte";
@@ -22,16 +21,14 @@
   import TopBar from "../components/mobile/TopBar.svelte";
   import TotalView from "../components/mobile/TotalView.svelte";
   import ModeToggle from "../components/ui/ModeToggle.svelte";
-  import { colorsFor } from "../lib/colors";
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
-  import { dateLong, dateShort, monthLabel, parseMoney, plainNumber } from "../lib/format";
+  import { dateLong, dateShort, monthLabel } from "../lib/format";
   import { dupeSide } from "../lib/labels";
   import { matches, sumOf } from "../lib/mobile";
   import { categoryTags, hasTag } from "../lib/tags";
   import { notify } from "../lib/notify.svelte";
   import { cachedList, offline } from "../lib/offline.svelte";
   import { overlay, type OutboxItem, type Pending } from "../lib/outbox";
-  import { colorOf } from "../lib/palettes";
   import { logout, pb, reauth, session } from "../lib/pb.svelte";
   import { store, touchTransactions } from "../lib/store.svelte";
   import { theme } from "../lib/theme.svelte";
@@ -127,8 +124,6 @@
   const income = $derived(sumOf(headTxs, "income"));
   const expense = $derived(sumOf(headTxs, "expense"));
 
-  const catColor = (id: string) => colorsFor([store.category(id)?.color || "tint-10"])[0];
-
   function openAccount(id: string) {
     accountFilter = id;
     tab = "trans";
@@ -145,78 +140,10 @@
   let daySheet = $state("");
   const dayTxs = $derived(daySheet ? shown.filter((t) => t.date.slice(0, 10) === daySheet) : []);
 
-  // --- Anotar rápido ---------------------------------------------------
-  let sheet = $state<"expense" | "income" | null>(null);
-  let amountText = $state("");
-  let category = $state("");
-  let account = $state("");
-  let description = $state("");
-  let date = $state(today());
-  let busy = $state(false);
-  let amountEl = $state<HTMLInputElement | null>(null);
-
-  // Las categorías que más usas este mes van primero.
-  const quickCats = $derived.by(() => {
-    if (!sheet) return [];
-    const uses = new Map<string, number>();
-    for (const t of txs) if (t.category) uses.set(t.category, (uses.get(t.category) ?? 0) + 1);
-    return store.categories
-      .filter((c) => c.kind === sheet)
-      .toSorted((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0) || a.name.localeCompare(b.name));
-  });
-
-  function openSheet(kind: "expense" | "income", day = today()) {
+  // --- Anotar: la pantalla de movimiento (ver mobile/TxScreen.svelte) ------
+  function openSheet(type: "expense" | "income", day = today()) {
     daySheet = "";
-    sheet = kind;
-    amountText = "";
-    category = "";
-    description = "";
-    date = day;
-    account = accountFilter || store.activeAccounts[0]?.id || "";
-    queueMicrotask(() => amountEl?.focus());
-  }
-
-  async function save() {
-    const amount = parseMoney(amountText);
-    if (!amount || amount <= 0) return notify.fail(new Error("Escribe la cantidad de dinero."));
-    if (!account) return notify.fail(new Error("Elige la cuenta."));
-    // Con la fecha borrada, hoy: el mes que se abre después es el mismo.
-    const day = date || today();
-    busy = true;
-    try {
-      await offline.create("transactions", {
-        owner: session.id,
-        type: sheet,
-        amount,
-        date: `${day} 12:00:00.000Z`,
-        account,
-        to_account: "",
-        category,
-        description: description.trim(),
-        notes: "",
-        tags: [],
-        source: "manual",
-      });
-      notify.done(
-        !offline.online
-          ? "Guardado en el teléfono: se envía al volver la conexión"
-          : sheet === "expense"
-            ? "Gasto anotado"
-            : "Ingreso anotado",
-      );
-      sheet = null;
-      ym = day.slice(0, 7);
-    } catch (err) {
-      notify.fail(err);
-    } finally {
-      busy = false;
-    }
-  }
-
-  function moreOptions() {
-    const type = sheet ?? "expense";
-    sheet = null;
-    txModal.new({ type, account, category: category || undefined });
+    txModal.new({ type, date: day, account: accountFilter || undefined });
   }
 
   // --- Sin conexión: el aviso y lo pendiente ----------------------------
@@ -224,34 +151,12 @@
 
   // Con una hoja abierta la página de atrás se queda quieta.
   $effect(() => {
-    if (!sheet && !daySheet && !syncSheet) return;
+    if (!daySheet && !syncSheet) return;
     const root = document.documentElement;
     const prev = root.style.overflow;
     root.style.overflow = "hidden";
     return () => {
       root.style.overflow = prev;
-    };
-  });
-
-  // El teclado del teléfono tapa la parte de abajo sin mover lo fijo: la hoja
-  // se sube lo que ocupa el teclado y se acorta al alto que queda a la vista.
-  let kb = $state(0);
-  let viewH = $state(0);
-  $effect(() => {
-    const vv = window.visualViewport;
-    if (!sheet || !vv) return;
-    const fit = () => {
-      kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-      viewH = Math.round(vv.height);
-    };
-    fit();
-    vv.addEventListener("resize", fit);
-    vv.addEventListener("scroll", fit);
-    return () => {
-      vv.removeEventListener("resize", fit);
-      vv.removeEventListener("scroll", fit);
-      kb = 0;
-      viewH = 0;
     };
   });
 
@@ -587,96 +492,6 @@
       </ul>
     {/if}
   </div>
-{/if}
-
-{#if sheet}
-  <div class="m-veil" role="presentation" onclick={() => (sheet = null)}></div>
-  <form
-    class="m-sheet m-quick"
-    class:kb={kb > 0}
-    style:--kb="{kb}px"
-    style:--view-h={viewH ? `${viewH}px` : null}
-    onsubmit={(e) => {
-      e.preventDefault();
-      void save();
-    }}
-  >
-    <div class="m-sheet-head">
-      <Segmented
-        value={sheet}
-        options={[
-          { id: "expense", label: "Gasto" },
-          { id: "income", label: "Ingreso" },
-        ]}
-        onchange={(v) => {
-          sheet = v;
-          category = "";
-        }}
-        label="Tipo"
-      />
-      <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (sheet = null)}>
-        <Icon name="cancel-01" size={16} />
-      </button>
-    </div>
-
-    <div class="m-quick-body">
-    <label class="m-amount" class:out={sheet === "expense"}>
-      <span>$</span>
-      <input
-        bind:this={amountEl}
-        inputmode="numeric"
-        placeholder="0"
-        aria-label="Cantidad"
-        value={amountText}
-        oninput={(e) => {
-          const n = parseMoney(e.currentTarget.value.replace(/\./g, ""));
-          amountText = n ? plainNumber(n) : "";
-          e.currentTarget.value = amountText;
-        }}
-      />
-    </label>
-
-    <div class="m-row2">
-      <input class="field-control" placeholder="¿En qué? (opcional)" bind:value={description} />
-      <input class="field-control" type="date" aria-label="Fecha" bind:value={date} />
-    </div>
-
-    <div class="m-chips" aria-label="Categoría">
-      {#each quickCats as c (c.id)}
-        <button
-          type="button"
-          class="m-chip"
-          class:on={category === c.id}
-          style:--c={catColor(c.id)}
-          onclick={() => (category = category === c.id ? "" : c.id)}
-        >
-          <Icon name={c.icon || "tag-01"} />{c.name}
-        </button>
-      {/each}
-    </div>
-
-    <div class="m-chips" aria-label="Cuenta">
-      {#each store.activeAccounts as a (a.id)}
-        <button
-          type="button"
-          class="m-chip"
-          class:on={account === a.id}
-          style:--c={colorOf(a.palette)}
-          onclick={() => (account = a.id)}
-        >
-          {a.name}
-        </button>
-      {/each}
-    </div>
-    </div>
-
-    <div class="m-sheet-foot">
-      <button type="button" class="btn" onclick={moreOptions}>Más opciones</button>
-      <button type="submit" class="m-btn {sheet === 'expense' ? 'out' : 'in'}" disabled={busy}>
-        {busy ? "Guardando…" : "Guardar"}
-      </button>
-    </div>
-  </form>
 {/if}
 
 <style>
@@ -1132,30 +947,6 @@
     }
   }
 
-  /* Anotar rápido: la cabeza y los botones siempre a la vista; lo del medio
-     se desplaza si no cabe, por ejemplo con el teclado abierto. */
-  .m-quick {
-    bottom: var(--kb, 0px);
-    max-height: calc(var(--view-h, 100dvh) * 0.9);
-    overflow: hidden;
-
-    /* Con el teclado abierto no hace falta dejar el hueco del borde inferior. */
-    &.kb {
-      max-height: calc(var(--view-h, 100dvh) - var(--sp-8));
-      padding-bottom: var(--sp-12);
-    }
-  }
-
-  .m-quick-body {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: var(--sp-12);
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
   .m-sheet-head,
   .m-sheet-foot {
     display: flex;
@@ -1211,74 +1002,4 @@
     }
   }
 
-  .m-amount {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: var(--sp-4);
-    font-family: var(--font-num);
-    font-size: 2.5rem;
-    font-weight: 600;
-    color: var(--success);
-
-    &.out {
-      color: var(--danger);
-    }
-
-    & input {
-      width: 100%;
-      min-width: 0;
-      max-width: 14ch;
-      border: 0;
-      outline: 0;
-      background: none;
-      font: inherit;
-      color: inherit;
-      text-align: center;
-    }
-  }
-
-  .m-row2 {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--sp-8);
-
-    & input {
-      min-width: 0;
-    }
-  }
-
-  .m-chips {
-    display: flex;
-    gap: var(--sp-6);
-    margin: 0 calc(-1 * var(--sp-16));
-    padding: 0 var(--sp-16) var(--sp-4);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .m-chip {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: var(--sp-6);
-    padding: var(--sp-8) var(--sp-12);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill, 99px);
-    background: var(--bg-field);
-    font: inherit;
-    font-size: var(--text-sm);
-    color: var(--text-primary);
-    cursor: pointer;
-
-    & :global(i) {
-      color: var(--c);
-    }
-
-    &.on {
-      border-color: var(--c);
-      background: color-mix(in oklch, var(--c) 20%, var(--bg-field));
-      font-weight: 600;
-    }
-  }
 </style>

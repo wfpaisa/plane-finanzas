@@ -4,6 +4,7 @@
   import Icon from "./components/Icon.svelte";
   import Logo from "./components/Logo.svelte";
   import TransactionForm from "./components/app/TransactionForm.svelte";
+  import TxScreen from "./components/mobile/TxScreen.svelte";
   import TooltipLayer from "./components/TooltipLayer.svelte";
   import { ErrorNote, Loading, Modal, SuccessNote } from "./components/ui";
   import ModeToggle from "./components/ui/ModeToggle.svelte";
@@ -273,7 +274,9 @@
   </div>
 </Modal>
 
-{#if session.user}
+{#if session.user && route.path === "/m"}
+  <TxScreen open={txModal.open} tx={txModal.tx} preset={txModal.preset} onClose={() => txModal.close()} />
+{:else if session.user}
   <TransactionForm
     open={txModal.open}
     tx={txModal.tx}

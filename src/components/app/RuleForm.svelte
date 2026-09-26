@@ -69,6 +69,8 @@
   let applyNow = $state(true);
   let busy = $state<"" | "rule" | "this">("");
   let confirmDelete = $state(false);
+  /** Se intentó guardar sin nombre: el campo se marca. */
+  let noName = $state(false);
   /** El nombre de antes: mientras la descripción sea igual a él, lo sigue. */
   let lastName = "";
 
@@ -85,7 +87,8 @@
       amount = rule?.amount ?? 0;
       // Con un correo, la plantilla muestra valores concretos: lo que la
       // regla no dice se llena con lo que se leyó de ese correo.
-      type = rule?.type || tx?.type || (rule ? "" : "expense");
+      // Las reglas de antes no decían el tipo: toman el del correo, o gasto.
+      type = rule?.type || tx?.type || "expense";
       setAmount = rule?.set_amount ?? 0;
       autoAmount = !setAmount;
       account = rule?.account || tx?.account || "";
@@ -112,12 +115,10 @@
     });
   });
 
-  // Las reglas de antes no decían el tipo: esa opción solo se ofrece a ellas.
   /** Si ya se procesó con esta regla: se puede cambiar solo su movimiento. */
   const usedHere = $derived(!!mail && !!rule && mail.row.status === "procesado");
   // Descartar no aplica a un correo que ya es movimiento: ese se queda.
   const types = $derived([
-    ...(rule && !rule.type ? [{ id: "" as RuleType, label: "Según el correo", icon: "mail-01" }] : []),
     ...TX_TYPES,
     ...(usedHere ? [] : [{ id: "discard" as RuleType, label: "Descartar", icon: "delete-02" }]),
   ]);
@@ -126,7 +127,7 @@
 
   // Al cambiar de tipo, una categoría del otro lado deja de valer.
   $effect(() => {
-    if (category && type && !cats.some((c) => c.id === category)) category = "";
+    if (category && !cats.some((c) => c.id === category)) category = "";
   });
 
   /** Una cuenta creada desde aquí nace con el remitente de la regla. */
@@ -153,7 +154,7 @@
   function data() {
     return {
       id: rule?.id,
-      name: name.trim() || match.split(",")[0]?.trim() || sender.trim(),
+      name: name.trim(),
       sender: sender.trim(),
       match: match.trim(),
       amount: amount > 0 ? amount : 0,
@@ -170,6 +171,7 @@
   }
 
   function check(scope: "rule" | "this"): string {
+    if (scope === "rule" && !name.trim()) return "Escribe el nombre de la regla.";
     if (scope === "rule" && !sender.trim() && !match.trim()) return "Escribe un remitente o texto del correo.";
     if (discarding) return "";
     if (!autoAmount && !(setAmount > 0)) return "Escribe la cantidad o usa la del correo.";
@@ -184,6 +186,7 @@
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   async function save(scope: "rule" | "this") {
+    noName = scope === "rule" && !name.trim();
     const problem = check(scope);
     if (problem) return notify.fail(new Error(problem));
     busy = scope;
@@ -279,7 +282,7 @@
     <!-- A la derecha: el movimiento que crea. -->
     <div class="rule-then">
       <Field label="Nombre de la regla">
-        <Input bind:value={name} placeholder="Panadería, arriendo, pago de la tarjeta…" autofocus={!mail} />
+        <Input bind:value={name} placeholder="Panadería, arriendo, pago de la tarjeta…" autofocus={!mail} required aria-invalid={(noName && !name.trim()) || undefined} />
       </Field>
 
       <Segmented bind:value={type} options={types} full label="Tipo" />
@@ -313,8 +316,8 @@
         {:else}
           <Field label="Categoría">
             <Select bind:value={category}>
-              <option value="">{type ? "Por palabras clave" : "No cambiarla"}</option>
-              {#each type ? cats : store.categories as c (c.id)}
+              <option value="">Por palabras clave</option>
+              {#each cats as c (c.id)}
                 <option value={c.id}>{c.name}</option>
               {/each}
             </Select>
