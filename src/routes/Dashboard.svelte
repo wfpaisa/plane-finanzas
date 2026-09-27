@@ -12,16 +12,20 @@
   import { Button } from "../components/ui";
   import { alpha, colorsFor, tintColor, token } from "../lib/colors";
   import { addMonths, bucketize, budgetUse, byCategory, monthRange, today } from "../lib/finance";
-  import { money, monthLabel } from "../lib/format";
+  import { money, moneyShort, monthLabel } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
   import { cachedList } from "../lib/offline.svelte";
   import { colorOf, tintFor } from "../lib/palettes";
   import { pb, session } from "../lib/pb.svelte";
-  import { go } from "../lib/router.svelte";
+  import { go, route } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
   import { byTag, FIXED_TAG, hasTag, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
   import { txModal } from "../lib/ui.svelte";
+
+  // En el celular la gráfica es angosta: el eje abrevia las cifras ($14.2M)
+  // y las escribe más pequeñas.
+  const mobile = route.path === "/m";
 
   const ym = today().slice(0, 7);
   const from = `${addMonths(ym, -5)}-01`;
@@ -115,8 +119,13 @@
       options: {
         interaction: { mode: "index", intersect: false },
         scales: {
-          x: { grid: { display: false } },
-          y: { ticks: { callback: (v) => money(Number(v)) }, border: { display: false } },
+          x: { grid: { display: false }, ticks: mobile ? { font: { size: 10 } } : {} },
+          y: {
+            ticks: mobile
+              ? { callback: (v) => moneyShort(Number(v)), font: { size: 10 }, maxTicksLimit: 5 }
+              : { callback: (v) => money(Number(v)) },
+            border: { display: false },
+          },
         },
         plugins: {
           legend: { position: "top", align: "end" },

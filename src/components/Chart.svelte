@@ -2,7 +2,7 @@
   Una gráfica de Chart.js que se viste con el tema.
 
   `config` es una función y no un objeto: se vuelve a llamar cuando cambian
-  sus datos, el modo claro/oscuro o el tinte del fondo, porque los colores se leen del tema en
+  sus datos, el modo claro/oscuro, el tinte del fondo o el estilo, porque los colores se leen del tema en
   ese momento (ver `lib/colors.ts`).
 
   Encima de lo que pida cada pantalla, todas se visten igual, al estilo de
@@ -15,6 +15,7 @@
   import { Chart, registerables, type ChartConfiguration, type Plugin } from "chart.js";
 
   import { alpha, token } from "../lib/colors";
+  import { estilo } from "../lib/estilo.svelte";
   import { tint } from "../lib/tint.svelte";
   import { theme } from "../lib/theme.svelte";
 
@@ -133,6 +134,7 @@
   $effect(() => {
     void theme.name;
     void tint.value;
+    void estilo.value;
     if (!canvas) return;
     const muted = token("--text-muted");
     const grid = token("--chart-grid");

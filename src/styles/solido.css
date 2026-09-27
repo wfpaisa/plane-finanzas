@@ -1,0 +1,395 @@
+/*
+ * SÓLIDO — el otro estilo, elegido en Ajustes (`<html data-estilo="solido">`,
+ * ver `lib/estilo.svelte.ts`).
+ *
+ * La misma app, con el mismo orden y las mismas medidas, sin la atmósfera de
+ * la bruma:
+ *
+ *   - Un fondo liso: casi negro en oscuro, papel en claro. Sin degradado ni
+ *     grano.
+ *   - El vidrio de la bruma se queda, pero liso: superficies translúcidas y
+ *     desenfoque en lo que flota (las barras, los menús, las hojas, los
+ *     modales), que deja ver lo de atrás; sin
+ *     reflejos ni brillos. Radios grandes y un filo claro de 1px, igual en
+ *     los cuatro lados.
+ *   - Sombras cortas y tenues, bastante más suaves que las de la bruma.
+ *   - Controles planos: sin almohada, contorno ni brillos. Los campos, un escalón por
+ *     debajo de la tarjeta.
+ *   - Colores vivos: el tinte de Ajustes da el color del acento y apenas
+ *     tiñe las superficies; ingresos en esmeralda, gastos en rosa, ahorros y
+ *     transferencias en azul eléctrico, y los veinte tintes de las
+ *     categorías con más croma.
+ *   - Las fichas de icono, de la misma medida pero con el icono más grande, el
+ *     color muy transparente y sin contorno. Un tinte gris deja un acento de tinta (blanco en oscuro,
+ *     negro en claro). Sin tinte, el azul del ícono de la app.
+ *   - Letra más firme: títulos gruesos y apretados.
+ *
+ * Se importa después de `glass.css` y, como la bruma, repinta casi todo con
+ * sus tokens; las reglas de abajo son lo que un token no alcanza.
+ */
+
+/* ---------- Acento y medidas, en claro y oscuro ---------- */
+:root[data-estilo="solido"] {
+  --s-h: var(--tint-h, 262);
+  /* Cuánto color tienen las superficies: casi nada, y nada con un gris. */
+  --s-k: var(--tint-k, 1);
+
+  --accent-text: oklch(0.99 0 0);
+  --brand-ink: var(--accent);
+  --chart-1: var(--accent);
+
+  --radius-md: 1rem;
+  --radius-lg: 1.75rem;
+  --radius-xl: 2rem;
+
+  /* Los veinte tintes de categorías, con más croma y algo más de luz. */
+  --tinte-1: oklch(0.63 0.23 258); /* azul */
+  --tinte-2: oklch(0.6 0.26 290); /* violeta */
+  --tinte-3: oklch(0.65 0.27 335); /* fucsia */
+  --tinte-4: oklch(0.65 0.25 22); /* rojo */
+  --tinte-5: oklch(0.71 0.2 45); /* naranja */
+  --tinte-6: oklch(0.83 0.17 80); /* ámbar */
+  --tinte-7: oklch(0.82 0.21 128); /* lima */
+  --tinte-8: oklch(0.74 0.21 152); /* verde */
+  --tinte-9: oklch(0.77 0.15 195); /* turquesa */
+  --tinte-10: oklch(0.62 0.07 252); /* pizarra */
+  --tinte-11: oklch(0.73 0.16 232); /* cielo */
+  --tinte-12: oklch(0.63 0.28 305); /* púrpura */
+  --tinte-13: oklch(0.69 0.25 355); /* rosa */
+  --tinte-14: oklch(0.76 0.19 58); /* mandarina */
+  --tinte-15: oklch(0.86 0.18 97); /* mostaza */
+  --tinte-16: oklch(0.84 0.23 137); /* lima neón */
+  --tinte-17: oklch(0.75 0.18 170); /* esmeralda */
+  --tinte-18: oklch(0.59 0.25 272); /* índigo */
+  --tinte-19: oklch(0.62 0.12 55); /* café */
+  --tinte-20: oklch(0.64 0.14 320); /* malva */
+
+  --canvas-wash: none;
+  --grain-opacity: 0;
+  --glass-blur: 28px;
+  --glass-sat: 160%;
+  --glass-sheen: none;
+}
+
+/* ---------- Claro: papel ---------- */
+:root[data-estilo="solido"]:not([data-theme="dark"]) {
+  --canvas: oklch(0.972 calc(0.004 * var(--s-k)) var(--s-h));
+  --s-ink: oklch(0.2 calc(0.012 * var(--s-k)) var(--s-h));
+  --accent: oklch(0.6 0.25 var(--s-h));
+  --accent-hover: oklch(0.54 0.25 var(--s-h));
+  --accent-soft: oklch(0.6 0.25 var(--s-h) / 0.12);
+  --accent-soft-text: oklch(0.52 0.24 var(--s-h));
+  --focus-ring: oklch(0.6 0.25 var(--s-h) / 0.3);
+  /* Cuánto color lleva el fondo de una ficha de icono. */
+  --s-chip: 6%;
+
+  /* Verde esmeralda, rojo rosa y azul eléctrico: los tonos de hoy de lo
+     que entra, lo que sale y lo que se guarda o se mueve. El texto va un
+     punto más oscuro que el trazo para leerse sobre el papel. */
+  --success: oklch(0.596 0.145 163);
+  --success-bg: oklch(0.696 0.17 163 / 0.12);
+  --danger: oklch(0.586 0.235 17);
+  --danger-bg: oklch(0.645 0.246 16 / 0.12);
+  --transfer: oklch(0.546 0.245 263);
+  --viz-income: oklch(0.696 0.17 163);
+  --viz-expense: oklch(0.645 0.246 16);
+  --viz-saving: oklch(0.623 0.214 260);
+  --viz-free: oklch(0.696 0.17 163);
+
+  --glass-0: oklch(1 0 0 / 0.66);
+  --glass-1: oklch(1 0 0 / 0.72);
+  /* Lo que flota (menús, listas, hojas, modales) deja ver lo de atrás,
+     desenfocado: nunca es un bloque sólido. */
+  --glass-2: oklch(0.99 calc(0.003 * var(--s-k)) var(--s-h) / 0.62);
+  --glass-3: oklch(0.99 calc(0.003 * var(--s-k)) var(--s-h) / 0.68);
+  /* Las barras de arriba y abajo: en claro, más ralas que en oscuro. */
+  --s-bar: oklch(0.972 calc(0.004 * var(--s-k)) var(--s-h) / 0.55);
+  --s-tabbar: oklch(0.972 calc(0.004 * var(--s-k)) var(--s-h) / 0.4);
+  --glass-edge: oklch(from var(--s-ink) l c h / 0.08);
+  --glass-rim: oklch(from var(--s-ink) l c h / 0.08);
+  --glass-line: oklch(from var(--s-ink) l c h / 0.07);
+  --glass-line-strong: oklch(from var(--s-ink) l c h / 0.12);
+  --glass-shadow: 0 6px 18px -12px oklch(from var(--s-ink) l c h / 0.1);
+  --glass-shadow-float: 0 16px 40px -20px oklch(from var(--s-ink) l c h / 0.22);
+  --glass-spec: 0 0 #0000;
+  --pillow: 0 0 #0000;
+  --field-bg: oklch(0.955 calc(0.005 * var(--s-k)) var(--s-h));
+  --field-bg-focus: oklch(0.975 calc(0.004 * var(--s-k)) var(--s-h));
+  --field-shadow: inset 0 0 0 1px oklch(from var(--s-ink) l c h / 0.05);
+  --s-raised: oklch(from var(--s-ink) l c h / 0.03);
+  --s-press: oklch(0.93 calc(0.006 * var(--s-k)) var(--s-h));
+  --s-pill: oklch(1 0 0);
+  --s-pill-shadow: 0 1px 3px oklch(from var(--s-ink) l c h / 0.12);
+
+  --bg-level1: var(--canvas);
+  --bg-field: oklch(0.955 calc(0.005 * var(--s-k)) var(--s-h));
+  --bg-hover: oklch(from var(--s-ink) l c h / 0.045);
+  --border-float: oklch(from var(--s-ink) l c h / 0.08);
+  --chart-grid: oklch(from var(--s-ink) l c h / 0.07);
+
+  --text-primary: var(--s-ink);
+  --text-secondary: oklch(0.36 calc(0.012 * var(--s-k)) var(--s-h));
+  --text-muted: oklch(0.5 calc(0.012 * var(--s-k)) var(--s-h));
+  --text-subtle: oklch(0.6 calc(0.01 * var(--s-k)) var(--s-h));
+}
+
+/* ---------- Oscuro: casi negro ---------- */
+:root[data-estilo="solido"][data-theme="dark"] {
+  --canvas: oklch(0.145 calc(0.006 * var(--s-k)) var(--s-h));
+  --accent: oklch(0.68 0.23 var(--s-h));
+  --accent-hover: oklch(0.73 0.22 var(--s-h));
+  --accent-soft: oklch(0.68 0.23 var(--s-h) / 0.16);
+  --accent-soft-text: oklch(0.78 0.18 var(--s-h));
+  --focus-ring: oklch(0.68 0.23 var(--s-h) / 0.35);
+  --s-chip: 9%;
+
+  --success: oklch(0.765 0.177 163);
+  --success-bg: oklch(0.765 0.177 163 / 0.14);
+  --danger: oklch(0.712 0.194 13);
+  --danger-bg: oklch(0.712 0.194 13 / 0.14);
+  --transfer: oklch(0.707 0.165 255);
+  --viz-income: oklch(0.765 0.177 163);
+  --viz-expense: oklch(0.68 0.215 15);
+  --viz-saving: oklch(0.707 0.165 255);
+  --viz-free: oklch(0.765 0.177 163);
+
+  --glass-0: oklch(0.3 calc(0.01 * var(--s-k)) var(--s-h) / 0.3);
+  --glass-1: oklch(0.3 calc(0.01 * var(--s-k)) var(--s-h) / 0.36);
+  --glass-2: oklch(0.22 calc(0.01 * var(--s-k)) var(--s-h) / 0.6);
+  --glass-3: oklch(0.21 calc(0.01 * var(--s-k)) var(--s-h) / 0.66);
+  --s-bar: oklch(0.145 calc(0.006 * var(--s-k)) var(--s-h) / 0.72);
+  --s-tabbar: oklch(0.145 calc(0.006 * var(--s-k)) var(--s-h) / 0.5);
+  --glass-edge: oklch(1 0 0 / 0.1);
+  --glass-rim: oklch(1 0 0 / 0.1);
+  --glass-line: oklch(1 0 0 / 0.07);
+  --glass-line-strong: oklch(1 0 0 / 0.12);
+  --glass-shadow: 0 6px 18px -12px oklch(0 0 0 / 0.35);
+  --glass-shadow-float: 0 16px 40px -20px oklch(0 0 0 / 0.6);
+  --glass-spec: 0 0 #0000;
+  --pillow: 0 0 #0000;
+  /* Apenas un velo oscuro sobre lo que haya detrás (tarjeta, hoja, vidrio):
+     se nota el hueco del campo sin que se vuelva negro. */
+  --field-bg: oklch(0 0 0 / 0.1);
+  --field-bg-focus: oklch(0 0 0 / 0.16);
+  --field-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.07);
+  --s-raised: oklch(1 0 0 / 0.035);
+  --s-press: oklch(0.3 calc(0.01 * var(--s-k)) var(--s-h));
+  --s-pill: oklch(0.3 calc(0.01 * var(--s-k)) var(--s-h));
+  --s-pill-shadow: 0 0 #0000;
+
+  --bg-level1: var(--canvas);
+  --bg-field: oklch(0.26 calc(0.01 * var(--s-k)) var(--s-h));
+  --bg-hover: oklch(1 0 0 / 0.05);
+  --border-float: oklch(1 0 0 / 0.09);
+  --chart-grid: oklch(1 0 0 / 0.06);
+
+  --text-primary: oklch(0.97 calc(0.004 * var(--s-k)) var(--s-h));
+  --text-secondary: oklch(0.83 calc(0.008 * var(--s-k)) var(--s-h));
+  --text-muted: oklch(0.68 calc(0.01 * var(--s-k)) var(--s-h));
+  --text-subtle: oklch(0.56 calc(0.01 * var(--s-k)) var(--s-h));
+}
+
+/* Un tinte gris no tiene tono: el acento es la tinta del texto. */
+:root[data-estilo="solido"][data-tint="gris"]:not([data-theme="dark"]) {
+  --accent: oklch(0.2 0 0);
+  --accent-hover: oklch(0.3 0 0);
+  --accent-soft: oklch(0.2 0 0 / 0.07);
+  --accent-soft-text: oklch(0.2 0 0);
+  --focus-ring: oklch(0.2 0 0 / 0.2);
+}
+
+:root[data-estilo="solido"][data-tint="gris"][data-theme="dark"] {
+  --accent: oklch(0.97 0 0);
+  --accent-hover: oklch(0.88 0 0);
+  --accent-text: oklch(0.16 0 0);
+  --accent-soft: oklch(1 0 0 / 0.1);
+  --accent-soft-text: oklch(0.97 0 0);
+  --focus-ring: oklch(1 0 0 / 0.3);
+}
+
+/* ---------- Lo que ningún token alcanza ---------- */
+:root[data-estilo="solido"] {
+  /* El velo detrás de un modal: más oscuro y menos desenfocado que en la
+     bruma, sin el azul. */
+  & .modal::backdrop,
+  & .plane-backdrop {
+    background: oklch(0 0 0 / 0.28);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Los avisos, también translúcidos (ver Toast.svelte). */
+  & body .notice-toast {
+    --toast-base: var(--glass-2);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  }
+
+  /* La pantalla de anotar un movimiento en el teléfono (mobile/TxScreen) y
+     la lista de meses (mobile/MonthNav): también vidrio. Detrás se adivina
+     la lista, desenfocada, sin que se lea. */
+  & body .ts {
+    background: oklch(from var(--canvas) l c h / 0.46);
+    -webkit-backdrop-filter: blur(20px) saturate(var(--glass-sat));
+    backdrop-filter: blur(20px) saturate(var(--glass-sat));
+  }
+
+  & body .mn-pop {
+    background: var(--glass-2);
+  }
+
+  /* Una tarjeta dentro de otra, un escalón más arriba y sin sombra. */
+  & .card .card {
+    background: var(--s-raised);
+    box-shadow: none;
+  }
+
+  /* Las barras de arriba y abajo: el fondo translúcido, con un filo, y lo
+     que pasa por debajo se ve desenfocado. */
+  & .tabbar,
+  & .tb {
+    background: var(--s-bar);
+    box-shadow: none;
+  }
+
+  /* La de abajo, más rala: se ve pasar la lista por debajo. */
+  & .tabbar {
+    background: var(--s-tabbar);
+  }
+
+  /* ---- Letra ---- */
+  & .page-head h1 {
+    font-weight: 750;
+    letter-spacing: -0.035em;
+  }
+
+  & .card-title,
+  & .modal-head :is(h2, h3) {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  & .kpi-label {
+    font-weight: 600;
+  }
+
+  & .tb-main {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* ---- Botones: planos ---- */
+  & :is(.btn, .btn-icon, .mini-btn):hover {
+    transform: none;
+  }
+
+  & :is(.btn, .btn-icon):not(.btn-primary, .btn-danger, .btn-ghost):hover,
+  & .mini-btn:hover {
+    background: var(--s-press);
+  }
+
+  & .field select:hover,
+  & select.field-control:hover {
+    background-color: var(--s-press);
+  }
+
+  & .btn {
+    font-weight: 650;
+  }
+
+  /* ---- Selectores: pista hundida y la opción marcada, en relieve ---- */
+  & :is(.chips, .tab-list) {
+    background: var(--field-bg);
+    box-shadow: var(--field-shadow);
+
+    &::before {
+      background: var(--s-pill);
+      box-shadow: var(--s-pill-shadow);
+    }
+  }
+
+  & :is(.bar-track, .progress) {
+    background: var(--field-bg);
+    box-shadow: var(--field-shadow);
+  }
+
+  /* ---- Fichas de icono ----
+   * La misma medida de la bruma, pero con el color muy transparente detrás,
+   * sin contorno ni relieve, y el icono más grande dentro (`scale`: su tamaño
+   * viene escrito en línea desde `Icon`). `body` en el selector le gana a las
+   * reglas de cada componente. */
+  & body :is(.kpi-ico, .m-menu-ic, .d-ico, .tx-ico, .ac-ico, .sv-ico, .insight-ico, .cr-ico, .cat-ico, .acc-ico) {
+    border: 0;
+    box-shadow: none;
+
+    & > i {
+      scale: 1.25;
+    }
+  }
+
+  & body :is(.kpi-ico, .m-menu-ic) {
+    border-radius: 0.875rem;
+  }
+
+  & body .kpi-ico {
+    background: color-mix(in oklab, var(--kpi-tone) var(--s-chip), transparent);
+  }
+
+  & body .m-menu-ic {
+    background: color-mix(in oklab, var(--accent) var(--s-chip), transparent);
+    color: var(--accent-soft-text);
+  }
+
+  & body :is(.d-ico, .tx-ico, .cr-ico, .cat-ico):is([class*="tint-"]),
+  & body .cr .cr-ico {
+    background: color-mix(in oklab, var(--tinte, var(--chart-1)) var(--s-chip), transparent);
+  }
+
+  & body .insight-ico {
+    background: color-mix(in oklab, var(--tone) var(--s-chip), transparent);
+  }
+
+  & body .sv-ico {
+    background: color-mix(in oklab, var(--c) var(--s-chip), transparent);
+  }
+
+  /* Las de cuentas no tienen color propio: un velo de la tinta del texto. */
+  & body :is(.ac-ico, .acc-ico) {
+    background: color-mix(in oklab, var(--text-primary) 4%, transparent);
+  }
+
+  & :is(.avatar-letter, .m-avatar) {
+    background: var(--accent);
+    box-shadow: none;
+    color: var(--accent-text);
+  }
+
+  /* ---- Menú lateral: la pantalla actual, en el acento ---- */
+  & .nav-item.active {
+    background: var(--accent-soft);
+    box-shadow: none;
+    color: var(--accent-soft-text);
+  }
+
+  /* ---- Tarjetas de color: tinte plano, sin degradado ---- */
+  & .insight:is(.a, .b, .c) {
+    background: color-mix(in srgb, var(--insight-tone) 14%, var(--bg-card));
+  }
+
+  & .insight.a {
+    --insight-tone: var(--chart-1);
+  }
+
+  & .insight.b {
+    --insight-tone: var(--chart-2);
+  }
+
+  & .insight.c {
+    --insight-tone: var(--chart-3);
+  }
+
+  & :is(.pl-free, .stat.free) {
+    background: color-mix(in oklab, var(--tone, var(--free-tone)) 12%, transparent);
+    box-shadow: none;
+  }
+}

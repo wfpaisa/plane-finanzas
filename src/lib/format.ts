@@ -10,6 +10,20 @@ export function money(n: number | null | undefined): string {
   return `${v < 0 && abs ? "−" : ""}$${num.format(abs)}`;
 }
 
+/**
+ * $14.2M · $7.0M · $850K: abreviado, para los ejes de las gráficas en el
+ * celular. Los millones llevan siempre un decimal, así las marcas del eje
+ * miden lo mismo y se leen en columna.
+ */
+export function moneyShort(n: number | null | undefined): string {
+  const v = Number.isFinite(n) ? (n as number) : 0;
+  const abs = Math.abs(v);
+  const sign = v < 0 && Math.round(abs) ? "−" : "";
+  if (abs >= 999_950) return `${sign}$${(abs / 1e6).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${String(Math.round(abs / 100) / 10)}K`;
+  return money(v);
+}
+
 export const plainNumber = (n: number) => num.format(Math.round(n));
 
 /** "9.917.228" -> 9917228. Acepta lo que escribe una persona. */

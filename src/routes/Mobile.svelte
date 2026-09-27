@@ -37,6 +37,7 @@
   import Dashboard from "./Dashboard.svelte";
   import Inbox from "./Inbox.svelte";
   import Settings from "./Settings.svelte";
+  import { estilo } from "../lib/estilo.svelte";
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
   import { dateLong, dateShort, monthLabel } from "../lib/format";
   import { dupeSide } from "../lib/labels";
@@ -510,6 +511,22 @@
             onToggle={(next) => theme.set(next)}
           />
         </li>
+        <li class="m-menu-row">
+          <span class="m-menu-ic"><Icon name="paint-board" size={18} /></span>
+          <span class="m-txt">
+            <span class="m-desc">Estilo sólido</span>
+            <span class="m-sub">Fondo liso, sin degradados</span>
+          </span>
+          <label class="switch">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Estilo sólido"
+              checked={estilo.value === "solido"}
+              onchange={(e) => estilo.set(e.currentTarget.checked ? "solido" : "bruma")}
+            />
+          </label>
+        </li>
         <li>
           <a href="#/" onclick={leave}>
             <span class="m-menu-ic"><Icon name="computer" size={18} /></span>
@@ -936,7 +953,7 @@
       background: var(--bg-hover);
     }
 
-    & .m-menu-row > .m-desc {
+    & .m-menu-row > :is(.m-desc, .m-txt) {
       flex: 1;
     }
   }

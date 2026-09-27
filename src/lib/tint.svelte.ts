@@ -44,7 +44,8 @@ function apply(color: string | null) {
   const root = document.documentElement;
   if (color) {
     const { h, c } = oklchOf(color);
-    root.dataset.tint = "";
+    // Un gris no tiene tono: el estilo sólido le da un acento de tinta.
+    root.dataset.tint = c < 0.02 ? "gris" : "";
     root.style.setProperty("--tint-h", h.toFixed(1));
     root.style.setProperty("--tint-k", Math.min(1.4, c / 0.1).toFixed(2));
   } else {

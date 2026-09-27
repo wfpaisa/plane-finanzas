@@ -2,6 +2,7 @@ import "./styles/global.css";
 import "./styles/app.css";
 import "./styles/finanzas.css";
 import "./styles/glass.css";
+import "./styles/solido.css";
 import "./styles/transitions.css";
 
 import { mount } from "svelte";

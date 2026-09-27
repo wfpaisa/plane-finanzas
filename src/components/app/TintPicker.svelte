@@ -3,6 +3,8 @@
   una sola fila de círculos, o cualquier color con la rueda o el hexadecimal
   (`ColorPicker`). Cada pastel se pinta con el mismo degradado de la bruma,
   en su tono. El monocromo es un gris: sin croma, el fondo no se tiñe.
+  Con el estilo sólido el tinte es el color del acento, y cada círculo lo
+  muestra así: lleno y vivo, y el monocromo en tinta.
 -->
 <script lang="ts">
   import { oklchOf } from "../../lib/palettes";
@@ -41,6 +43,7 @@
       <button
         type="button"
         class="opt-tile tint-swatch"
+        class:tint-gray={p.gray}
         class:selected={current === p.hex}
         style:--h={p.h}
         style:--k={p.k}
@@ -51,7 +54,7 @@
       ></button>
     {/each}
   </div>
-  <ColorPicker bind:value={() => tint.value ?? "", (c) => tint.set(c || null)} label="Tinte del fondo" presets={false} placeholder="Por defecto" />
+  <ColorPicker bind:value={() => tint.value ?? "", (c) => tint.set(c || null)} label="Color" presets={false} placeholder="Por defecto" />
 </div>
 
 <style>
@@ -82,5 +85,18 @@
   /* La bruma de partida, con sus colores fijos. */
   .tint-default {
     background: linear-gradient(180deg, oklch(0.6 0.05 238), oklch(0.88 0.03 190) 60%, oklch(0.93 0.012 205)) border-box;
+  }
+
+  /* En el estilo sólido, el acento que daría cada uno (ver styles/solido.css). */
+  :global(:root[data-estilo="solido"]) .tint-swatch {
+    background: light-dark(oklch(0.57 0.2 var(--h)), oklch(0.66 0.19 var(--h))) border-box;
+  }
+
+  :global(:root[data-estilo="solido"]) .tint-default {
+    background: light-dark(oklch(0.57 0.2 262), oklch(0.66 0.19 262)) border-box;
+  }
+
+  :global(:root[data-estilo="solido"]) .tint-gray {
+    background: var(--text-primary) border-box;
   }
 </style>

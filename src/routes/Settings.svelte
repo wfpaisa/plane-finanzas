@@ -22,6 +22,7 @@
   import type { Kind } from "../lib/finance";
   import { notify } from "../lib/notify.svelte";
   import { pb, session } from "../lib/pb.svelte";
+  import { estilo } from "../lib/estilo.svelte";
   import { CATEGORY_TINT_NAMES, CATEGORY_TINTS, nextCategoryTint, tintFor } from "../lib/palettes";
   import { go, route } from "../lib/router.svelte";
   import { reload, store, touchTransactions } from "../lib/store.svelte";
@@ -343,11 +344,34 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h3 class="card-title">Tinte del fondo</h3>
-            <p class="card-sub">El color del fondo de la aplicación, en claro y en oscuro. Se guarda en tu cuenta.</p>
+            <h3 class="card-title">Apariencia</h3>
+            <p class="card-sub">El estilo de la aplicación y su color, en claro y en oscuro. El color se guarda en tu cuenta; el estilo, en este navegador.</p>
           </div>
         </div>
-        <div class="card-body"><TintPicker /></div>
+        <div class="card-body stack">
+          <!-- Sin <label>: envuelven varios botones, y un clic en el espacio
+               libre pulsaría el primero. -->
+          <div class="field block" role="group" aria-labelledby="estilo-label">
+            <span class="field-label" id="estilo-label">Estilo</span>
+            <Segmented
+              label="Estilo"
+              bind:value={() => estilo.value, (v) => estilo.set(v)}
+              options={[
+                { id: "bruma", label: "Bruma" },
+                { id: "solido", label: "Sólido" },
+              ]}
+            />
+            <span class="field-hint">
+              {estilo.value === "solido"
+                ? "Fondo liso, vidrio sin brillos y sombras suaves. El color de abajo es el de los botones, la sección actual y los íconos."
+                : "Fondo con degradado y tarjetas de vidrio. El color de abajo tiñe el fondo."}
+            </span>
+          </div>
+          <div class="field block" role="group" aria-labelledby="color-label">
+            <span class="field-label" id="color-label">Color</span>
+            <TintPicker />
+          </div>
+        </div>
       </div>
 
       <div class="card">
