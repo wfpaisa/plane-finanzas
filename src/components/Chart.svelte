@@ -122,8 +122,9 @@
         if (!square) ds.maxBarThickness = Math.min(Number(ds.maxBarThickness ?? 18), stacked ? 22 : 18);
       } else if (type === "doughnut" || type === "pie") {
         ds.borderWidth = 0;
-        ds.spacing = 4;
-        ds.borderRadius = 8;
+        // Lo que traiga la gráfica manda: el celular las quiere rectas.
+        ds.spacing ??= 4;
+        ds.borderRadius ??= 8;
         ds.hoverOffset = 6;
       }
     }

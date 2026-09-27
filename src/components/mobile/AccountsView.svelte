@@ -87,11 +87,13 @@
     }
 
     & span:first-child {
-      font-size: var(--text-sm);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
     }
 
     & :global(.money) {
       font-size: var(--text-sm);
+      font-weight: 600;
     }
   }
 
@@ -103,7 +105,7 @@
       justify-content: space-between;
       padding: var(--sp-14, 0.875rem) var(--sp-16) var(--sp-10);
       border-bottom: 1px solid var(--border);
-      font-size: var(--text-sm);
+      font-size: var(--text-xs);
       color: var(--text-muted);
     }
 
@@ -119,11 +121,12 @@
       align-items: center;
       gap: var(--sp-10);
       width: 100%;
-      padding: var(--sp-14, 0.875rem) var(--sp-16);
+      padding: var(--sp-12) var(--sp-16);
       border: 0;
       border-bottom: 1px solid var(--border);
       background: none;
       font: inherit;
+      font-size: var(--text-sm);
       color: var(--text-primary);
       text-align: left;
       cursor: pointer;
@@ -156,6 +159,7 @@
 
   .ac-empty {
     padding: var(--sp-40) var(--sp-16);
+    font-size: var(--text-sm);
     color: var(--text-muted);
     text-align: center;
   }

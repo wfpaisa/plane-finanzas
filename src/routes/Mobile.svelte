@@ -39,7 +39,7 @@
   import { store, touchTransactions } from "../lib/store.svelte";
   import { theme } from "../lib/theme.svelte";
   import type { Transaction } from "../lib/types";
-  import { nextDirection, route } from "../lib/router.svelte";
+  import { closeOnBack, goBack, nextDirection, route } from "../lib/router.svelte";
   import { transition } from "../lib/transition";
   import { syncSheet, txModal } from "../lib/ui.svelte";
 
@@ -140,6 +140,15 @@
   const dayTxs = $derived(
     daySheet ? txs.filter((t) => t.date.slice(0, 10) === daySheet) : [],
   );
+
+  // El botón de atrás del teléfono cierra las hojas.
+  const dayOpen = $derived(!!daySheet);
+  $effect(() => {
+    if (dayOpen) return closeOnBack(() => (daySheet = ""));
+  });
+  $effect(() => {
+    if (syncSheet.open) return closeOnBack(() => (syncSheet.open = false));
+  });
 
   // --- Anotar: la pantalla de movimiento (ver mobile/TxScreen.svelte) ------
   function openSheet(type: "expense" | "income", day = today()) {
@@ -260,6 +269,9 @@
   const sub = $derived(
     SUBS.includes(route.query.get("ver") ?? "") ? route.query.get("ver") : null,
   );
+  // El detalle de Análisis va en la ruta (`#/m?categoria=…`): así el botón de
+  // atrás del teléfono sube un nivel. Con él abierto, la pestaña es Análisis.
+  const drilled = $derived(route.query.has("categoria") || route.query.has("etiqueta"));
   // Mientras está abierta se marca su pestaña; al cerrarla se vuelve a la
   // de antes (de una cuenta, a Cuentas).
   let tabBefore: Tab | null = null;
@@ -271,11 +283,9 @@
       tab = tabBefore;
       tabBefore = null;
     }
+    if (drilled) tab = "stats";
   });
-  function closeSub() {
-    if (history.length > 1) history.back();
-    else location.replace("#/m");
-  }
+  const closeSub = () => goBack("#/m");
 </script>
 
 <div class="m">
@@ -458,10 +468,10 @@
       class:on={tab === t.id}
       aria-current={tab === t.id ? "page" : undefined}
       onclick={() => {
-        if (tab === t.id && !sub) return;
+        if (tab === t.id && !sub && !drilled) return;
         tabBefore = null;
         // Con una subpantalla abierta la anima el cambio de ruta.
-        if (sub) {
+        if (sub || drilled) {
           tab = t.id;
           nextDirection("lado");
           location.replace("#/m");

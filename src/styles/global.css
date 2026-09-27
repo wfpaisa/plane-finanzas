@@ -64,6 +64,12 @@ body,
   font-size: 110%;
 }
 
+/* Sin el recuadro azul que el teléfono pinta al tocar: cada botón ya
+   marca su propio estado (`:active`, `:focus-visible`). */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /*
  * El globo de ayuda (ver `components/TooltipLayer.svelte`). Lo dibuja una capa
  * al final del documento, en coordenadas de ventana, así que ningún

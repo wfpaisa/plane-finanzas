@@ -24,6 +24,7 @@
   import { cachedList, offline } from "../../lib/offline.svelte";
   import { overlay, type Pending } from "../../lib/outbox";
   import { pb } from "../../lib/pb.svelte";
+  import { goBack, route } from "../../lib/router.svelte";
   import { store } from "../../lib/store.svelte";
   import { byTag, hasTag, tagsOf } from "../../lib/tags";
   import { tintFor } from "../../lib/palettes";
@@ -36,10 +37,27 @@
   let ym = $state(today().slice(0, 7));
   let yearly = $state(false);
   let kind = $state<"expense" | "income">("expense");
-  /** Dónde se está: arriba, en una etiqueta o en una categoría. */
-  let path = $state<{ tag?: string; category?: string }>({});
-  /** Arriba, por categoría o por etiqueta. Por etiqueta si alguna categoría la tiene. */
-  let by = $state<"category" | "tag">(store.categories.some((c) => c.tags?.length) ? "tag" : "category");
+  /**
+   * Dónde se está: arriba, en una etiqueta o en una categoría. Va en la ruta
+   * (`#/m?etiqueta=…&categoria=…`, "" es "sin …") para que el botón de atrás
+   * del teléfono suba un nivel.
+   */
+  const path = $derived.by(() => {
+    const q = route.query;
+    return {
+      tag: q.has("etiqueta") ? (q.get("etiqueta") ?? "") : undefined,
+      category: q.has("categoria") ? (q.get("categoria") ?? "") : undefined,
+    };
+  });
+  const hashOf = (p: { tag?: string; category?: string }) => {
+    const q = new URLSearchParams();
+    if (p.tag !== undefined) q.set("etiqueta", p.tag);
+    if (p.category !== undefined) q.set("categoria", p.category);
+    const s = q.toString();
+    return `#/m${s ? `?${s}` : ""}`;
+  };
+  /** Arriba, por categoría o por etiqueta. */
+  let by = $state<"category" | "tag">("category");
 
   const year = $derived(Number(ym.slice(0, 4)));
   // Lo del periodo y lo de antes, para la línea: ocho meses o cinco años.
@@ -138,15 +156,11 @@
   });
 
   function pick(key: string) {
-    if (byTags) path = { tag: key };
-    else path = { ...path, category: key };
+    location.hash = hashOf(byTags ? { tag: key } : { ...path, category: key });
   }
 
-  function back() {
-    // De una categoría se vuelve a su etiqueta si se llegó por ella.
-    if (path.category !== undefined && path.tag !== undefined) path = { tag: path.tag };
-    else path = {};
-  }
+  // De una categoría se vuelve a su etiqueta si se llegó por ella.
+  const back = () => goBack(hashOf(path.category !== undefined && path.tag !== undefined ? { tag: path.tag } : {}));
 
   const title = $derived(
     path.category !== undefined
@@ -165,9 +179,25 @@
       type: "pie",
       data: {
         labels: slices.map((s) => s.label),
-        datasets: [{ data: slices.map((s) => s.total), backgroundColor: slices.map((s) => resolveColor(s.color)) }],
+        datasets: [
+          {
+            data: slices.map((s) => s.total),
+            backgroundColor: slices.map((s) => resolveColor(s.color)),
+            borderRadius: 0,
+            spacing: 1,
+          },
+        ],
       },
       options: {
+        // Tocar una parte la abre, igual que su fila de la lista.
+        onClick: (_e, els) => {
+          const s = els[0] && slices[els[0].index];
+          if (s) pick(s.key);
+        },
+        onHover: (e, els) => {
+          const el = e.native?.target as HTMLElement | undefined;
+          if (el) el.style.cursor = els.length ? "pointer" : "";
+        },
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (c) => ` ${c.label}: ${money(Number(c.raw))}` } },
@@ -239,8 +269,8 @@
         full
         label="Tipo"
         options={[
-          { id: "income", label: "Ingresos", sub: money(incomeTotal) },
           { id: "expense", label: "Gastos", sub: money(expenseTotal) },
+          { id: "income", label: "Ingresos", sub: money(incomeTotal) },
         ]}
       />
     </div>
@@ -258,7 +288,7 @@
       {#if byTags}<p>Un movimiento con varias etiquetas suma en cada una.</p>{/if}
     </div>
 
-    <SlideIn key={kind} order={["income", "expense"]}>
+    <SlideIn key={kind} order={["expense", "income"]}>
       <SlideIn key={by} order={["category", "tag"]}>
         {#if slices.length && !byTags}
           <div class="st-pie">
@@ -335,6 +365,11 @@
 
   .st-tabs {
     padding: var(--sp-8) var(--sp-16) 0;
+    font-size: var(--text-sm);
+
+    & :global(.seg-sub) {
+      font-size: var(--text-xs);
+    }
   }
 
   .st-by {
@@ -372,6 +407,7 @@
     border-bottom: 1px solid var(--border);
     background: none;
     font: inherit;
+    font-size: var(--text-sm);
     color: var(--text-primary);
     text-align: left;
     cursor: pointer;
@@ -400,6 +436,7 @@
 
   .st-empty {
     padding: var(--sp-40) var(--sp-16);
+    font-size: var(--text-sm);
     color: var(--text-muted);
     text-align: center;
   }
@@ -422,7 +459,7 @@
     }
 
     & strong {
-      font-size: 1.75rem;
+      font-size: 1.375rem;
       font-weight: 600;
     }
   }

@@ -20,6 +20,7 @@
   import { offline } from "../../lib/offline.svelte";
   import { colorOf } from "../../lib/palettes";
   import { pb, session } from "../../lib/pb.svelte";
+  import { closeOnBack } from "../../lib/router.svelte";
   import { store, touchTransactions } from "../../lib/store.svelte";
   import type { Transaction } from "../../lib/types";
   import type { TxPreset } from "../../lib/ui.svelte";
@@ -97,21 +98,11 @@
 
   // El botón "atrás" del teléfono cierra primero el panel y luego la pantalla.
   $effect(() => {
-    if (!open) return;
-    // Una marca propia: una entrada que quedó de antes (tras recargar) no cuenta.
-    const mark = Date.now();
-    history.pushState({ txScreen: mark }, "");
-    const onPop = () => {
-      if (panel) {
-        panel = null;
-        history.pushState({ txScreen: mark }, "");
-      } else onClose();
-    };
-    window.addEventListener("popstate", onPop);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      if (history.state?.txScreen === mark) history.back();
-    };
+    if (open) return closeOnBack(onClose);
+  });
+  const hasPanel = $derived(open && !!panel);
+  $effect(() => {
+    if (hasPanel) return closeOnBack(() => (panel = null));
   });
 
   let bodyEl = $state<HTMLElement | null>(null);
