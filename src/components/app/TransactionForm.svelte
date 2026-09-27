@@ -182,7 +182,7 @@
     <Segmented bind:value={type} options={TX_TYPES} full label="Tipo" />
 
     <div class="form-grid">
-      <Field label="Cantidad">
+      <Field label="Monto">
         <MoneyInput bind:value={amount} autofocus={!tx} />
       </Field>
       <Field label="Fecha">
@@ -299,8 +299,8 @@
       <button
         type="button"
         class="btn-icon foot-icon foot-danger"
-        aria-label="Borrar"
-        data-tip="Borrar"
+        aria-label="Eliminar"
+        data-tip="Eliminar"
         onclick={() => (confirmDelete = true)}
       >
         <Icon name="delete-02" size={18} />
@@ -354,8 +354,8 @@
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
-  title="Borrar movimiento"
-  message="Se borra con sus adjuntos. No se puede deshacer."
+  title="Eliminar movimiento"
+  message="Se eliminará con sus adjuntos. No se puede deshacer."
   {busy}
   onConfirm={remove}
 />

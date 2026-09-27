@@ -38,22 +38,22 @@
   <header class="page-head">
     <div>
       <h1>Cuentas</h1>
-      <p>Entre todas tus cuentas tienes <b><Money value={store.total} /></b></p>
+      <p>El saldo neto de tus cuentas es <b><Money value={store.total} /></b></p>
     </div>
     <a href="#/m?ver=cuentas" class="btn sm">Administrar</a>
   </header>
 
   <div class="card ac-sum">
     <div>
-      <span class="ac-sum-label"><span class="kpi-ico tone-income"><Icon name="arrow-up-right-01" size={14} /></span>Capital</span>
+      <span class="ac-sum-label"><span class="kpi-ico tone-income"><Icon name="arrow-up-right-01" size={14} /></span>Saldos positivos</span>
       <Money value={capital} tone="income" />
     </div>
     <div>
-      <span class="ac-sum-label"><span class="kpi-ico tone-expense"><Icon name="credit-card" size={14} /></span>A deber</span>
+      <span class="ac-sum-label"><span class="kpi-ico tone-expense"><Icon name="credit-card" size={14} /></span>Deudas</span>
       <Money value={debt} tone="expense" />
     </div>
     <div>
-      <span class="ac-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Balance</span>
+      <span class="ac-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Saldo neto</span>
       <Money value={capital - debt} />
     </div>
   </div>

@@ -105,7 +105,7 @@
   <header class="page-head">
     <div>
       <h1>Cuentas</h1>
-      <p>Entre todas tus cuentas tienes <b><Money value={store.total} /></b></p>
+      <p>El saldo neto de tus cuentas es <b><Money value={store.total} /></b></p>
     </div>
     <div class="page-actions">
       <Switch bind:checked={showArchived} label="Ver archivadas" />
@@ -116,7 +116,7 @@
   <div class="stack">
     <div class="kpis-auto">
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Dinero total</span></div>
+        <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
         <div class="kpi-val"><Money value={store.total} /></div>
       </div>
       <div class="card kpi">

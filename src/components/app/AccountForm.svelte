@@ -184,7 +184,7 @@
     </Field>
 
     <div class="form-switches">
-      <Switch bind:checked={exclude} label="Excluir del dinero total" />
+      <Switch bind:checked={exclude} label="Excluir del saldo neto" />
       {#if account}<Switch bind:checked={archived} label="Archivada" />{/if}
     </div>
   </div>
@@ -192,7 +192,7 @@
   {#snippet footer()}
     {#if account}
       <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}>
-        <Icon name="delete-02" />Borrar
+        <Icon name="delete-02" />Eliminar
       </Button>
       <span class="flex-1"></span>
     {/if}
@@ -204,8 +204,8 @@
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
-  title="Borrar cuenta"
-  message="También se borrarán todos los movimientos de esta cuenta. Esta acción no se puede deshacer. Si quieres conservar el historial, archiva la cuenta."
+  title="Eliminar cuenta"
+  message="También se eliminarán todos los movimientos de esta cuenta. Esta acción no se puede deshacer. Si quieres conservar el historial, archiva la cuenta."
   confirmText={account?.name}
   confirmHint="Escribe el nombre de la cuenta para confirmar"
   {busy}

@@ -11,7 +11,7 @@
     onClose,
     title,
     message,
-    confirmLabel = "Borrar",
+    confirmLabel = "Eliminar",
     busy = false,
     onConfirm,
     confirmText,

@@ -156,7 +156,7 @@
     try {
       const r = await pb.send<{ transactions: number; movements: number }>("/api/finanzas/automatic/run", { method: "POST" });
       await reload("accounts", "savings");
-      notify.done(`${r.transactions} movimientos frecuentes y ${r.movements} aportes creados.`);
+      notify.done(`${r.transactions} movimientos recurrentes y ${r.movements} aportes creados.`);
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -231,7 +231,7 @@
       await reload();
       touchTransactions();
       confirmClean = false;
-      notify.done(`Todo borrado: ${r.transactions} movimientos.`);
+      notify.done(`Datos eliminados: ${r.transactions} movimientos.`);
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -271,7 +271,7 @@
           <p class="card-sub">Las palabras clave permiten clasificar automáticamente los movimientos importados de Gmail.</p>
         </div>
         <div class="card-head-actions">
-          <Button size="sm" variant="secondary" onclick={() => edit(null, catKind)}><Icon name="add-01" />Nueva</Button>
+          <Button size="sm" variant="secondary" onclick={() => edit(null, catKind)}><Icon name="add-01" />Nueva categoría</Button>
         </div>
       </div>
       <div class="card-body stack">
@@ -331,7 +331,7 @@
         <div class="card">
           <div class="card-head">
             <div>
-              <h3 class="card-title">Movimientos automáticos</h3>
+              <h3 class="card-title">Movimientos recurrentes</h3>
               <p class="card-sub">A las 6:00 a. m., la aplicación revisa si debe registrar un ingreso, gasto o aporte programado. Este proceso no mueve dinero en el banco.</p>
             </div>
           </div>
@@ -386,7 +386,7 @@
           <Button onclick={() => fileInput?.click()}><Icon name="database-import" />Importar</Button>
           <input bind:this={fileInput} type="file" accept=".zip,.json,application/zip,application/json" hidden onchange={(e) => pickBackup(e.currentTarget.files?.[0])} />
           <span class="flex-1"></span>
-          <Button variant="ghost" class="btn-danger" onclick={() => (confirmClean = true)}><Icon name="delete-02" />Borrar todo</Button>
+          <Button variant="ghost" class="btn-danger" onclick={() => (confirmClean = true)}><Icon name="delete-02" />Eliminar todos los datos</Button>
         </div>
       </div>
     </div>
@@ -438,7 +438,7 @@
   </div>
   {#snippet footer()}
     {#if editing}
-      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Borrar</Button>
+      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Eliminar</Button>
       <span class="flex-1"></span>
     {/if}
     <Button onclick={() => (open = false)}>Cancelar</Button>
@@ -449,7 +449,7 @@
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
-  title="Borrar categoría"
+  title="Eliminar categoría"
   message="Los movimientos que usan esta categoría se conservarán, pero quedarán sin categoría."
   {busy}
   onConfirm={removeCategory}
@@ -468,10 +468,10 @@
 <ConfirmDialog
   open={confirmClean}
   onClose={() => (confirmClean = false)}
-  title="Borrar todo"
-  message="Se borrarán tus cuentas, movimientos, ingresos y gastos frecuentes, ahorros y categorías. Gmail seguirá conectado y volverá a leer los correos desde el principio. Esta acción no se puede deshacer."
-  confirmText="BORRAR"
-  confirmHint="Escribe BORRAR para confirmar"
+  title="Eliminar todos los datos"
+  message="Se eliminarán tus cuentas, movimientos, ingresos y gastos recurrentes, ahorros y categorías. Gmail seguirá conectado y volverá a leer los correos desde el principio. Esta acción no se puede deshacer."
+  confirmText="ELIMINAR"
+  confirmHint="Escribe ELIMINAR para confirmar"
   busy={cleaning}
   onConfirm={cleanAll}
 />

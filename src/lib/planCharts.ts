@@ -139,7 +139,7 @@ export function simulationChart(sim: SimRow[], simSavings: (Saving & { current: 
       datasets: [
         ...pots,
         {
-          label: "Dinero total",
+          label: "Saldo neto",
           data: [total, ...sim.map((r) => r.total)],
           borderColor: token("--viz-line"),
           backgroundColor: token("--viz-line"),

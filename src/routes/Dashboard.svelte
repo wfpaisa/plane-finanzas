@@ -220,14 +220,14 @@
           <Icon name="alert-02" />{review} {review === 1 ? "movimiento pendiente" : "movimientos pendientes"}
         </Button>
       {/if}
-      <Button variant="secondary" onclick={() => txModal.new()}><Icon name="add-01" />Agregar</Button>
+      <Button variant="secondary" onclick={() => txModal.new()}><Icon name="add-01" />Agregar movimiento</Button>
     </div>
   </header>
 
   <div class="stack dash">
     <div class="kpis-auto">
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Dinero total</span></div>
+        <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
         <div class="kpi-val"><Money value={store.total} /></div>
         <div class="kpi-foot">{store.activeAccounts.length} cuentas</div>
       </div>

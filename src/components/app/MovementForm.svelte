@@ -102,7 +102,7 @@
     try {
       await pb.collection("saving_movements").delete(movement.id);
       await reload("savings");
-      notify.done("Movimiento borrado");
+      notify.done("Movimiento eliminado");
       confirmDelete = false;
       onClose();
     } catch (err) {
@@ -132,11 +132,11 @@
       ]}
     />
     <div class="form-grid">
-      <Field label="Cantidad"><MoneyInput bind:value={amount} autofocus /></Field>
+      <Field label="Monto"><MoneyInput bind:value={amount} autofocus /></Field>
       <Field label="Fecha"><input type="date" class="field-control w-full" bind:value={date} /></Field>
     </div>
     {#if foreignAccount}
-      <p class="small muted">Sale de la cuenta de otra persona del ahorro; esa no se puede cambiar desde aquí.</p>
+      <p class="small muted">Este aporte pertenece a otra persona; su cuenta no se puede cambiar desde aquí.</p>
     {:else}
       <Field label="Cuenta" tip="Dónde queda guardado este dinero. En Cuentas, la columna «Para ahorros» suma lo de cada una.">
         <Select bind:value={account}>
@@ -149,7 +149,7 @@
   </div>
   {#snippet footer()}
     {#if movement}
-      <button type="button" class="btn-icon foot-icon foot-danger" aria-label="Borrar" data-tip="Borrar" onclick={() => (confirmDelete = true)}>
+      <button type="button" class="btn-icon foot-icon foot-danger" aria-label="Eliminar" data-tip="Eliminar" onclick={() => (confirmDelete = true)}>
         <Icon name="delete-02" size={18} />
       </button>
       <span class="flex-1"></span>
@@ -162,7 +162,7 @@
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
-  title="Borrar movimiento"
+  title="Eliminar movimiento"
   message="Sale del ahorro. No se puede deshacer."
   {busy}
   onConfirm={remove}

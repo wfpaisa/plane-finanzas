@@ -171,7 +171,7 @@
           </div>
         {/if}
         {#if movs.length}
-          <ul class="sv-movs" aria-label="Abonos y retiros de {s.name}">
+          <ul class="sv-movs" aria-label="Aportes y retiros de {s.name}">
             {#each expandedAll.has(s.id) ? movs : movs.slice(0, SHOWN) as { m, after } (m.id)}
               <li>
                 <button type="button" disabled={!canEdit(m)} onclick={() => openMovement(s, m)}>
@@ -192,7 +192,7 @@
             <button type="button" class="sv-more" onclick={() => expandedAll.add(s.id)}>Ver los {movs.length} movimientos</button>
           {/if}
         {:else}
-          <p class="sv-empty">Todavía no hay abonos ni retiros.</p>
+          <p class="sv-empty">Todavía no hay aportes ni retiros.</p>
         {/if}
         <div class="sv-actions">
           <Button size="sm" variant="secondary" onclick={() => openMovement(s)}><Icon name="add-circle" />Movimiento</Button>

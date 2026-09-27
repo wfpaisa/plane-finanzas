@@ -244,7 +244,7 @@
         <Field label="Contiene" tip="Separa varias opciones con comas. Basta con que coincida una.">
           <div class="dot-field"><Input bind:value={match} placeholder="PANADERIA, GOU PAYMENTS" aria-invalid={misses.match || undefined} /><span class="dot hl-rule" aria-hidden="true"></span></div>
         </Field>
-        <Field label="Valor" tip="Opcional. Debe coincidir exactamente.">
+        <Field label="Monto" tip="Opcional. Debe coincidir exactamente.">
           <div class="dot-field"><MoneyInput bind:value={amount} placeholder="Cualquiera" invalid={misses.amount} /><span class="dot hl-amount" aria-hidden="true"></span></div>
         </Field>
       </div>
@@ -296,7 +296,7 @@
         <!-- Sin Field: su <label> no puede envolver al del interruptor, y su
              estilo de campo estiraría el interruptor. -->
         <div>
-          <span class="field-label">Cantidad</span>
+          <span class="field-label">Monto</span>
           <div class="amount-mode">
             <Switch bind:checked={autoAmount} label="Usar la del correo" />
             {#if autoAmount}
@@ -378,7 +378,7 @@
 
   {#snippet footer()}
     {#if rule && !mail}
-      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Borrar</Button>
+      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Eliminar</Button>
       <span class="flex-1"></span>
     {/if}
     <Button onclick={onClose}>Cancelar</Button>
@@ -402,7 +402,7 @@
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
-  title="Borrar regla"
+  title="Eliminar regla"
   message="Los movimientos creados con esta regla no cambiarán."
   busy={!!busy}
   onConfirm={remove}

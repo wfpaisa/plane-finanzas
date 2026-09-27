@@ -152,7 +152,7 @@
       {/each}
     </ul>
     <button type="button" class="pl-add" onclick={() => edit(null)}>
-      <Icon name="add-circle" />{kind === "income" ? "Ingreso frecuente" : "Gasto frecuente"}
+      <Icon name="add-circle" />{kind === "income" ? "Ingreso recurrente" : "Gasto recurrente"}
     </button>
   </SlideIn>
 </section>
@@ -196,7 +196,7 @@
     </div>
   {/if}
 
-  <Chart config={simConfig} height={240} label="Cálculo del dinero total a futuro" />
+  <Chart config={simConfig} height={240} label="Cálculo del saldo neto a futuro" />
 
   <Field label="¿Para cuándo tendría…?"><MoneyInput bind:value={goal} placeholder="200.000.000" /></Field>
   <p class="pl-goal">

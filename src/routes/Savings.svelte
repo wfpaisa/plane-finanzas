@@ -273,13 +273,13 @@
                 <tr class="sv-detail" class:sv-archived={s.archived} id="sv-movs-{s.id}">
                   <td colspan="7">
                     {#if movs.length}
-                      <table class="movs" aria-label="Abonos y retiros de {s.name}">
+                      <table class="movs" aria-label="Aportes y retiros de {s.name}">
                         <thead>
                           <tr>
                             <th>Fecha</th>
                             <th>Movimiento</th>
                             <th>Cuenta</th>
-                            <th class="num">Valor</th>
+                            <th class="num">Monto</th>
                             <th class="num"><span data-tip="Lo que tenía el ahorro después de este movimiento">Quedó en</span></th>
                             <th><span class="sr-only">Acciones</span></th>
                           </tr>
@@ -321,8 +321,8 @@
                                   <button
                                     type="button"
                                     class="btn-icon sm"
-                                    aria-label="Borrar"
-                                    data-tip="Borrar"
+                                    aria-label="Eliminar"
+                                    data-tip="Eliminar"
                                     onclick={(e) => {
                                       e.stopPropagation();
                                       removeMovement(m.id);
@@ -339,7 +339,7 @@
                       {/if}
                     {:else}
                       <p class="mov-empty">
-                        Todavía no hay abonos ni retiros.
+                        Todavía no hay aportes ni retiros.
                         <button type="button" class="link" onclick={() => openMovement(s)}>Registrar el primero</button>
                       </p>
                     {/if}

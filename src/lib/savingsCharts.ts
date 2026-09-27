@@ -129,7 +129,7 @@ export function simChart(savings: Saving[], current: Current, horizon: number, y
   const c1 = resolveColor(colorOf(s.palette));
   const datasets: ChartConfiguration<"line">["data"]["datasets"] = [
     {
-      label: s.annual_rate ? `Con interés anual del ${s.annual_rate}%` : "Cantidad estimada",
+      label: s.annual_rate ? `Con interés anual del ${s.annual_rate}%` : "Saldo estimado",
       data: labels.map((_, i) => valueAt(s, now, i)),
       borderColor: c1,
       backgroundColor: alpha(c1, 0.08),

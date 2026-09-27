@@ -45,7 +45,7 @@
     <div class="card-head">
       <div>
         <h2 class="card-title">{mode === "login" ? "Entrar" : "Crear cuenta"}</h2>
-        <p class="card-sub">{mode === "login" ? "Escribe tus datos para continuar." : "Crea tus datos de acceso."}</p>
+        <p class="card-sub">{mode === "login" ? "Escribe tus datos para continuar." : "Crea una cuenta para empezar."}</p>
       </div>
     </div>
     <div class="card-body login-fields">

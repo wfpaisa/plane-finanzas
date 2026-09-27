@@ -105,7 +105,7 @@
   }
 </script>
 
-<Modal {open} {onClose} title={item ? "Editar movimiento frecuente" : kind === "income" ? "Nuevo ingreso frecuente" : "Nuevo gasto frecuente"}>
+<Modal {open} {onClose} title={item ? "Editar movimiento recurrente" : kind === "income" ? "Nuevo ingreso recurrente" : "Nuevo gasto recurrente"}>
   <div class="stack">
     <Segmented
       bind:value={kind}
@@ -117,7 +117,7 @@
     />
     <div class="form-grid">
       <Field label="Nombre"><Input bind:value={name} placeholder="Crédito hipotecario" autofocus /></Field>
-      <Field label="Cantidad"><MoneyInput bind:value={amount} /></Field>
+      <Field label="Monto"><MoneyInput bind:value={amount} /></Field>
       <Field label="Cada cuánto ocurre">
         <Select bind:value={frequency}>
           {#each FREQUENCIES as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
@@ -164,7 +164,7 @@
   </div>
   {#snippet footer()}
     {#if item}
-      <Button variant="ghost" class="btn-danger" onclick={remove}><Icon name="delete-02" />Borrar</Button>
+      <Button variant="ghost" class="btn-danger" onclick={remove}><Icon name="delete-02" />Eliminar</Button>
       <span class="flex-1"></span>
     {/if}
     <Button onclick={onClose}>Cancelar</Button>

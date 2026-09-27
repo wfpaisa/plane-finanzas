@@ -274,7 +274,7 @@
     try {
       await offline.remove("transactions", editing.id, editing);
       confirmDelete = false;
-      notify.done("Movimiento borrado");
+      notify.done("Movimiento eliminado");
       onClose();
     } catch (err) {
       notify.fail(err);
@@ -336,7 +336,7 @@
         {/if}
 
         <div class="ts-row" class:focus={panel === "amount"}>
-          <span class="ts-label">Importe</span>
+          <span class="ts-label">Monto</span>
           <button type="button" class="ts-value ts-amount" onclick={() => (panel = "amount")}>
             {#if hasOps}
               <span class="ts-expr">{exprLabel}</span>{#if hasSum}<span>= {money(amount)}</span>{/if}
@@ -414,9 +414,9 @@
     </div>
 
     {#if panel}
-      <section class="ts-panel" aria-label={panel === "amount" ? "Importe" : panel === "category" ? "Categoría" : "Cuentas"}>
+      <section class="ts-panel" aria-label={panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : "Cuentas"}>
         <div class="ts-panel-head">
-          <strong>{panel === "amount" ? "Importe" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
+          <strong>{panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
           <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (panel = null)}>
             <Icon name="cancel-01" size={18} />
           </button>
@@ -458,7 +458,7 @@
     open={confirmDelete}
     onClose={() => (confirmDelete = false)}
     title="Eliminar movimiento"
-    message="Se borra con sus adjuntos. No se puede deshacer."
+    message="Se eliminará con sus adjuntos. No se puede deshacer."
     {busy}
     onConfirm={remove}
   />

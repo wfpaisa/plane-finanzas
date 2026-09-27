@@ -235,7 +235,7 @@
 
   {#snippet footer()}
     {#if saving && mine}
-      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Borrar</Button>
+      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Eliminar</Button>
       <span class="flex-1"></span>
     {/if}
     <Button onclick={onClose}>Cancelar</Button>
@@ -246,7 +246,7 @@
 <ConfirmDialog
   open={confirmDelete}
   onClose={() => (confirmDelete = false)}
-  title="Borrar ahorro"
+  title="Eliminar ahorro"
   message="Se eliminarán los aportes registrados en este ahorro. El saldo de las cuentas no cambiará. Esta acción no se puede deshacer."
   {busy}
   onConfirm={remove}

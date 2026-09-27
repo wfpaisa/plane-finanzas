@@ -94,8 +94,8 @@
       <p>Calcula cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
     </div>
     <div class="page-actions">
-      <Button onclick={() => edit(null, "income")}><Icon name="money-receive-01" />Ingreso frecuente</Button>
-      <Button variant="secondary" onclick={() => edit(null, "expense")}><Icon name="add-01" />Gasto frecuente</Button>
+      <Button onclick={() => edit(null, "income")}><Icon name="money-receive-01" />Ingreso recurrente</Button>
+      <Button variant="secondary" onclick={() => edit(null, "expense")}><Icon name="add-01" />Gasto recurrente</Button>
     </div>
   </header>
 
@@ -142,8 +142,8 @@
     <div class="split-even">
       <div class="card">
         <div class="card-head">
-          <div><h3 class="card-title">Ingresos frecuentes</h3><p class="card-sub">Dinero que esperas recibir: <Money value={plan.income} /> al mes</p></div>
-          <div class="card-head-actions"><button type="button" class="btn-icon sm" aria-label="Agregar ingreso fijo" onclick={() => edit(null, "income")}><Icon name="add-01" /></button></div>
+          <div><h3 class="card-title">Ingresos recurrentes</h3><p class="card-sub">Dinero que esperas recibir: <Money value={plan.income} /> al mes</p></div>
+          <div class="card-head-actions"><button type="button" class="btn-icon sm" aria-label="Agregar ingreso recurrente" onclick={() => edit(null, "income")}><Icon name="add-01" /></button></div>
         </div>
         <div class="card-body">
           {#each incomes as r (r.id)}
@@ -155,8 +155,8 @@
       </div>
       <div class="card">
         <div class="card-head">
-          <div><h3 class="card-title">Gastos frecuentes</h3><p class="card-sub">Pagos que esperas repetir: <Money value={plan.fixed} /> al mes</p></div>
-          <div class="card-head-actions"><button type="button" class="btn-icon sm" aria-label="Agregar gasto fijo" onclick={() => edit(null, "expense")}><Icon name="add-01" /></button></div>
+          <div><h3 class="card-title">Gastos recurrentes</h3><p class="card-sub">Pagos que esperas repetir: <Money value={plan.fixed} /> al mes</p></div>
+          <div class="card-head-actions"><button type="button" class="btn-icon sm" aria-label="Agregar gasto recurrente" onclick={() => edit(null, "expense")}><Icon name="add-01" /></button></div>
         </div>
         <div class="card-body">
           {#each expenses as r (r.id)}
@@ -235,7 +235,7 @@
           </div>
         {/if}
 
-        <Chart config={simConfig} height={320} label="Cálculo del dinero total a futuro" />
+        <Chart config={simConfig} height={320} label="Cálculo del saldo neto a futuro" />
 
         <div class="goal">
           <Field label="¿Para cuándo tendría…?"><MoneyInput bind:value={goal} placeholder="200.000.000" /></Field>

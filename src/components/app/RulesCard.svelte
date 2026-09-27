@@ -83,7 +83,7 @@
       {#if rules.some((r) => !r.paused)}
         <Button size="sm" variant="ghost" loading={applying} onclick={applyAll}><Icon name="repeat" />Aplicar a todo</Button>
       {/if}
-      <Button size="sm" onclick={() => openRule(null)}><Icon name="add-01" />Nueva</Button>
+      <Button size="sm" onclick={() => openRule(null)}><Icon name="add-01" />Nueva regla</Button>
     </div>
   </div>
   <div class="card-body">
@@ -105,7 +105,7 @@
                 <span class="rule-cond">
                   {#if r.sender}<span class="cond"><i class="dot hl-sender"></i>De <b>{r.sender}</b></span>{/if}
                   {#if r.match}<span class="cond"><i class="dot hl-rule"></i>Contiene <b>{r.match}</b></span>{/if}
-                  {#if r.amount}<span class="cond"><i class="dot hl-amount"></i>Valor <b>{money(r.amount)}</b></span>{/if}
+                  {#if r.amount}<span class="cond"><i class="dot hl-amount"></i>Monto <b>{money(r.amount)}</b></span>{/if}
                 </span>
                 <span class="rule-result">
                   {#if r.type === "discard"}

@@ -216,7 +216,7 @@
           <th class="tx-mail-col" aria-label="Origen"
             ><Icon name="mail-01" size={14} /></th
           >
-          {@render head("amount", "Valor", "num")}
+          {@render head("amount", "Monto", "num")}
         </tr>
       </thead>
       <tbody>

@@ -40,7 +40,7 @@
     images?: boolean;
   } = $props();
 
-  const LABEL: Record<Mark, string> = { rule: "Texto de la regla", amount: "Valor", merchant: "Comercio" };
+  const LABEL: Record<Mark, string> = { rule: "Texto de la regla", amount: "Monto", merchant: "Comercio" };
 
   const pieces = $derived(linkify(rich ? highlightRich(rich, { amount, merchant, keys }) : highlight(text, { amount, merchant, keys })));
   let inHtml = $state<Mark[]>([]);

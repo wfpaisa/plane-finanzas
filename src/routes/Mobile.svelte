@@ -182,7 +182,7 @@
   const OP_LABEL = {
     create: "Nuevo",
     update: "Cambio",
-    delete: "Borrado",
+    delete: "Eliminado",
   } as const;
 
   function describe(item: OutboxItem) {
@@ -379,7 +379,7 @@
           <Money value={expense} tone="expense" />
         </div>
         <div>
-          <span class="m-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Balance</span>
+          <span class="m-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Saldo neto</span>
           <Money value={income - expense} />
         </div>
       </div>

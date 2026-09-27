@@ -95,7 +95,7 @@
   <header class="page-head">
     <div>
       <h1>Correos</h1>
-      <p>Revisa los correos del banco y decide qué hacer. Estos correos fueron filtrados por los tags que tiene cada cuenta.</p>
+      <p>Revisa los correos del banco y decide qué hacer. Se filtran según los remitentes configurados en tus cuentas.</p>
     </div>
     <div class="page-actions">
       {#if store.gmail?.email}
@@ -118,7 +118,7 @@
   {#if !loading && !rows.length}
     <div class="card">
       <EmptyState
-        title={tab === "pendiente" ? "No hay correos pendientes" : "No hay correos procesados"}
+        title={tab === "pendiente" ? "No hay correos por decidir" : "No hay correos procesados"}
         description={tab === "pendiente"
           ? "Los correos que necesiten revisión aparecerán aquí."
           : "Aquí aparecerán los correos convertidos en movimientos."}
