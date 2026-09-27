@@ -866,6 +866,9 @@
   .ts-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* Cada fila mide lo que su celda: con muchas opciones la cuadrícula se
+       desplaza en vez de aplastar las filas contra la altura del panel. */
+    grid-auto-rows: max-content;
     overflow-y: auto;
     overscroll-behavior: contain;
 
