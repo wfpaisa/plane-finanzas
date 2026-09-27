@@ -301,6 +301,25 @@ function processPending(app, userId) {
 }
 
 /**
+ * Los procesados cuyo movimiento se borró vuelven a quedar por decidir, sin
+ * regla. @returns {number} cuántos
+ */
+function reopen(app, userId) {
+  var rows = app.findRecordsByFilter("inbox", "owner = {:u} && status = 'procesado'", "", 0, 0, { u: userId });
+  var n = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var ext = rows[i].getString("external_id");
+    if (txOf(app, userId, ext)) continue;
+    ignored.forget(app, userId, ext);
+    rows[i].set("status", "pendiente");
+    rows[i].set("rule", "");
+    app.save(rows[i]);
+    n++;
+  }
+  return n;
+}
+
+/**
  * Aplica una regla (guardada o no) a un correo de la bandeja, coincida o no:
  * la persona lo pidió para ese correo. Si ya tenía movimiento, lo actualiza.
  */
@@ -504,6 +523,7 @@ module.exports = {
   seen: seen,
   ingest: ingest,
   processPending: processPending,
+  reopen: reopen,
   saveRule: saveRule,
   suggestFor: suggestFor,
   textId: textId,

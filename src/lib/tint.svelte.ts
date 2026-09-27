@@ -6,7 +6,8 @@
  *
  * Va en `<html data-tint>` como `--tint-h` (el tono) y `--tint-k` (cuánto
  * color: un gris no tiñe, un color vivo tiñe un poco más que la bruma);
- * `glass.css` los usa en el lienzo, el vidrio, las líneas y el texto. Sin
+ * `glass.css` los usa en el lienzo, el vidrio, las líneas y el texto. El
+ * color tal cual va en `--tint`: el estilo sólido lo usa de acento. Sin
  * tinte (`null`) queda la bruma de partida. El mismo cálculo lo hace el guion de `index.html` antes de
  * pintar, para que no parpadee.
  */
@@ -48,10 +49,12 @@ function apply(color: string | null) {
     root.dataset.tint = c < 0.02 ? "gris" : "";
     root.style.setProperty("--tint-h", h.toFixed(1));
     root.style.setProperty("--tint-k", Math.min(1.4, c / 0.1).toFixed(2));
+    root.style.setProperty("--tint", color);
   } else {
     delete root.dataset.tint;
     root.style.removeProperty("--tint-h");
     root.style.removeProperty("--tint-k");
+    root.style.removeProperty("--tint");
   }
   chosen = color;
 }

@@ -185,7 +185,7 @@ routerAdd(
       throw new BadRequestError("Primero conecta tu cuenta de Gmail.");
     }
     try {
-      const r = sync.syncConnection(e.app, conn);
+      const r = sync.syncConnection(e.app, conn, { again: !!(e.requestInfo().body || {}).again });
       return e.json(200, { read: r.read, created: r.created, pending: r.pending, skipped: r.skipped });
     } catch (err) {
       throw new BadRequestError("No se pudo leer Gmail: " + (err && err.message ? err.message : err));

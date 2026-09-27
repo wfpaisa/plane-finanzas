@@ -37,4 +37,11 @@ function remember(app, userId, externalId) {
   app.save(r);
 }
 
-module.exports = { known: known, ignored: ignored, remember: remember };
+/** Lo saca de los borrados: la próxima lectura lo vuelve a traer. */
+function forget(app, userId, externalId) {
+  try {
+    app.delete(app.findFirstRecordByFilter("ignored_imports", "owner = {:u} && external_id = {:e}", { u: userId, e: externalId }));
+  } catch (_) {}
+}
+
+module.exports = { known: known, ignored: ignored, remember: remember, forget: forget };

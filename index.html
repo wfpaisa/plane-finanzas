@@ -45,6 +45,7 @@
             root.dataset.tint = Math.hypot(A, B) < 0.02 ? "gris" : "";
             root.style.setProperty("--tint-h", (((Math.atan2(B, A) * 180) / Math.PI + 360) % 360).toFixed(1));
             root.style.setProperty("--tint-k", Math.min(1.4, Math.hypot(A, B) / 0.1).toFixed(2));
+            root.style.setProperty("--tint", t);
           }
         } catch {}
         // Y el estilo (lib/estilo.svelte.ts).

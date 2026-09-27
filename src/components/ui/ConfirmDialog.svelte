@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
 
-  import Button from "./Button.svelte";
+  import Button, { type Variant } from "./Button.svelte";
   import Field from "./Field.svelte";
   import Input from "./Input.svelte";
   import Modal from "./Modal.svelte";
@@ -12,6 +12,7 @@
     title,
     message,
     confirmLabel = "Eliminar",
+    confirmVariant = "danger",
     busy = false,
     onConfirm,
     confirmText,
@@ -22,6 +23,8 @@
     title: string;
     message: string | Snippet;
     confirmLabel?: string;
+    /** "danger" salvo que confirmar no borre nada. */
+    confirmVariant?: Variant;
     busy?: boolean;
     onConfirm: () => void;
     /** Si se da, hay que escribirlo tal cual para poder confirmar. */
@@ -52,7 +55,7 @@
   {/if}
   {#snippet footer()}
     <Button onclick={onClose} disabled={busy}>Cancelar</Button>
-    <Button variant="danger" loading={busy} disabled={!matches} onclick={onConfirm}>
+    <Button variant={confirmVariant} loading={busy} disabled={!matches} onclick={onConfirm}>
       {confirmLabel}
     </Button>
   {/snippet}

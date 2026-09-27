@@ -6,6 +6,7 @@
 
 var gmail = require(__hooks + "/lib/gmail.js");
 var inbox = require(__hooks + "/lib/inbox.js");
+var ignored = require(__hooks + "/lib/ignored.js");
 var parsers = require(__hooks + "/lib/parsers.js");
 
 function jsonList(record, field) {
@@ -38,21 +39,31 @@ function nowString() {
   return new Date().toISOString().replace("T", " ");
 }
 
-function syncConnection(app, conn) {
+/**
+ * Lee los correos nuevos y los mete a la bandeja. Con `opts.again` vuelve a
+ * traer los de los últimos 90 días que no tienen movimiento: los que se
+ * quitaron de la bandeja y los procesados cuyo movimiento se borró, que
+ * quedan otra vez por decidir. Lo que ya tiene movimiento no se toca.
+ */
+function syncConnection(app, conn, opts) {
   var owner = conn.getString("owner");
+  var again = !!(opts && opts.again);
   try {
     var token = gmail.accessToken(conn.getString("refresh_token"));
     var query = gmail.queryFor(sendersOf(app, conn));
-    var last = conn.getString("last_sync");
+    var last = again ? "" : conn.getString("last_sync");
     // Un día de solape: Gmail indexa con retraso y la bandeja no duplica. Sin
     // lectura previa (o con remitentes nuevos, ver main.pb.js), 90 días atrás.
     var since = last ? Math.floor(new Date(last.replace(" ", "T")).getTime() / 1000) - 86400 : 0;
     var q = query + (since > 0 ? " after:" + since : " newer_than:90d");
 
     var ids = gmail.listIds(token, q, MAX);
+    var reopened = again ? inbox.reopen(app, owner) : 0;
     var fresh = [];
-    // Ni lo que ya está en la bandeja, ni lo importado, ni lo descartado.
+    // Ni lo que ya está en la bandeja, ni lo importado, ni lo descartado
+    // (salvo que se pida traerlo de nuevo).
     for (var i = 0; i < ids.length; i++) {
+      if (again) ignored.forget(app, owner, ids[i]);
       if (!inbox.seen(app, owner, ids[i])) fresh.push(ids[i]);
     }
     var mails = fresh.map(function (id) {
@@ -61,6 +72,7 @@ function syncConnection(app, conn) {
     var result = inbox.ingest(app, owner, mails, { source: "gmail" });
     result.read = ids.length;
     result.skipped += ids.length - fresh.length;
+    result.pending += reopened;
 
     conn.set("last_sync", nowString());
     conn.set("last_error", "");

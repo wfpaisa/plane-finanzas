@@ -7,7 +7,7 @@
   import InboxMail from "../components/app/InboxMail.svelte";
   import Money from "../components/app/Money.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Button, EmptyState } from "../components/ui";
+  import { Button, ConfirmDialog, EmptyState } from "../components/ui";
   import Tag from "../components/ui/Tag.svelte";
   import { dateShort } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
@@ -27,6 +27,7 @@
   let loading = $state(true);
   let syncing = $state(false);
   let openId = $state<string | null>(null);
+  let confirmAgain = $state(false);
 
   async function load(more = false) {
     try {
@@ -68,14 +69,19 @@
       .finally(() => go("/correos"));
   });
 
-  async function sync() {
+  /** Con `again`, trae de nuevo los de 90 días atrás que no tienen movimiento. */
+  async function sync(again = false) {
     syncing = true;
     try {
-      const r = await pb.send<SyncResult>("/api/finanzas/gmail/sync", { method: "POST" });
+      const r = await pb.send<SyncResult>("/api/finanzas/gmail/sync", { method: "POST", body: { again } });
       if (r.created) touchTransactions();
       await reload("gmail");
       const fresh = r.created + r.pending;
-      notify.done(fresh ? `${fresh} nuevos: ${r.created} procesados y ${r.pending} pendientes.` : "No hay correos nuevos.");
+      notify.done(fresh ? `${fresh} ${again ? "de vuelta" : "nuevos"}: ${r.created} procesados y ${r.pending} pendientes.` : "No hay correos nuevos.");
+      if (again) {
+        confirmAgain = false;
+        tab = "pendiente";
+      }
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -99,7 +105,8 @@
     </div>
     <div class="page-actions">
       {#if store.gmail?.email}
-        <Button variant="secondary" loading={syncing} onclick={sync}><Icon name="refresh" />Revisar Gmail</Button>
+        <Button variant="ghost" disabled={syncing} onclick={() => (confirmAgain = true)}><Icon name="mail-download-01" />Traer de nuevo</Button>
+        <Button variant="secondary" loading={syncing && !confirmAgain} onclick={() => sync()}><Icon name="refresh" />Revisar Gmail</Button>
       {:else}
         <Button variant="secondary" onclick={() => go("/ajustes", { seccion: "gmail" })}><Icon name="link-01" />Conectar Gmail</Button>
       {/if}
@@ -158,6 +165,17 @@
 </div>
 
 <InboxMail id={openId} onClose={() => (openId = null)} onChanged={() => void load()} />
+
+<ConfirmDialog
+  open={confirmAgain}
+  onClose={() => (confirmAgain = false)}
+  title="Traer de nuevo los correos"
+  message="Se vuelven a leer de Gmail los correos de tus remitentes de los últimos 90 días que no tienen movimiento, incluidos los que quitaste de la bandeja o cuyo movimiento eliminaste. Quedan en Por decidir, salvo los que reconozca una regla. Los movimientos que ya tienes no cambian."
+  confirmLabel="Traer de nuevo"
+  confirmVariant="secondary"
+  busy={syncing}
+  onConfirm={() => sync(true)}
+/>
 
 <style>
   .inbox-tabs {

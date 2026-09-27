@@ -5,8 +5,8 @@
  * La misma app, con el mismo orden y las mismas medidas, sin la atmósfera de
  * la bruma:
  *
- *   - Un fondo liso: casi negro en oscuro, papel en claro. Sin degradado ni
- *     grano.
+ *   - Un fondo liso: casi negro en oscuro, papel en claro. Sin degradado,
+ *     con un grano apenas visible, más tenue que el de la bruma.
  *   - El vidrio de la bruma se queda, pero liso: superficies translúcidas y
  *     desenfoque en lo que flota (las barras, los menús, las hojas, los
  *     modales), que deja ver lo de atrás; sin
@@ -15,8 +15,8 @@
  *   - Sombras cortas y tenues, bastante más suaves que las de la bruma.
  *   - Controles planos: sin almohada, contorno ni brillos. Los campos, un escalón por
  *     debajo de la tarjeta.
- *   - Colores vivos: el tinte de Ajustes da el color del acento y apenas
- *     tiñe las superficies; ingresos en esmeralda, gastos en rosa, ahorros y
+ *   - Colores vivos: el color de Ajustes es el acento, tal cual (el texto
+ *     encima pasa a negro si es muy claro), y apenas tiñe las superficies; ingresos en esmeralda, gastos en rosa, ahorros y
  *     transferencias en azul eléctrico, y los veinte tintes de las
  *     categorías con más croma.
  *   - Las fichas de icono, de la misma medida pero con el icono más grande, el
@@ -34,7 +34,8 @@
   /* Cuánto color tienen las superficies: casi nada, y nada con un gris. */
   --s-k: var(--tint-k, 1);
 
-  --accent-text: oklch(0.99 0 0);
+  /* Blanco sobre un acento oscuro o medio; negro sobre uno muy claro. */
+  --accent-text: oklch(from var(--accent) clamp(0, calc((0.74 - l) * 100), 1) 0 0);
   --brand-ink: var(--accent);
   --chart-1: var(--accent);
 
@@ -65,7 +66,6 @@
   --tinte-20: oklch(0.64 0.14 320); /* malva */
 
   --canvas-wash: none;
-  --grain-opacity: 0;
   --glass-blur: 28px;
   --glass-sat: 160%;
   --glass-sheen: none;
@@ -74,12 +74,15 @@
 /* ---------- Claro: papel ---------- */
 :root[data-estilo="solido"]:not([data-theme="dark"]) {
   --canvas: oklch(0.972 calc(0.004 * var(--s-k)) var(--s-h));
+  --grain-opacity: 0.035;
   --s-ink: oklch(0.2 calc(0.012 * var(--s-k)) var(--s-h));
-  --accent: oklch(0.6 0.25 var(--s-h));
-  --accent-hover: oklch(0.54 0.25 var(--s-h));
-  --accent-soft: oklch(0.6 0.25 var(--s-h) / 0.12);
-  --accent-soft-text: oklch(0.52 0.24 var(--s-h));
-  --focus-ring: oklch(0.6 0.25 var(--s-h) / 0.3);
+  /* El color elegido, tal cual; sin color, el azul del ícono de la app. El
+     texto en acento se oscurece lo justo para leerse sobre el papel. */
+  --accent: var(--tint, oklch(0.6 0.25 var(--s-h)));
+  --accent-hover: oklch(from var(--accent) calc(l - 0.06) c h);
+  --accent-soft: oklch(from var(--accent) l c h / 0.12);
+  --accent-soft-text: oklch(from var(--accent) min(l, 0.52) c h);
+  --focus-ring: oklch(from var(--accent) l c h / 0.3);
   /* Cuánto color lleva el fondo de una ficha de icono. */
   --s-chip: 6%;
 
@@ -136,11 +139,13 @@
 /* ---------- Oscuro: casi negro ---------- */
 :root[data-estilo="solido"][data-theme="dark"] {
   --canvas: oklch(0.145 calc(0.006 * var(--s-k)) var(--s-h));
-  --accent: oklch(0.68 0.23 var(--s-h));
-  --accent-hover: oklch(0.73 0.22 var(--s-h));
-  --accent-soft: oklch(0.68 0.23 var(--s-h) / 0.16);
-  --accent-soft-text: oklch(0.78 0.18 var(--s-h));
-  --focus-ring: oklch(0.68 0.23 var(--s-h) / 0.35);
+  --grain-opacity: 0.06;
+  /* En oscuro el texto en acento se aclara lo justo para leerse. */
+  --accent: var(--tint, oklch(0.68 0.23 var(--s-h)));
+  --accent-hover: oklch(from var(--accent) calc(l + 0.05) c h);
+  --accent-soft: oklch(from var(--accent) l c h / 0.16);
+  --accent-soft-text: oklch(from var(--accent) max(l, 0.74) c h);
+  --focus-ring: oklch(from var(--accent) l c h / 0.35);
   --s-chip: 9%;
 
   --success: oklch(0.765 0.177 163);
@@ -318,7 +323,20 @@
    * sin contorno ni relieve, y el icono más grande dentro (`scale`: su tamaño
    * viene escrito en línea desde `Icon`). `body` en el selector le gana a las
    * reglas de cada componente. */
-  & body :is(.kpi-ico, .m-menu-ic, .d-ico, .tx-ico, .ac-ico, .sv-ico, .insight-ico, .cr-ico, .cat-ico, .acc-ico) {
+  &
+    body
+    :is(
+      .kpi-ico,
+      .m-menu-ic,
+      .d-ico,
+      .tx-ico,
+      .ac-ico,
+      .sv-ico,
+      .insight-ico,
+      .cr-ico,
+      .cat-ico,
+      .acc-ico
+    ) {
     border: 0;
     box-shadow: none;
 
@@ -342,7 +360,11 @@
 
   & body :is(.d-ico, .tx-ico, .cr-ico, .cat-ico):is([class*="tint-"]),
   & body .cr .cr-ico {
-    background: color-mix(in oklab, var(--tinte, var(--chart-1)) var(--s-chip), transparent);
+    background: color-mix(
+      in oklab,
+      var(--tinte, var(--chart-1)) var(--s-chip),
+      transparent
+    );
   }
 
   & body .insight-ico {
@@ -389,7 +411,11 @@
   }
 
   & :is(.pl-free, .stat.free) {
-    background: color-mix(in oklab, var(--tone, var(--free-tone)) 12%, transparent);
+    background: color-mix(
+      in oklab,
+      var(--tone, var(--free-tone)) 12%,
+      transparent
+    );
     box-shadow: none;
   }
 }
