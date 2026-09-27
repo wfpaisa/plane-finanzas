@@ -15,7 +15,7 @@
   import { today } from "../../lib/finance";
   import { colorsFor } from "../../lib/colors";
   import { dateYmd, money, plainNumber } from "../../lib/format";
-  import { SOURCE_LABEL, TX_TYPES } from "../../lib/labels";
+  import { accountTypeIcon, SOURCE_LABEL, TX_TYPES } from "../../lib/labels";
   import { notify } from "../../lib/notify.svelte";
   import { offline } from "../../lib/offline.svelte";
   import { colorOf } from "../../lib/palettes";
@@ -412,59 +412,61 @@
       </div>
     </div>
 
-    {#if panel}
-      <!-- El velo sobre el formulario, como detrás de un menú; tocarlo cierra el panel. -->
-      <button type="button" class="ts-scrim" aria-label="Cerrar el panel" tabindex="-1" onclick={() => (panel = null)}></button>
-      <section class="ts-panel" aria-label={panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : "Cuentas"}>
-        <div class="ts-panel-head">
-          <strong>{panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
-          <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (panel = null)}>
-            <Icon name="cancel-01" size={18} />
-          </button>
-        </div>
-
-        {#if panel === "date"}
-          <div class="ts-cal">
-            <Calendar
-              mode="day"
-              value={date}
-              onpick={(d) => {
-                date = d;
-                panel = null;
-              }}
-            />
-          </div>
-        {:else if panel === "account" || panel === "to"}
-          <div class="ts-grid">
-            {#each store.activeAccounts.filter((a) => panel === "account" || a.id !== account) as a (a.id)}
-              {@const on = (panel === "to" ? toAccount : account) === a.id}
-              <button type="button" class:on style:--c={colorOf(a.palette)} onclick={() => pickAccount(a.id)}>
-                <i class="ts-dot"></i>{a.name}
-              </button>
-            {/each}
-          </div>
-        {:else if panel === "category"}
-          <div class="ts-grid">
-            {#each cats as c (c.id)}
-              <button type="button" class:on={category === c.id} style:--c={catColor(c.id)} onclick={() => pickCategory(c.id)}>
-                <Icon name={c.icon || "tag-01"} size={20} />{c.name}
-              </button>
-            {/each}
-            <button type="button" class="none" class:on={!category} onclick={() => pickCategory("")}>Sin categoría</button>
-          </div>
-        {:else}
-          <div class="ts-keys">
-            {#each KEYS as k (k)}
-              <button type="button" aria-label={k === "back" ? "Borrar" : k === "−" ? "Restar" : k === "+" ? "Sumar" : undefined} onclick={() => press(k)}>
-                {k === "back" ? "⌫" : k}
-              </button>
-            {/each}
-            <button type="button" class="done" onclick={amountDone}>{hasSum ? "=" : "Listo"}</button>
-          </div>
-        {/if}
-      </section>
-    {/if}
   </div>
+
+  <!-- Fuera de .ts: la pantalla ya lleva un desenfoque de fondo (estilo
+       sólido) y en el teléfono uno dentro de otro no se pinta. Aparte, el
+       vidrio del panel desenfoca lo que tiene detrás. -->
+  {#if panel}
+    <section class="ts-panel" data-type={type} aria-label={panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : "Cuentas"}>
+      <div class="ts-panel-head">
+        <strong>{panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
+        <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (panel = null)}>
+          <Icon name="cancel-01" size={18} />
+        </button>
+      </div>
+
+      {#if panel === "date"}
+        <div class="ts-cal">
+          <Calendar
+            mode="day"
+            value={date}
+            onpick={(d) => {
+              date = d;
+              panel = null;
+            }}
+          />
+        </div>
+      {:else if panel === "account" || panel === "to"}
+        <div class="ts-grid">
+          {#each store.activeAccounts.filter((a) => panel === "account" || a.id !== account) as a (a.id)}
+            {@const on = (panel === "to" ? toAccount : account) === a.id}
+            <button type="button" class:on style:--c={colorOf(a.palette)} onclick={() => pickAccount(a.id)}>
+              <span class="ts-ico"><Icon name={a.icon || accountTypeIcon(a.type)} size={18} /></span>{a.name}
+            </button>
+          {/each}
+        </div>
+      {:else if panel === "category"}
+        <div class="ts-grid">
+          {#each cats as c (c.id)}
+            <button type="button" class:on={category === c.id} style:--c={catColor(c.id)} onclick={() => pickCategory(c.id)}>
+              <span class="ts-ico"><Icon name={c.icon || "tag-01"} size={18} /></span>{c.name}
+            </button>
+          {/each}
+          <button type="button" class="none" class:on={!category} onclick={() => pickCategory("")}>Sin categoría</button>
+        </div>
+      {:else}
+        <div class="ts-keys">
+          {#each KEYS as k (k)}
+            <button type="button" aria-label={k === "back" ? "Borrar" : k === "−" ? "Restar" : k === "+" ? "Sumar" : undefined} onclick={() => press(k)}>
+              {k === "back" ? "⌫" : k}
+            </button>
+          {/each}
+          <button type="button" class="done" onclick={amountDone}>{hasSum ? "=" : "Listo"}</button>
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   <ConfirmDialog
     open={confirmDelete}
@@ -804,40 +806,27 @@
   }
 
   /* En oscuro los tonos son claros: el texto encima va oscuro para leerse. */
-  :global([data-theme="dark"]) .ts :is(.ts-btn.main, .ts-keys .done) {
+  .ts-panel[data-type="income"] {
+    --tone: var(--success);
+  }
+
+  .ts-panel[data-type="transfer"] {
+    --tone: var(--transfer);
+  }
+
+  :global([data-theme="dark"]) :is(.ts .ts-btn.main, .ts-panel .ts-keys .done) {
     color: oklch(0.2 0 0);
   }
 
   /* --- El panel de abajo --- */
-  /* Desenfoca lo de atrás mientras hay un panel abierto; la fila que se
-     está llenando (`.ts-row.focus`) queda por encima, nítida. */
-  .ts-scrim {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    padding: 0;
-    border: 0;
-    background: oklch(0 0 0 / 0.18);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    cursor: default;
-    animation: fade 0.18s ease-out;
-  }
-
-  @keyframes fade {
-    from {
-      opacity: 0;
-    }
-  }
-
-  .ts-row.focus {
-    z-index: 6;
-  }
 
   .ts-panel {
-    position: absolute;
+    --tone: var(--danger);
+    position: fixed;
     inset: auto 0 0 0;
-    z-index: 10;
+    z-index: 46;
+    max-width: 40rem;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     max-height: 55dvh;
@@ -885,9 +874,10 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: var(--sp-4);
+      gap: var(--sp-6);
       min-height: 3.25rem;
-      padding: var(--sp-6) var(--sp-4);
+      /* Aire arriba y abajo: la ficha del icono no toca las rayas. */
+      padding: var(--sp-12) var(--sp-6);
       border: 0;
       border-right: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
@@ -905,10 +895,6 @@
         border-right: 0;
       }
 
-      & :global(i) {
-        color: var(--c);
-      }
-
       &:active {
         background: var(--bg-hover);
       }
@@ -922,6 +908,19 @@
         color: var(--text-muted);
       }
     }
+  }
+
+  /* La ficha del icono: el color de la cuenta o la categoría, muy
+     transparente detrás, como en las listas. */
+  .ts-ico {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    background: color-mix(in oklab, var(--c, var(--text-muted)) 8%, transparent);
+    color: var(--c, var(--text-secondary));
   }
 
   .ts-keys {
