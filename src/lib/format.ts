@@ -71,10 +71,10 @@ export function parseYmd(text: string): string | null {
   return `${y}-${pad2(mo)}-${pad2(d)}`;
 }
 
-/** "2026 · Septiembre": un mes, con el año primero como las fechas. */
-export function monthYm(ym: string): string {
+/** "2026 · Septiembre" ("2026 · Sep" corto): un mes, con el año primero como las fechas. */
+export function monthYm(ym: string, short = false): string {
   const [y, m] = parts(ym);
-  return `${y} · ${cap(MONTHS_LONG[m - 1])}`;
+  return `${y} · ${cap((short ? MONTHS : MONTHS_LONG)[m - 1])}`;
 }
 
 /** Los nombres para el calendario (lib vanilla-calendar-pro), en español. */

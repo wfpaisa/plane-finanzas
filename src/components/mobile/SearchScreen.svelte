@@ -11,6 +11,7 @@
   import Money from "../app/Money.svelte";
   import DayList from "./DayList.svelte";
   import TopBar from "./TopBar.svelte";
+  import { Calendar } from "../ui";
   import { TX_TYPES } from "../../lib/labels";
   import {
     emptyFilters,
@@ -44,7 +45,7 @@
   let loading = $state(false);
 
   const count = $derived(filterCount(filters));
-  const range = $derived(periodRange(filters.period, filters.ref));
+  const range = $derived(periodRange(filters.period, filters.ref, filters.to));
   // Sin texto ni filtros no se trae nada: "Todos" sin más sería la historia entera.
   const idle = $derived(!filters.text.trim() && !count);
 
@@ -113,8 +114,13 @@
     filters[key] = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
 
+  // El calendario del periodo, abierto bajo las fichas. Un rango lo abre
+  // solo: sin él no hay cómo elegir los días.
+  let picking = $state(false);
+
   function setPeriod(p: Period) {
     filters.period = p;
+    picking = p === "range";
   }
 
   function clearAll() {
@@ -125,7 +131,7 @@
   const chips = $derived.by(() => {
     const out: { key: string; label: string; color?: string; remove: () => void }[] = [];
     if (filters.period !== "all")
-      out.push({ key: "p", label: periodLabel(filters.period, filters.ref), remove: () => (filters.period = "all") });
+      out.push({ key: "p", label: periodLabel(filters.period, filters.ref, filters.to), remove: () => (filters.period = "all") });
     for (const id of filters.types)
       out.push({ key: `t${id}`, label: TX_TYPES.find((x) => x.id === id)?.label ?? id, remove: () => toggle("types", id) });
     for (const id of filters.accounts) {
@@ -201,14 +207,39 @@
         {/each}
         {#if filters.period !== "all"}
           <div class="se-nav">
-            <button type="button" class="btn-icon sm" aria-label="Anterior" onclick={() => (filters.ref = shiftPeriod(filters.period, filters.ref, -1))}>
-              <Icon name="arrow-left-01" size={16} />
+            {#if filters.period !== "range"}
+              <button type="button" class="btn-icon sm" aria-label="Anterior" onclick={() => (filters.ref = shiftPeriod(filters.period, filters.ref, -1))}>
+                <Icon name="arrow-left-01" size={16} />
+              </button>
+            {/if}
+            <button type="button" class="se-when" aria-expanded={picking} onclick={() => (picking = !picking)}>
+              {periodLabel(filters.period, filters.ref, filters.to)}<Icon name="calendar-03" size={14} />
             </button>
-            <span>{periodLabel(filters.period, filters.ref)}</span>
-            <button type="button" class="btn-icon sm" aria-label="Siguiente" onclick={() => (filters.ref = shiftPeriod(filters.period, filters.ref, 1))}>
-              <Icon name="arrow-right-01" size={16} />
-            </button>
+            {#if filters.period !== "range"}
+              <button type="button" class="btn-icon sm" aria-label="Siguiente" onclick={() => (filters.ref = shiftPeriod(filters.period, filters.ref, 1))}>
+                <Icon name="arrow-right-01" size={16} />
+              </button>
+            {/if}
           </div>
+          {#if picking}
+            <!-- Un calendario por forma: el día de la semana, el mes, el año o los dos días del rango. -->
+            <div class="se-cal">
+              {#key filters.period}
+                <Calendar
+                  mode={filters.period === "week" ? "day" : filters.period === "month" ? "month" : filters.period === "year" ? "year" : "range"}
+                  value={filters.period === "month" ? filters.ref.slice(0, 7) : filters.period === "year" ? filters.ref.slice(0, 4) : filters.ref}
+                  to={filters.period === "range" && filters.to >= filters.ref ? filters.to : ""}
+                  onpick={(v, to) => {
+                    if (filters.period === "range") {
+                      filters.ref = v;
+                      filters.to = to ?? v;
+                    } else filters.ref = filters.period === "month" ? `${v}-01` : filters.period === "year" ? `${v}-01-01` : v;
+                    picking = false;
+                  }}
+                />
+              {/key}
+            </div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -421,6 +452,31 @@
     width: 100%;
     font-size: var(--text-sm);
     font-weight: 600;
+  }
+
+  .se-when {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-6);
+    padding: var(--sp-6) var(--sp-8);
+    border: 0;
+    border-radius: var(--radius-pill, 99px);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+
+    &[aria-expanded="true"] {
+      background: var(--bg-field);
+    }
+  }
+
+  .se-cal {
+    width: 100%;
+    padding-top: var(--sp-4);
   }
 
   .se-done {

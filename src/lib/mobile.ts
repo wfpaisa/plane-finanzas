@@ -3,7 +3,7 @@
  * llama un movimiento en una lista.
  */
 import { addMonths, dayOf, today, weekStart, ymd } from "./finance";
-import { dateShort, monthLabel } from "./format";
+import { dateYmd, monthYm } from "./format";
 import { store } from "./store.svelte";
 import { hasTag, tagsOf } from "./tags";
 import type { Transaction } from "./types";
@@ -50,20 +50,23 @@ export const sumOf = (txs: readonly Transaction[], type: string) =>
 // dentro de un mismo filtro, basta con uno de los elegidos).
 // ---------------------------------------------------------------------------
 
-export type Period = "all" | "week" | "month" | "year";
+export type Period = "all" | "week" | "month" | "year" | "range";
 
 export const PERIODS: { id: Period; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "week", label: "Semanal" },
   { id: "month", label: "Mensual" },
   { id: "year", label: "Anual" },
+  { id: "range", label: "Rango" },
 ];
 
 export interface TxFilters {
   text: string;
   period: Period;
-  /** Un día dentro del periodo que se mira. */
+  /** Un día dentro del periodo que se mira; en un rango, el primero. */
   ref: string;
+  /** En un rango, el último día (incluido). */
+  to: string;
   types: string[];
   accounts: string[];
   categories: string[];
@@ -74,6 +77,7 @@ export const emptyFilters = (): TxFilters => ({
   text: "",
   period: "all",
   ref: today(),
+  to: today(),
   types: [],
   accounts: [],
   categories: [],
@@ -85,8 +89,9 @@ const addDays = (s: string, n: number) => {
   return ymd(new Date(y, m - 1, d + n));
 };
 
-/** [desde, hasta) del periodo, o `null` si es "Todos". */
-export function periodRange(p: Period, ref: string): [string, string] | null {
+/** [desde, hasta) del periodo, o `null` si es "Todos". `to`: el último día de un rango. */
+export function periodRange(p: Period, ref: string, to = ref): [string, string] | null {
+  if (p === "range") return [ref, addDays(to, 1)];
   if (p === "week") {
     const from = weekStart(ref);
     return [from, addDays(from, 7)];
@@ -102,7 +107,7 @@ export function periodRange(p: Period, ref: string): [string, string] | null {
   return null;
 }
 
-/** Corre el periodo `n` pasos (semanas, meses o años). */
+/** Corre el periodo `n` pasos (semanas, meses o años); un rango no se mueve. */
 export function shiftPeriod(p: Period, ref: string, n: number): string {
   if (p === "week") return addDays(ref, 7 * n);
   if (p === "month") return `${addMonths(ref.slice(0, 7), n)}-01`;
@@ -110,12 +115,14 @@ export function shiftPeriod(p: Period, ref: string, n: number): string {
   return ref;
 }
 
-export function periodLabel(p: Period, ref: string): string {
+/** Con el año primero, como las fechas: "2026 · Septiembre", "2026/09/21 – 2026/09/27". */
+export function periodLabel(p: Period, ref: string, to = ref): string {
   if (p === "week") {
     const from = weekStart(ref);
-    return `${dateShort(from)} – ${dateShort(addDays(from, 6))}`;
+    return `${dateYmd(from)} – ${dateYmd(addDays(from, 6))}`;
   }
-  if (p === "month") return monthLabel(ref.slice(0, 7), true);
+  if (p === "range") return `${dateYmd(ref)} – ${dateYmd(to)}`;
+  if (p === "month") return monthYm(ref.slice(0, 7));
   if (p === "year") return ref.slice(0, 4);
   return "Todos";
 }
@@ -125,7 +132,7 @@ export const filterCount = (f: TxFilters) =>
   (f.period !== "all" ? 1 : 0) + f.types.length + f.accounts.length + f.categories.length + f.tags.length;
 
 export function passes(t: Transaction, f: TxFilters): boolean {
-  const range = periodRange(f.period, f.ref);
+  const range = periodRange(f.period, f.ref, f.to);
   const d = t.date.slice(0, 10);
   return (
     (!range || (d >= range[0] && d < range[1])) &&

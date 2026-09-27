@@ -1,11 +1,12 @@
 <!--
-  ‹ sept 2026 › — o solo el año. Tocar el mes despliega un selector: el año
-  con sus flechas y los doce meses (o doce años, si se ve por año).
+  ‹ 2026 · Sep › — o solo el año. Tocar el mes despliega el calendario de
+  meses (o de años, si se ve por año), el mismo del escritorio.
 -->
 <script lang="ts">
   import Icon from "../Icon.svelte";
-  import { addMonths, today } from "../../lib/finance";
-  import { monthLabel } from "../../lib/format";
+  import { addMonths } from "../../lib/finance";
+  import { monthYm } from "../../lib/format";
+  import { Calendar } from "../ui";
   import { closeOnBack } from "../../lib/router.svelte";
 
   let { ym = $bindable(), yearly = false }: { ym: string; yearly?: boolean } = $props();
@@ -17,14 +18,6 @@
   let pop = $state<HTMLDivElement | null>(null);
   let open = $state(false);
 
-  /** El año que se está viendo en el selector; por año, el último de la página de doce. */
-  let shown = $state(0);
-  const year = $derived(Number(ym.slice(0, 4)));
-  const now = today().slice(0, 7);
-
-  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const years = $derived(Array.from({ length: 12 }, (_, i) => shown - 11 + i));
-
   // El botón de atrás del teléfono lo cierra.
   $effect(() => {
     if (open) return closeOnBack(() => pop?.hidePopover());
@@ -32,8 +25,6 @@
 
   function onToggle(e: ToggleEvent) {
     open = e.newState === "open";
-    // Al abrir, el año del mes elegido; por año, una página que lo incluya.
-    if (open) shown = yearly ? Math.max(year, Number(now.slice(0, 4))) : year;
   }
 
   function pick(next: string) {
@@ -54,7 +45,7 @@
     aria-label={yearly ? "Elegir año" : "Elegir mes"}
     style:anchor-name="--{id}"
   >
-    {yearly ? ym.slice(0, 4) : monthLabel(ym)}
+    {yearly ? ym.slice(0, 4) : monthYm(ym, true)}
   </button>
   <button type="button" class="btn-icon sm" aria-label={yearly ? "Año siguiente" : "Mes siguiente"} onclick={() => (ym = addMonths(ym, step))}>
     <Icon name="arrow-right-01" size={20} />
@@ -62,34 +53,14 @@
 </div>
 
 <div bind:this={pop} {id} class="mn-pop" popover style:position-anchor="--{id}" ontoggle={onToggle}>
-  <div class="mn-head">
-    <button type="button" class="btn-icon sm" aria-label="Antes" onclick={() => (shown -= yearly ? 12 : 1)}>
-      <Icon name="arrow-left-01" size={18} />
-    </button>
-    <span>{yearly ? `${years[0]} – ${years[11]}` : shown}</span>
-    <button type="button" class="btn-icon sm" aria-label="Después" onclick={() => (shown += yearly ? 12 : 1)}>
-      <Icon name="arrow-right-01" size={18} />
-    </button>
-  </div>
-  <div class="mn-grid">
-    {#if yearly}
-      {#each years as y (y)}
-        <button
-          type="button"
-          class:on={y === year}
-          class:today={String(y) === now.slice(0, 4)}
-          onclick={() => pick(`${y}${ym.slice(4)}`)}>{y}</button
-        >
-      {/each}
-    {:else}
-      {#each months as m (m)}
-        {@const key = `${shown}-${m}`}
-        <button type="button" class:on={key === ym} class:today={key === now} onclick={() => pick(key)}>
-          {monthLabel(key).split(" ")[0]}
-        </button>
-      {/each}
-    {/if}
-  </div>
+  <!-- Montado solo abierto: así abre siempre en el mes o el año elegido. -->
+  {#if open}
+    <Calendar
+      mode={yearly ? "year" : "month"}
+      value={yearly ? ym.slice(0, 4) : ym}
+      onpick={(v) => pick(yearly ? `${v}${ym.slice(4)}` : v)}
+    />
+  {/if}
 </div>
 
 <style>
@@ -102,6 +73,7 @@
   .mn-label {
     min-width: 5.5rem;
     padding: var(--sp-4) var(--sp-8);
+    white-space: nowrap;
     border: 0;
     border-radius: var(--radius-pill, 99px);
     background: none;
@@ -168,48 +140,4 @@
     }
   }
 
-  .mn-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: var(--sp-6);
-
-    & span {
-      font-family: var(--font-num, inherit);
-      font-size: var(--text-sm);
-      font-weight: 600;
-    }
-  }
-
-  .mn-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--sp-4);
-
-    & button {
-      min-height: 2.5rem;
-      border: 0;
-      border-radius: var(--radius-pill, 99px);
-      background: none;
-      font: inherit;
-      font-size: var(--text-sm);
-      color: var(--text-secondary);
-      cursor: pointer;
-
-      &:active {
-        background: var(--bg-field);
-      }
-
-      &.today {
-        color: var(--accent);
-        font-weight: 600;
-      }
-
-      &.on {
-        background: var(--accent);
-        color: var(--accent-text);
-        font-weight: 600;
-      }
-    }
-  }
 </style>

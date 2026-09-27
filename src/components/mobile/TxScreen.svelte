@@ -413,6 +413,8 @@
     </div>
 
     {#if panel}
+      <!-- El velo sobre el formulario, como detrás de un menú; tocarlo cierra el panel. -->
+      <button type="button" class="ts-scrim" aria-label="Cerrar el panel" tabindex="-1" onclick={() => (panel = null)}></button>
       <section class="ts-panel" aria-label={panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : "Cuentas"}>
         <div class="ts-panel-head">
           <strong>{panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
@@ -807,9 +809,35 @@
   }
 
   /* --- El panel de abajo --- */
+  /* Desenfoca lo de atrás mientras hay un panel abierto; la fila que se
+     está llenando (`.ts-row.focus`) queda por encima, nítida. */
+  .ts-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    padding: 0;
+    border: 0;
+    background: oklch(0 0 0 / 0.18);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    cursor: default;
+    animation: fade 0.18s ease-out;
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .ts-row.focus {
+    z-index: 6;
+  }
+
   .ts-panel {
     position: absolute;
     inset: auto 0 0 0;
+    z-index: 10;
     display: flex;
     flex-direction: column;
     max-height: 55dvh;
