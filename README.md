@@ -57,7 +57,7 @@ En **Análisis** comparas ingresos y gastos por semana, mes o año, y ves el rep
 ![Análisis](docs/capturas/analisis.png)
 
 ### Ahorrar con metas
-Crea ahorros con **meta, aporte mensual y rentabilidad**. La app calcula para cuándo llegas a la meta. Un ahorro se puede repartir entre varias cuentas y **compartir con otra persona** (por ejemplo, un viaje en pareja). Los aportes pueden ser automáticos.
+Crea ahorros con **meta, aporte mensual y rentabilidad**. La app calcula para cuándo llegas a la meta. Un ahorro se puede repartir entre varias cuentas y **compartir con otra persona** (por ejemplo, un viaje en pareja): cada quien pone su propio aporte al mes y el del ahorro es la suma de todos. Los aportes pueden ser automáticos.
 
 ![Ahorros](docs/capturas/ahorros.png)
 
@@ -91,7 +91,7 @@ Además **funciona sin internet**: lo que anotes sin señal se guarda en el tel�
 
 ### Y además…
 - **Reglas automáticas**: "si el movimiento dice *Netflix*, es Entretenimiento". Las categorías también aprenden con palabras clave (por ejemplo `exito, carulla, d1` → Mercado).
-- **Modo claro y oscuro**.
+- **Modo claro y oscuro**, y un estilo sólido (sin degradados) para quien prefiere colores planos.
 - **Respaldo**: exporta todos tus datos a un archivo y vuelve a cargarlos cuando quieras, incluso en otro servidor.
 - **Varios usuarios**: cada persona se registra con su correo y solo ve sus datos.
 
