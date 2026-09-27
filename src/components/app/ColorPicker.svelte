@@ -122,9 +122,17 @@
     clip-path: inset(50%);
   }
 
-  .color-text {
+  /* Va dentro del contorno de `.color-hex`: sin el aspecto de campo que
+     `.field input` le pondría (sombra hundida, esquinas, relleno), que se
+     veía como un segundo borde. */
+  .color-text,
+  .color-text:focus {
     width: 5.5rem;
+    height: auto;
+    padding: 0;
     border: 0;
+    border-radius: 0;
+    box-shadow: none;
     background: transparent;
     color: var(--text-primary);
     font-family: var(--font-mono);

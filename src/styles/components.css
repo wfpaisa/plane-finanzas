@@ -2850,7 +2850,10 @@ input[type="range"].field-control {
     justify-self: start;
   }
 
-  & button {
+  /* Las opciones del menú. No los botones de lo que va dentro de uno --las
+     pestañas con su pastilla, el calendario, un botón de verdad--, que
+     traen su propio aspecto. */
+  & button:not(.btn, :is(.chips, .tab-list, .calendar) *) {
     display: flex;
     align-items: center;
     gap: 0.5625rem;
