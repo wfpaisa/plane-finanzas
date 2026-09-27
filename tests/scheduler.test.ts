@@ -31,8 +31,11 @@ function fakeApp(rows: { recurring?: Fields[]; savings?: Fields[]; accounts?: Fi
   const saved: FakeRecord[] = [];
   return {
     saved,
-    findRecordsByFilter: (col: "recurring" | "savings" | "saving_movements") =>
-      (rows[col] ?? []).map((f, i) => record(String(f.id ?? `${col}${i}`), f)),
+    // De los aportes solo se busca el último de una persona, con cuenta.
+    findRecordsByFilter: (col: "recurring" | "savings" | "saving_movements", _f: string, _s: string, _l: number, _o: number, params?: { u?: string }) =>
+      (rows[col] ?? [])
+        .filter((f) => col !== "saving_movements" || (f.created_by === params?.u && f.account))
+        .map((f, i) => record(String(f.id ?? `${col}${i}`), f)),
     findCollectionByNameOrId: (name: string) => name,
     findRecordById: (_col: string, id: string) => {
       const a = (rows.accounts ?? []).find((x) => x.id === id);
@@ -41,9 +44,11 @@ function fakeApp(rows: { recurring?: Fields[]; savings?: Fields[]; accounts?: Fi
     },
     // "¿Ya existe esta marca?": se busca entre lo guardado en esta corrida y
     // los aportes de antes. Con `~`, la marca empieza así.
-    findFirstRecordByFilter: (_col: string, filter: string, params: { k: string }) => {
-      const same = (ext: unknown) => (filter.includes("~") ? String(ext ?? "").startsWith(params.k) : ext === params.k);
-      const hit = saved.find((r) => same(r.fields.external_id)) ?? (rows.saving_movements ?? []).find((m) => same(m.external_id));
+    // Con `created_by`, además, de esa persona.
+    findFirstRecordByFilter: (_col: string, filter: string, params: { k: string; u?: string }) => {
+      const byWho = (f: Fields) => !filter.includes("created_by") || f.created_by === params.u;
+      const same = (f: Fields) => byWho(f) && (filter.includes("~") ? String(f.external_id ?? "").startsWith(params.k) : f.external_id === params.k);
+      const hit = saved.find((r) => same(r.fields)) ?? (rows.saving_movements ?? []).find((m) => same(m));
       if (!hit) throw new Error("no está");
       return hit;
     },
@@ -140,6 +145,30 @@ describe("aportes automáticos", () => {
     s.runSavings(app, "u");
     s.runSavings(app, "u");
     expect(app.saved.length).toBe(0);
+  });
+
+  test("en uno compartido, cada persona su parte desde su última cuenta", () => {
+    at("2026-09-26");
+    const app = fakeApp({
+      savings: [{ id: "s", owner: "u", members: ["v", "w"], shares: { u: 400000, v: 300000, w: 0 }, monthly_amount: 700000, day_of_month: 1 }],
+      saving_movements: [
+        { saving: "s", account: "a", created_by: "u", amount: 1, external_id: "" },
+        { saving: "s", account: "b", created_by: "v", amount: 1, external_id: "" },
+      ],
+    });
+    s.runSavings(app, "u");
+    s.runSavings(app, "v");
+    expect(app.saved.map((r) => r.fields)).toEqual([
+      expect.objectContaining({ account: "a", created_by: "u", amount: 400000, external_id: "auto:2026-09:a" }),
+      expect.objectContaining({ account: "b", created_by: "v", amount: 300000, external_id: "auto:2026-09:b:v" }),
+    ]);
+  });
+
+  test("compartido sin reparto: todo lo pone el dueño", () => {
+    at("2026-09-26");
+    const app = fakeApp({ savings: [{ id: "s", owner: "u", members: ["v"], shares: null, monthly_amount: 1000, day_of_month: 1 }] });
+    s.runSavings(app, "v");
+    expect(app.saved.map((r) => r.fields)).toEqual([expect.objectContaining({ created_by: "u", amount: 1000 })]);
   });
 
   test("antes de su día no aporta", () => {

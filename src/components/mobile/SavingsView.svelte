@@ -79,7 +79,9 @@
   }
 
   const canEdit = (m: SavingMovement) => m.created_by === session.id || store.saving(m.saving)?.owner === session.id;
-  const accountName = (id: string) => store.account(id)?.name ?? (id ? "Cuenta de otra persona" : "Sin cuenta");
+  const accountName = (id: string) => store.account(id)?.name ?? (id ? "Otra cuenta" : "Sin cuenta");
+  /** De otra persona: en una cuenta suya, o sin cuenta y anotado por ella. */
+  const isForeign = (m: SavingMovement) => (m.account ? !store.account(m.account) : m.created_by !== session.id);
 
   function toggle(id: string) {
     if (opened.has(id)) opened.delete(id);
@@ -127,6 +129,7 @@
 {#each list as s (s.id)}
   {@const now = store.savingCurrent(s.id)}
   {@const e = eta(s, now)}
+  {@const holders = store.savingHolders(s.id)}
   {@const pct = s.target_amount ? Math.min(100, Math.max(0, (now / s.target_amount) * 100)) : 0}
   {@const movs = movsBySaving.get(s.id) ?? []}
   {@const open = opened.has(s.id)}
@@ -155,14 +158,15 @@
     {/if}
     {#if open}
       <div class="sv-body">
-        {#if store.savingAccounts(s.id).length}
+        {#if holders.length}
+          <!-- Las cuentas propias y, debajo, lo de cada persona en las suyas. -->
           <div class="sv-accs">
-            {#each store.savingAccounts(s.id) as a (a.account)}
-              {@const acc = store.account(a.account)}
-              <span class="sv-acc"
-                ><i style:background={colorOf(acc?.palette)}></i>{a.account ? (acc?.name ?? "Otra cuenta") : "Sin cuenta"}
-                <Money value={a.amount} /></span
-              >
+            {#each holders as h (h.key)}
+              {#if h.person}
+                <span class="sv-acc"><Icon name="user" size={11} />{store.personName(h.person)} <Money value={h.amount} /></span>
+              {:else}
+                <span class="sv-acc"><i style:background={colorOf(store.account(h.account ?? "")?.palette)}></i>{accountName(h.account ?? "")} <Money value={h.amount} /></span>
+              {/if}
             {/each}
           </div>
         {/if}
@@ -174,7 +178,7 @@
                   <span class="mv-kind" class:out={m.amount < 0}><Icon name={m.amount < 0 ? "trade-down" : "trade-up"} size={14} /></span>
                   <span class="mv-main">
                     <span>{m.note && m.note !== "Aporte" && m.note !== "Retiro" ? m.note : m.amount < 0 ? "Retiro" : "Aporte"}</span>
-                    <span class="sv-sub">{dateShort(m.date)} {m.date.slice(0, 4)} · {accountName(m.account)}</span>
+                    <span class="sv-sub">{dateShort(m.date)} {m.date.slice(0, 4)} · {isForeign(m) ? store.personName(m.created_by) : accountName(m.account)}</span>
                   </span>
                   <span class="mv-amt">
                     <Money value={m.amount} tone="auto" />

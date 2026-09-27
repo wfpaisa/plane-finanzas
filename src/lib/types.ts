@@ -92,7 +92,13 @@ export interface Saving extends RecordModel {
   palette: string;
   target_amount: number;
   target_date: string;
+  /** En uno compartido, la suma de lo que pone cada quien (`shares`). */
   monthly_amount: number;
+  /**
+   * En uno compartido, cuánto pone al mes cada persona: `{ idDelUsuario: 200000 }`.
+   * Vacío, todo el aporte es del dueño.
+   */
+  shares: Record<string, number> | null;
   day_of_month: number;
   annual_rate: number;
   allocations: Allocation[] | null;

@@ -149,7 +149,9 @@
     return n ? `${n} ${n === 1 ? "movimiento" : "movimientos"}` : "Sin movimientos";
   }
 
-  const accountName = (id: string) => store.account(id)?.name ?? (id ? "Cuenta de otra persona" : "Sin cuenta");
+  const accountName = (id: string) => store.account(id)?.name ?? (id ? "Otra cuenta" : "Sin cuenta");
+  /** De otra persona: en una cuenta suya, o sin cuenta y anotado por ella. */
+  const isForeign = (m: SavingMovement) => (m.account ? !store.account(m.account) : m.created_by !== session.id);
 </script>
 
 <div class="page">
@@ -196,6 +198,7 @@
             {#each list as s (s.id)}
               {@const current = store.savingCurrent(s.id)}
               {@const e = eta(s, current)}
+              {@const holders = store.savingHolders(s.id)}
               {@const pct = s.target_amount ? Math.min(100, Math.max(0, (current / s.target_amount) * 100)) : 0}
               <tr class:sv-archived={s.archived}>
                 <td class="sv-check">
@@ -233,14 +236,15 @@
                 </td>
                 <td class="sv-cell">
                   <!-- Dónde está, según sus movimientos. -->
-                  {#if store.savingAccounts(s.id).length}
+                  {#if holders.length}
                     <span class="alloc-chips">
-                      {#each store.savingAccounts(s.id) as a (a.account)}
-                        {@const acc = store.account(a.account)}
-                        <span class="alloc-chip"
-                          ><i style:background={colorOf(acc?.palette)}></i>{a.account ? (acc?.name ?? "Otra cuenta") : "Sin cuenta"}
-                          <Money value={a.amount} /></span
-                        >
+                      <!-- Las cuentas propias y, debajo, lo de cada persona en las suyas. -->
+                      {#each holders as h (h.key)}
+                        {#if h.person}
+                          <span class="alloc-chip"><Icon name="user" size={11} />{store.personName(h.person)} <Money value={h.amount} /></span>
+                        {:else}
+                          <span class="alloc-chip"><i style:background={colorOf(store.account(h.account ?? "")?.palette)}></i>{accountName(h.account ?? "")} <Money value={h.amount} /></span>
+                        {/if}
                       {/each}
                     </span>
                   {:else}—{/if}
@@ -294,7 +298,11 @@
                                 {#if m.note && m.note !== "Aporte" && m.note !== "Retiro"}<span class="mov-note">{m.note}</span>{/if}
                               </td>
                               <td class="mov-acc">
-                                <span class="alloc-chip"><i style:background={colorOf(acc?.palette)}></i>{accountName(m.account)}</span>
+                                {#if isForeign(m)}
+                                  <span class="alloc-chip"><Icon name="user" size={11} />{store.personName(m.created_by)}</span>
+                                {:else}
+                                  <span class="alloc-chip"><i style:background={colorOf(acc?.palette)}></i>{accountName(m.account)}</span>
+                                {/if}
                               </td>
                               <td class="num"><Money value={m.amount} tone="auto" /></td>
                               <td class="num mov-after"><Money value={after} /></td>
@@ -590,6 +598,8 @@
   .alloc-chips {
     display: flex;
     flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
     max-width: 18rem;
     gap: var(--sp-6);
   }

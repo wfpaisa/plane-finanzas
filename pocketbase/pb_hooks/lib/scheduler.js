@@ -118,19 +118,36 @@ function runRecurring(app, userId) {
 }
 
 /**
- * La cuenta donde el dueño guardó por última vez en ese ahorro: el ahorro no
- * tiene una cuenta fija, la dice cada movimiento. Sin ninguno, sin cuenta.
+ * La cuenta donde esa persona guardó por última vez en ese ahorro: el ahorro
+ * no tiene una cuenta fija, la dice cada movimiento. Sin ninguno, sin cuenta.
  */
-function lastAccount(app, savingId, owner) {
+function lastAccount(app, savingId, userId) {
   var list = app.findRecordsByFilter(
     "saving_movements",
     "saving = {:s} && created_by = {:u} && account != ''",
     "-date,-created",
     1,
     0,
-    { s: savingId, u: owner },
+    { s: savingId, u: userId },
   );
   return list.length ? list[0].getString("account") : "";
+}
+
+/**
+ * Cuánto pone al mes cada persona: `shares` en uno compartido, y si no hay
+ * reparto, todo el dueño. Ver src/lib/store.svelte.ts.
+ */
+function sharesOf(s) {
+  var shares = null;
+  try {
+    shares = JSON.parse(s.getString("shares") || "null");
+  } catch (_) {}
+  var out = [];
+  if (shares && typeof shares === "object") {
+    for (var id in shares) if (+shares[id] > 0) out.push({ user: id, amount: +shares[id] });
+    if (Object.keys(shares).length) return out;
+  }
+  return [{ user: s.getString("owner"), amount: s.getFloat("monthly_amount") }];
 }
 
 function runSavings(app, userId) {
@@ -146,24 +163,31 @@ function runSavings(app, userId) {
     var dom = Math.min(s.getInt("day_of_month") || 1, lastDay(t.y, t.m));
     if (t.d < dom) continue;
     var date = ym + "-" + pad(dom);
-    var monthly = s.getFloat("monthly_amount");
     var owner = s.getString("owner");
-    // Uno por ahorro y mes. Los de antes llevaban la cuenta en la marca
-    // ("auto:<mes>:<cuenta>"): cualquiera de ese mes cuenta.
-    if (has(app, "saving_movements", "saving = {:s} && external_id ~ {:k}", { s: s.id, k: "auto:" + ym + ":" })) continue;
-    var account = lastAccount(app, s.id, owner);
-    var key = "auto:" + ym + ":" + (account || "sin-cuenta");
+    var parts = sharesOf(s);
 
-    var mv = new Record(col);
-    mv.set("saving", s.id);
-    if (account) mv.set("account", account);
-    mv.set("created_by", owner);
-    mv.set("amount", Math.round(monthly));
-    mv.set("date", date + " 12:00:00.000Z");
-    mv.set("note", "Aporte automático");
-    mv.set("external_id", key);
-    app.save(mv);
-    created++;
+    // En uno compartido, cada persona aporta su parte desde su última cuenta.
+    for (var j = 0; j < parts.length; j++) {
+      var who = parts[j].user;
+      // Uno por persona, ahorro y mes. Los de antes llevaban la cuenta en la
+      // marca ("auto:<mes>:<cuenta>"): cualquiera de ese mes cuenta.
+      if (has(app, "saving_movements", "saving = {:s} && created_by = {:u} && external_id ~ {:k}", { s: s.id, u: who, k: "auto:" + ym + ":" })) continue;
+      var account = lastAccount(app, s.id, who);
+      // La marca es única por ahorro: la de los demás lleva quién es, para
+      // que dos "sin-cuenta" no choquen. La del dueño sigue como antes.
+      var key = "auto:" + ym + ":" + (account || "sin-cuenta") + (who === owner ? "" : ":" + who);
+
+      var mv = new Record(col);
+      mv.set("saving", s.id);
+      if (account) mv.set("account", account);
+      mv.set("created_by", who);
+      mv.set("amount", Math.round(parts[j].amount));
+      mv.set("date", date + " 12:00:00.000Z");
+      mv.set("note", "Aporte automático");
+      mv.set("external_id", key);
+      app.save(mv);
+      created++;
+    }
   }
   return created;
 }

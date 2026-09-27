@@ -50,12 +50,16 @@ const total = $derived(
  * Los aportes sumados: por ahorro, por cuenta, lo de cada ahorro en las
  * cuentas propias y, de cada cuenta, cuánto es de cada ahorro. La cuenta la
  * dice cada movimiento: el ahorro no tiene una fija.
+ *
+ * `holders` dice dónde está cada ahorro: en qué cuentas propias y cuánto en
+ * las de cada una de las demás personas, que no se ven y se suman por persona.
  */
 const saved = $derived.by(() => {
   const bySaving = new Map<string, number>();
   const byAccount = new Map<string, number>();
   const mine = new Map<string, number>();
   const split = new Map<string, Map<string, number>>();
+  const holders = new Map<string, { accounts: Map<string, number>; people: Map<string, number> }>();
   const add = (map: Map<string, number>, key: string, v: number) => map.set(key, (map.get(key) ?? 0) + v);
   for (const m of movements) {
     add(bySaving, m.saving, m.amount);
@@ -64,18 +68,29 @@ const saved = $derived.by(() => {
     if (!per) split.set(m.account, (per = new Map()));
     add(per, m.saving, m.amount);
     // Sin cuenta, es de quien lo anotó.
-    if (m.account ? accountIds.has(m.account) : m.created_by === session.id) add(mine, m.saving, m.amount);
+    const own = m.account ? accountIds.has(m.account) : m.created_by === session.id;
+    if (own) add(mine, m.saving, m.amount);
+    let h = holders.get(m.saving);
+    if (!h) holders.set(m.saving, (h = { accounts: new Map(), people: new Map() }));
+    if (own) add(h.accounts, m.account, m.amount);
+    else add(h.people, m.created_by, m.amount);
   }
-  return { bySaving, byAccount, mine, split };
+  return { bySaving, byAccount, mine, split, holders };
 });
 
+/** Cuánto pone al mes cada persona en un ahorro. Sin reparto, todo lo pone el dueño. */
+function sharesOf(s: Saving): Record<string, number> {
+  return s.shares && Object.keys(s.shares).length ? s.shares : { [s.owner]: s.monthly_amount || 0 };
+}
+
 /**
- * La parte del aporte mensual de un ahorro que le toca a esta persona: el
- * aporte del mes lo hace el dueño (ver pb_hooks/lib/scheduler.js); en uno
- * compartido, los demás aportan cuando quieren, desde sus cuentas.
+ * La parte del aporte mensual de un ahorro que le toca a esta persona: en uno
+ * compartido, lo que definió para sí (ver pb_hooks/lib/scheduler.js).
  */
 function shareOf(s: Saving): number {
-  return s.owner === session.id ? 1 : 0;
+  const total = s.monthly_amount || 0;
+  if (!total) return s.owner === session.id ? 1 : 0;
+  return Math.min(1, (sharesOf(s)[session.id] ?? 0) / total);
 }
 
 /**
@@ -340,14 +355,32 @@ export const store = {
       .map(([saving, amount]) => ({ saving, amount }))
       .sort((a, b) => b.amount - a.amount);
   },
-  /** En qué cuentas está un ahorro y cuánto en cada una, según sus movimientos. */
-  savingAccounts(savingId: string): { account: string; amount: number }[] {
-    const out: { account: string; amount: number }[] = [];
-    for (const [account, per] of saved.split) {
-      const amount = per.get(savingId) ?? 0;
-      if (Math.abs(amount) >= 0.5) out.push({ account, amount });
+  /** Cuánto pone al mes cada persona en un ahorro (`{ idDelUsuario: valor }`). */
+  savingShares(s: Saving) {
+    return sharesOf(s);
+  },
+  /**
+   * Dónde está un ahorro, según sus movimientos: primero cada cuenta propia
+   * (`account`; vacía es "sin cuenta") y después cada una de las demás
+   * personas (`person`), con lo que tiene en sus cuentas sumado.
+   */
+  savingHolders(savingId: string): { key: string; account?: string; person?: string; amount: number }[] {
+    const h = saved.holders.get(savingId);
+    if (!h) return [];
+    const byAmount = (a: { amount: number }, b: { amount: number }) => b.amount - a.amount;
+    const kept = ([, amount]: [string, number]) => Math.abs(amount) >= 0.5;
+    return [
+      ...[...h.accounts].filter(kept).map(([account, amount]) => ({ key: `a:${account}`, account, amount })).sort(byAmount),
+      ...[...h.people].filter(kept).map(([person, amount]) => ({ key: `p:${person}`, person, amount })).sort(byAmount),
+    ];
+  },
+  /** El nombre de alguien que comparte un ahorro con esta persona. */
+  personName(userId: string): string {
+    for (const s of savings) {
+      const u = s.expand?.owner?.id === userId ? s.expand.owner : s.expand?.members?.find((m) => m.id === userId);
+      if (u) return u.name || u.email || "Otra persona";
     }
-    return out.sort((a, b) => b.amount - a.amount);
+    return "Otra persona";
   },
   /** La cuenta del último aporte propio a un ahorro: la de partida para el siguiente. */
   lastSavingAccount(savingId: string): string {

@@ -1,6 +1,9 @@
 <!--
   Crear o editar un ahorro: cuánto al mes, la meta, el rendimiento y con
   quién se comparte. En qué cuenta está el dinero lo dice cada movimiento.
+
+  En uno compartido cada persona define su propio aporte (`shares`); el del
+  ahorro es la suma.
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -37,6 +40,19 @@
   let confirmDelete = $state(false);
 
   const mine = $derived(!saving || saving.owner === session.id);
+  const shared = $derived(members.length > 0 || !mine);
+  /** Lo que ponen las demás personas que siguen en el ahorro. */
+  const others = $derived.by(() => {
+    if (!saving || !shared) return [];
+    const shares = store.savingShares(saving);
+    const ids = [saving.owner, ...members.map((m) => m.id)].filter((id) => id !== session.id);
+    const named = (id: string) => {
+      const u = members.find((m) => m.id === id);
+      return u ? u.name || u.email || "Otra persona" : store.personName(id);
+    };
+    return ids.map((id) => ({ id, name: named(id), amount: shares[id] ?? 0 }));
+  });
+  const total = $derived(monthly + others.reduce((a, o) => a + o.amount, 0));
 
   // Se llena al abrir o al cambiar de saving, y solo entonces: lo demás que
   // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
@@ -48,7 +64,9 @@
       name = saving?.name ?? "";
       icon = saving?.icon || "piggy-bank";
       color = saving?.palette ? colorOf(saving.palette) : "#00bba7";
-      monthly = saving?.monthly_amount ?? 0;
+      // En uno compartido, solo lo propio: lo de los demás lo define cada quien.
+      const isShared = !!saving && (saving.owner !== session.id || !!saving.members?.length);
+      monthly = !saving ? 0 : isShared ? (store.savingShares(saving)[session.id] ?? 0) : saving.monthly_amount || 0;
       day = saving?.day_of_month || 1;
       rate = saving?.annual_rate ?? 0;
       target = saving?.target_amount ?? 0;
@@ -70,6 +88,21 @@
   });
   const needed = $derived(target && monthsLeft > 0 ? monthlyNeeded(current, rate, target, monthsLeft) : 0);
 
+  /**
+   * El reparto que se guarda: lo último de los demás (pudieron cambiarlo
+   * mientras este formulario estaba abierto), lo propio, y nadie que ya no esté.
+   */
+  async function sharesToSave(): Promise<Record<string, number>> {
+    const fresh = saving ? await pb.collection("savings").getOne<Saving>(saving.id) : null;
+    const owner = saving?.owner ?? session.id;
+    const keep = new Set([owner, ...members.map((m) => m.id)]);
+    const out: Record<string, number> = {};
+    for (const [id, v] of Object.entries(fresh ? store.savingShares(fresh) : {})) if (keep.has(id) && v > 0) out[id] = v;
+    if (monthly > 0) out[session.id] = monthly;
+    else delete out[session.id];
+    return out;
+  }
+
   async function addMember() {
     const email = memberEmail.trim();
     if (!email) return;
@@ -87,11 +120,13 @@
     if (!name.trim()) return notify.fail(new Error("Ponle nombre al ahorro."));
     busy = true;
     try {
-      const data = {
+      const shares = shared ? await sharesToSave() : {};
+      const data: Record<string, unknown> = {
         name: name.trim(),
         icon,
         palette: color,
-        monthly_amount: monthly,
+        monthly_amount: shared ? Object.values(shares).reduce((a, v) => a + v, 0) : monthly,
+        shares,
         day_of_month: day,
         annual_rate: rate,
         target_amount: target,
@@ -101,8 +136,9 @@
         auto,
         archived,
         notes,
-        members: members.map((m) => m.id),
       };
+      // Con quién se comparte lo decide solo el dueño: si lo manda otro, no se guarda nada.
+      if (mine) data.members = members.map((m) => m.id);
       if (saving) await pb.collection("savings").update(saving.id, data);
       else await pb.collection("savings").create({ ...data, owner: session.id });
       await reload("savings");
@@ -135,17 +171,28 @@
   <div class="saving-form">
     <div class="form-grid">
       <Field label="Nombre" tip="El objetivo para el que guardas dinero. Así aparecerá en Ahorros, Resumen y Plan futuro."><Input bind:value={name} placeholder="Viajes, imprevistos, vejez…" autofocus /></Field>
-      <Field label="Cuánto guardarás al mes" tip="Esta cantidad se reserva cada mes y deja de contarse como dinero disponible para otros gastos."><MoneyInput bind:value={monthly} /></Field>
+      {#if shared}
+        <Field label="Tu aporte al mes" tip="Lo que pones tú cada mes, desde tus cuentas. Cada persona define el suyo y el aporte del ahorro es la suma. Solo tu parte deja de contarse como dinero disponible."><MoneyInput bind:value={monthly} /></Field>
+      {:else}
+        <Field label="Cuánto guardarás al mes" tip="Esta cantidad se reserva cada mes y deja de contarse como dinero disponible para otros gastos."><MoneyInput bind:value={monthly} /></Field>
+      {/if}
       <Field label="Día del aporte" tip="Día del mes en que se registra el aporte automático. Si el mes es más corto, se usa su último día."><Input type="number" min="1" max="31" bind:value={day} /></Field>
       <Field label="Interés anual (%)" tip="El porcentaje que esperas ganar en un año por tener este dinero guardado. Se usa solo para calcular el futuro. Escribe 0 si la cuenta no paga intereses."><Input type="number" min="0" max="100" step="0.1" bind:value={rate} /></Field>
       <Field label="Objetivo de ahorro (opcional)" tip="Cantidad total que deseas ahorrar. La barra mostrará el avance hacia este objetivo."><MoneyInput bind:value={target} /></Field>
       <Field label="Fecha objetivo (opcional)" tip="Fecha en la que deseas completar el ahorro. Con la cantidad y la fecha objetivo, se calcula el aporte mensual necesario."><input type="date" class="field-control w-full" bind:value={targetDate} /></Field>
     </div>
 
+    {#if others.length}
+      <p class="shares">
+        {#each others as o (o.id)}<span>{o.name} <Money value={o.amount} /></span>{/each}
+        <span class="shares-total">Entre todos <b><Money value={total} /></b> al mes</span>
+      </p>
+    {/if}
+
     {#if needed > 0}
       <p class="hint-box">
         <Icon name="target-01" />Para ahorrar <Money value={target} /> en {monthsLeft} meses, el aporte mensual necesario es
-        <b><Money value={needed} /></b>{monthly >= needed ? ". El aporte definido es suficiente." : "."}
+        <b><Money value={needed} /></b>{shared ? " entre todos" : ""}{total >= needed ? ". El aporte definido es suficiente." : "."}
       </p>
     {/if}
 
@@ -175,7 +222,7 @@
     <div class="flex flex-wrap gap-5">
       <span class="label-tip">
         <Switch bind:checked={auto} label="Aportar automáticamente" />
-        <InfoTip text="En el día elegido, la aplicación registrará esta cantidad como ahorro, en la cuenta de tu último aporte. El proceso se ejecuta diariamente a las 6:00 a. m. y no mueve dinero en el banco." />
+        <InfoTip text={shared ? "En el día elegido, la aplicación registrará el aporte de cada persona, en la cuenta de su último aporte. El proceso se ejecuta diariamente a las 6:00 a. m. y no mueve dinero en el banco." : "En el día elegido, la aplicación registrará esta cantidad como ahorro, en la cuenta de tu último aporte. El proceso se ejecuta diariamente a las 6:00 a. m. y no mueve dinero en el banco."} />
       </span>
       {#if saving}
         <span class="label-tip">
@@ -229,6 +276,20 @@
     background: var(--accent-soft);
     color: var(--accent-soft-text);
     font-size: var(--text-sm);
+  }
+
+  /* El aporte de los demás y el de todos, debajo del propio. */
+  .shares {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4) var(--sp-16);
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .shares-total {
+    margin-left: auto;
   }
 
   .members {

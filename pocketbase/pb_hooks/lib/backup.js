@@ -24,7 +24,7 @@ var FIELDS = {
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "senders", "exclude_from_total", "archived", "sort", "notes"],
   recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
-  savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
+  savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
   rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "paused"],
   inbox: ["external_id", "source", "sender", "subject", "date", "text", "rich", "parsed", "status", "rule"],
@@ -252,12 +252,18 @@ function restoreData(app, userId, data, counts) {
       tx.save(r);
     });
     insert("savings", data.savings, function (r, row) {
-      r.set(
-        "members",
-        (row.members || []).filter(function (m) {
-          return m !== userId && userExists(tx, m);
-        }),
-      );
+      var members = (row.members || []).filter(function (m) {
+        return m !== userId && userExists(tx, m);
+      });
+      r.set("members", members);
+      // Lo de cada miembro sigue siendo suyo; lo que no es de un miembro es
+      // del dueño, que aquí es quien importa. Los respaldos de antes no lo traen.
+      var shares = {};
+      for (var who in row.shares || {}) {
+        var id = members.indexOf(who) >= 0 ? who : userId;
+        shares[id] = (shares[id] || 0) + (+row.shares[who] || 0);
+      }
+      r.set("shares", shares);
       r.set(
         "allocations",
         (row.allocations || []).map(function (a) {

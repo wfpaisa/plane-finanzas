@@ -812,8 +812,8 @@
     /* Vidrio de verdad: el velo del nivel 2 más ralo que en los menús, para
        que se adivine el formulario detrás, y mucho desenfoque para que no
        se lea. */
+    /* Recto arriba: va pegado de lado a lado, como un teclado. */
     border-top: 1px solid var(--glass-rim, var(--border));
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     background: var(--glass-sheen, none), oklch(from var(--glass-2, var(--bg-level2)) l c h / 0.5);
     -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 1.2)) saturate(var(--glass-sat, 170%));
     backdrop-filter: blur(calc(var(--glass-blur, 16px) * 1.2)) saturate(var(--glass-sat, 170%));
