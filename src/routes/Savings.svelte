@@ -760,6 +760,12 @@
     background: color-mix(in oklab, var(--accent) 4%, transparent);
   }
 
+  /* En sólido oscuro, lo que cuelga de la fila abierta va sin tinte: un
+     fondo algo más negro que la tabla. */
+  :global(:root[data-estilo="solido"][data-theme="dark"]) .sv-detail > td {
+    background: color-mix(in oklab, black 22%, transparent);
+  }
+
   .movs {
     width: 100%;
     border-collapse: collapse;
