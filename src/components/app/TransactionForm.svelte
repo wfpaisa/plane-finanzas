@@ -16,7 +16,7 @@
   import { ruleLabel } from "../../lib/rules";
   import type { Rule, Transaction, TxDraft } from "../../lib/types";
   import Icon from "../Icon.svelte";
-  import { Button, ConfirmDialog, Field, Input, Modal, Select, Textarea } from "../ui";
+  import { Button, ConfirmDialog, DateInput, Field, Input, Modal, Select, Textarea } from "../ui";
   import AccountSelect from "./AccountSelect.svelte";
   import MoneyInput from "./MoneyInput.svelte";
   import RuleForm from "./RuleForm.svelte";
@@ -186,7 +186,7 @@
         <MoneyInput bind:value={amount} autofocus={!tx} />
       </Field>
       <Field label="Fecha">
-        <input type="date" class="field-control w-full" bind:value={date} />
+        <DateInput bind:value={date} />
       </Field>
       <Field label={type === "transfer" ? "Desde" : "Cuenta"}>
         <AccountSelect bind:value={account} senders={origin?.sender ? [origin.sender] : []} />

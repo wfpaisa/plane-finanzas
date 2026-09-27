@@ -15,7 +15,7 @@
   import { reload, store } from "../../lib/store.svelte";
   import type { Saving, User } from "../../lib/types";
   import Icon from "../Icon.svelte";
-  import { Button, ConfirmDialog, Field, InfoTip, Input, Modal, Switch, Textarea } from "../ui";
+  import { Button, ConfirmDialog, DateInput, Field, InfoTip, Input, Modal, Switch, Textarea } from "../ui";
   import IconSelect from "./IconSelect.svelte";
   import Money from "./Money.svelte";
   import MoneyInput from "./MoneyInput.svelte";
@@ -179,7 +179,7 @@
       <Field label="Día del aporte" tip="Día del mes en que se registra el aporte automático. Si el mes es más corto, se usa su último día."><Input type="number" min="1" max="31" bind:value={day} /></Field>
       <Field label="Interés anual (%)" tip="El porcentaje que esperas ganar en un año por tener este dinero guardado. Se usa solo para calcular el futuro. Escribe 0 si la cuenta no paga intereses."><Input type="number" min="0" max="100" step="0.1" bind:value={rate} /></Field>
       <Field label="Objetivo de ahorro (opcional)" tip="Cantidad total que deseas ahorrar. La barra mostrará el avance hacia este objetivo."><MoneyInput bind:value={target} /></Field>
-      <Field label="Fecha objetivo (opcional)" tip="Fecha en la que deseas completar el ahorro. Con la cantidad y la fecha objetivo, se calcula el aporte mensual necesario."><input type="date" class="field-control w-full" bind:value={targetDate} /></Field>
+      <Field label="Fecha objetivo (opcional)" tip="Fecha en la que deseas completar el ahorro. Con la cantidad y la fecha objetivo, se calcula el aporte mensual necesario."><DateInput bind:value={targetDate} clearable /></Field>
     </div>
 
     {#if others.length}

@@ -6,7 +6,9 @@
  * siga escribiendo un solo import.
  */
 export { default as Button } from "./Button.svelte";
+export { default as Calendar } from "./Calendar.svelte";
 export { default as ConfirmDialog } from "./ConfirmDialog.svelte";
+export { default as DateInput } from "./DateInput.svelte";
 export { default as Dropdown } from "./Dropdown.svelte";
 export { default as EmptyState } from "./EmptyState.svelte";
 export { default as ErrorNote } from "./ErrorNote.svelte";
@@ -21,6 +23,7 @@ export { default as MenuSeparator } from "./MenuSeparator.svelte";
 export { default as Modal } from "./Modal.svelte";
 export { default as ModeToggle } from "./ModeToggle.svelte";
 export { default as MonthPicker } from "./MonthPicker.svelte";
+export { default as PeriodPicker } from "./PeriodPicker.svelte";
 export { default as Note } from "./Note.svelte";
 export { default as Select } from "./Select.svelte";
 export { default as Spinner } from "./Spinner.svelte";

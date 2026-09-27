@@ -12,7 +12,7 @@
   import { pb, session } from "../../lib/pb.svelte";
   import { reload, store } from "../../lib/store.svelte";
   import type { Saving, SavingMovement } from "../../lib/types";
-  import { Button, ConfirmDialog, Field, Input, Modal, Select } from "../ui";
+  import { Button, ConfirmDialog, DateInput, Field, Input, Modal, Select } from "../ui";
   import Icon from "../Icon.svelte";
   import MoneyInput from "./MoneyInput.svelte";
   import Segmented from "./Segmented.svelte";
@@ -133,7 +133,7 @@
     />
     <div class="form-grid">
       <Field label="Monto"><MoneyInput bind:value={amount} autofocus /></Field>
-      <Field label="Fecha"><input type="date" class="field-control w-full" bind:value={date} /></Field>
+      <Field label="Fecha"><DateInput bind:value={date} /></Field>
     </div>
     {#if foreignAccount}
       <p class="small muted">Este aporte pertenece a otra persona; su cuenta no se puede cambiar desde aquí.</p>

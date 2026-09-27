@@ -1,0 +1,81 @@
+/*
+ * El calendario (vanilla-calendar-pro, ver `components/ui/Calendar.svelte`)
+ * con los colores de la app. Sus dos temas, claro y oscuro, leen estas
+ * variables; como los tokens de la app ya cambian con el tema y el estilo,
+ * con ponerlas una vez basta.
+ */
+.calendar .vc {
+  --vc-bg: transparent;
+  --vc-color: var(--text-primary);
+  --vc-focus-outline-color: var(--focus-ring);
+
+  --vc-header-color: var(--text-primary);
+  --vc-title-color: var(--text-primary);
+  --vc-title-color-hover: var(--accent-soft-text);
+  --vc-title-color-disabled: var(--text-subtle);
+  --vc-week-day-color: var(--text-muted);
+  --vc-week-day-color-hover: var(--text-secondary);
+
+  --vc-date-bg: transparent;
+  --vc-date-color: var(--text-primary);
+  --vc-date-bg-hover: var(--bg-hover);
+  --vc-date-hover-bg: var(--bg-hover);
+  --vc-date-hover-edge-bg: var(--bg-hover);
+  --vc-date-outside-color: var(--text-subtle);
+  --vc-date-disabled-color: var(--text-subtle);
+  --vc-date-today-bg: var(--accent-soft);
+  --vc-date-today-color: var(--accent-soft-text);
+  --vc-date-today-outside-color: var(--text-subtle);
+  --vc-date-selected-bg: var(--accent);
+  --vc-date-selected-color: var(--accent-text);
+  --vc-date-selected-outside-bg: var(--accent-soft);
+  --vc-date-selected-outside-color: var(--text-secondary);
+  --vc-date-range-middle-bg: var(--accent-soft);
+  --vc-date-range-middle-color: var(--text-primary);
+  --vc-date-range-middle-outside-bg: var(--accent-soft);
+  --vc-date-range-middle-outside-color: var(--text-muted);
+
+  --vc-months-years-bg: transparent;
+  --vc-months-years-bg-hover: var(--bg-hover);
+  --vc-months-years-color: var(--text-secondary);
+  --vc-months-years-color-disabled: var(--text-subtle);
+  --vc-months-years-bg-selected: var(--accent);
+  --vc-months-years-color-selected: var(--accent-text);
+
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-family: inherit;
+}
+
+.calendar .vc-date__btn,
+.calendar .vc-months__month,
+.calendar .vc-years__year {
+  border-radius: var(--radius-sm, 0.5rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar .vc-month,
+.calendar .vc-year {
+  font-weight: 650;
+}
+
+/* Las flechas de mes: del tamaño de un botón de icono. Con dos meses a la
+   vista flotan sobre los títulos; se alinean con ellos, no más abajo. */
+.calendar .vc [data-vc-arrow] {
+  display: block;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm, 0.5rem);
+}
+
+.calendar .vc [data-vc-arrow]:hover {
+  background: var(--bg-hover);
+}
+
+.calendar .vc [data-vc="controls"] {
+  top: 0;
+  height: 2.75rem;
+  padding: 0;
+}

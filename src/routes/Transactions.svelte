@@ -14,11 +14,12 @@
   import TransactionList from "../components/app/TransactionList.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Input, Loading, MonthPicker, Select } from "../components/ui";
+  import { Input, Loading, Select } from "../components/ui";
+  import PeriodPicker, { type Period } from "../components/ui/PeriodPicker.svelte";
   import Tag, { type Tone } from "../components/ui/Tag.svelte";
   import { alpha, token } from "../lib/colors";
   import { addMonths, dayOf, monthRange, today, ymd } from "../lib/finance";
-  import { dateShort, money, monthLabel } from "../lib/format";
+  import { dateShort, dateYmd, money, monthLabel, monthYm } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
   import { tintFor } from "../lib/palettes";
   import { pb } from "../lib/pb.svelte";
@@ -30,12 +31,50 @@
   import { txModal } from "../lib/ui.svelte";
 
   const q = route.query;
-  // "mes" es un mes (aaaa-mm) o "todo"; lo demás, el mes de hoy.
+  // El periodo: "mes" es un mes (aaaa-mm) o "todo"; "año", un año;
+  // "desde" y "hasta", un rango de días. Sin nada, el mes de hoy (y con una
+  // etiqueta, todo el historial).
   const MONTH = /^\d{4}-\d{2}$/;
-  const mes = q.get("mes") ?? "";
-  let ym = $state(MONTH.test(mes) ? mes : today().slice(0, 7));
-  let all = $state(
-    q.get("mes") === "todo" || (!!q.get("tag") && !q.get("mes")),
+  const DAY = /^\d{4}-\d{2}-\d{2}$/;
+  function fromQuery(): Period {
+    const mes = q.get("mes") ?? "";
+    const año = q.get("año") ?? "";
+    const [desde, hasta] = [q.get("desde") ?? "", q.get("hasta") ?? ""];
+    if (DAY.test(desde) && DAY.test(hasta)) return { kind: "rango", from: desde, to: hasta };
+    if (/^\d{4}$/.test(año)) return { kind: "año", y: año };
+    if (MONTH.test(mes)) return { kind: "mes", ym: mes };
+    if (mes === "todo" || (q.get("tag") && !mes)) return { kind: "todo" };
+    return { kind: "mes", ym: today().slice(0, 7) };
+  }
+  let period = $state<Period>(fromQuery());
+  const all = $derived(period.kind === "todo");
+  const thisMonth = (): Period => ({ kind: "mes", ym: today().slice(0, 7) });
+
+  /** Del primer día del periodo al día siguiente al último; null si es todo. */
+  function bounds(p: Period): [string, string] | null {
+    if (p.kind === "mes") return monthRange(p.ym);
+    if (p.kind === "año") return [`${p.y}-01-01`, `${Number(p.y) + 1}-01-01`];
+    if (p.kind === "rango") {
+      const [y, m, d] = p.to.split("-").map(Number);
+      return [p.from, ymd(new Date(y, m - 1, d + 1))];
+    }
+    return null;
+  }
+
+  /** El mes o el año anterior (-1) o siguiente (1); un rango o todo no se mueven. */
+  function shift(n: number) {
+    if (period.kind === "mes") period = { kind: "mes", ym: addMonths(period.ym, n) };
+    else if (period.kind === "año") period = { kind: "año", y: String(Number(period.y) + n) };
+  }
+
+  const periodText = $derived(
+    period.kind === "mes"
+      ? monthYm(period.ym)
+      : period.kind === "año"
+        ? `Año ${period.y}`
+        : period.kind === "rango"
+          ? `Del ${dateYmd(period.from)} al ${dateYmd(period.to)}`
+          : "Todo el historial",
   );
   let account = $state(q.get("cuenta") ?? "");
   let category = $state(q.get("cat") ?? "");
@@ -50,8 +89,9 @@
     void store.txVersion;
     const parts: string[] = [];
     const params: Record<string, string> = {};
-    if (!all) {
-      const [a, b] = monthRange(ym);
+    const range = bounds(period);
+    if (range) {
+      const [a, b] = range;
       parts.push("date >= {:a} && date < {:b}");
       params.a = a;
       params.b = b;
@@ -262,13 +302,10 @@
   // Con algo marcado para sumar, las flechas no cambian de mes: se perdería
   // de vista lo marcado.
   const onKey = keys({
-    ArrowLeft: () => !all && !selected.size && (ym = addMonths(ym, -1)),
-    ArrowRight: () => !all && !selected.size && (ym = addMonths(ym, 1)),
-    h: () => {
-      all = false;
-      ym = today().slice(0, 7);
-    },
-    t: () => (all = !all),
+    ArrowLeft: () => !selected.size && shift(-1),
+    ArrowRight: () => !selected.size && shift(1),
+    h: () => (period = thisMonth()),
+    t: () => (period = all ? thisMonth() : { kind: "todo" }),
     g: () => showChart(),
     v: () => setCompact(!compact),
     "/": () => searchBox?.querySelector("input")?.focus(),
@@ -276,8 +313,7 @@
 
   function clear() {
     account = category = type = tag = search = "";
-    all = false;
-    ym = today().slice(0, 7);
+    period = thisMonth();
     go("/movimientos");
   }
 </script>
@@ -289,40 +325,12 @@
     <div>
       <h1>Movimientos</h1>
       <p>
-        {all ? "Todo el historial" : monthLabel(ym, true)} · {shown.length}
+        {periodText} · {shown.length}
         {shown.length === 1 ? "movimiento" : "movimientos"}
       </p>
     </div>
     <div class="page-actions">
-      <div class="month-nav">
-        <button
-          type="button"
-          class="btn-icon sm"
-          aria-label="Mes anterior"
-          data-tip="Mes anterior (←)"
-          disabled={all}
-          onclick={() => (ym = addMonths(ym, -1))}
-        >
-          <Icon name="arrow-left-01" />
-        </button>
-        <MonthPicker bind:value={ym} disabled={all} />
-        <button
-          type="button"
-          class="btn-icon sm"
-          aria-label="Mes siguiente"
-          data-tip="Mes siguiente (→)"
-          disabled={all}
-          onclick={() => (ym = addMonths(ym, 1))}
-        >
-          <Icon name="arrow-right-01" />
-        </button>
-        <Tag
-          class="month-all"
-          tone={all ? "tint-1" : "off"}
-          onclick={() => (all = !all)}
-          pressed={all}>Todo</Tag
-        >
-      </div>
+      <PeriodPicker bind:value={period} />
     </div>
   </header>
 
@@ -529,19 +537,6 @@
       & ~ .filters-clear {
         margin-left: 0;
       }
-    }
-  }
-
-  .month-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-4);
-
-    /* "Todo" del alto del selector de mes, un poco aparte de las flechas. */
-    & :global(.month-all) {
-      height: 34px;
-      margin-left: var(--sp-8);
-      padding-inline: var(--sp-14);
     }
   }
 

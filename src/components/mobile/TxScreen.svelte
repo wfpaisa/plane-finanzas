@@ -14,7 +14,7 @@
   import type { TxType } from "../../lib/finance";
   import { today } from "../../lib/finance";
   import { colorsFor } from "../../lib/colors";
-  import { money, plainNumber } from "../../lib/format";
+  import { dateYmd, money, plainNumber } from "../../lib/format";
   import { SOURCE_LABEL, TX_TYPES } from "../../lib/labels";
   import { notify } from "../../lib/notify.svelte";
   import { offline } from "../../lib/offline.svelte";
@@ -26,7 +26,7 @@
   import type { TxPreset } from "../../lib/ui.svelte";
   import Icon from "../Icon.svelte";
   import Segmented from "../app/Segmented.svelte";
-  import { ConfirmDialog } from "../ui";
+  import { Calendar, ConfirmDialog } from "../ui";
 
   let {
     open,
@@ -40,7 +40,7 @@
     onClose: () => void;
   } = $props();
 
-  type Panel = "account" | "to" | "category" | "amount" | null;
+  type Panel = "date" | "account" | "to" | "category" | "amount" | null;
 
   const TITLE: Record<TxType, string> = { income: "Ingreso", expense: "Gasto", transfer: "Transferencia" };
   const DAYS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
@@ -191,7 +191,7 @@
   const dateLabel = $derived.by(() => {
     const [y, m, d] = date.split("-").map(Number);
     if (!y) return "Hoy";
-    return `${d}/${m}/${y} (${DAYS[new Date(y, m - 1, d).getDay()]})`;
+    return `${dateYmd(date)} (${DAYS[new Date(y, m - 1, d).getDay()]})`;
   });
 
   const accountName = (id: string) => store.account(id)?.name ?? "";
@@ -301,11 +301,10 @@
       </div>
 
       <div class="ts-rows">
-        <label class="ts-row">
+        <div class="ts-row" class:focus={panel === "date"}>
           <span class="ts-label">Fecha</span>
-          <span class="ts-value">{dateLabel}</span>
-          <input class="ts-date" type="date" aria-label="Fecha" bind:value={date} onfocus={() => (panel = null)} />
-        </label>
+          <button type="button" class="ts-value" onclick={() => (panel = "date")}>{dateLabel}</button>
+        </div>
 
         <div class="ts-row" class:focus={panel === "account"}>
           <span class="ts-label">{type === "transfer" ? "De" : "Cuenta"}</span>
@@ -414,15 +413,26 @@
     </div>
 
     {#if panel}
-      <section class="ts-panel" aria-label={panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : "Cuentas"}>
+      <section class="ts-panel" aria-label={panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : "Cuentas"}>
         <div class="ts-panel-head">
-          <strong>{panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
+          <strong>{panel === "date" ? "Fecha" : panel === "amount" ? "Monto" : panel === "category" ? "Categoría" : panel === "to" ? "Hacia la cuenta" : "Cuentas"}</strong>
           <button type="button" class="btn-icon sm" aria-label="Cerrar" onclick={() => (panel = null)}>
             <Icon name="cancel-01" size={18} />
           </button>
         </div>
 
-        {#if panel === "account" || panel === "to"}
+        {#if panel === "date"}
+          <div class="ts-cal">
+            <Calendar
+              mode="day"
+              value={date}
+              onpick={(d) => {
+                date = d;
+                panel = null;
+              }}
+            />
+          </div>
+        {:else if panel === "account" || panel === "to"}
           <div class="ts-grid">
             {#each store.activeAccounts.filter((a) => panel === "account" || a.id !== account) as a (a.id)}
               {@const on = (panel === "to" ? toAccount : account) === a.id}
@@ -572,9 +582,6 @@
       box-shadow 0.15s;
   }
 
-  .ts-row:has(.ts-date) .ts-value {
-    grid-column: 2 / -1;
-  }
 
   /* Sin anillo de foco, como en escritorio: el campo se aclara, y el del
      panel abierto lleva un filo del color del tipo. */
@@ -599,19 +606,18 @@
     grid-column: 2 / -1;
   }
 
-  /* El selector de fecha del teléfono, invisible encima de la fila. */
-  .ts-date {
-    position: absolute;
-    inset: 0 0 0 5rem;
-    opacity: 0;
-    cursor: pointer;
+  /* El calendario, del ancho del panel y con días grandes para el dedo. */
+  .ts-cal {
+    padding: 0 var(--sp-4) var(--sp-8);
 
-    &::-webkit-calendar-picker-indicator {
-      position: absolute;
-      inset: 0;
-      width: auto;
-      height: auto;
-      opacity: 0;
+    & :global(.vc) {
+      width: 100%;
+      max-width: 24rem;
+      margin: 0 auto;
+    }
+
+    & :global(.vc-date__btn) {
+      min-height: 2.5rem;
     }
   }
 

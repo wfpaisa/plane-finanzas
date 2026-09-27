@@ -52,6 +52,37 @@ const DAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "
 
 const parts = (s: string) => String(s).slice(0, 10).split("-").map(Number);
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** "2026/09/22": las fechas que se eligen o se escriben van año/mes/día. "" si no hay. */
+export function dateYmd(s: string): string {
+  const [y, m, d] = parts(s);
+  return y && m && d ? `${y}/${pad2(m)}/${pad2(d)}` : "";
+}
+
+/** "2026/09/22" (o "2026-9-22") -> "2026-09-22"; null si no es una fecha que exista. */
+export function parseYmd(text: string): string | null {
+  const m = /^\s*(\d{4})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*$/.exec(text);
+  if (!m) return null;
+  const [y, mo, d] = [+m[1], +m[2], +m[3]];
+  const t = new Date(y, mo - 1, d);
+  if (t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== d) return null;
+  return `${y}-${pad2(mo)}-${pad2(d)}`;
+}
+
+/** "2026 · Septiembre": un mes, con el año primero como las fechas. */
+export function monthYm(ym: string): string {
+  const [y, m] = parts(ym);
+  return `${y} · ${cap(MONTHS_LONG[m - 1])}`;
+}
+
+/** Los nombres para el calendario (lib vanilla-calendar-pro), en español. */
+export const calendarLocale = {
+  months: { long: MONTHS_LONG.map(cap), short: MONTHS.map(cap) },
+  weekdays: { long: DAYS.map(cap), short: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] },
+};
+
 /** "22 sep" */
 export function dateShort(s: string): string {
   const [, m, d] = parts(s);

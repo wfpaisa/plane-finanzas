@@ -10,7 +10,7 @@
   import { reload, store } from "../../lib/store.svelte";
   import type { Recurring } from "../../lib/types";
   import Icon from "../Icon.svelte";
-  import { Button, Field, Input, Modal, Select, Switch } from "../ui";
+  import { Button, DateInput, Field, Input, Modal, Select, Switch } from "../ui";
   import MoneyInput from "./MoneyInput.svelte";
   import Segmented from "./Segmented.svelte";
 
@@ -124,7 +124,7 @@
         </Select>
       </Field>
       {#if frequency === "once"}
-        <Field label="Fecha"><input type="date" class="field-control w-full" bind:value={start} /></Field>
+        <Field label="Fecha"><DateInput bind:value={start} /></Field>
       {:else}
         <Field label="Día del mes"><Input type="number" min="1" max="31" bind:value={day} /></Field>
       {/if}
@@ -148,8 +148,8 @@
         </Select>
       </Field>
       {#if frequency !== "once"}
-        <Field label="Desde (opcional)"><input type="date" class="field-control w-full" bind:value={start} /></Field>
-        <Field label="Hasta (opcional)" hint="Ej: la última cuota del crédito"><input type="date" class="field-control w-full" bind:value={end} /></Field>
+        <Field label="Desde (opcional)"><DateInput bind:value={start} clearable /></Field>
+        <Field label="Hasta (opcional)" hint="Ej: la última cuota del crédito"><DateInput bind:value={end} clearable /></Field>
       {/if}
     </div>
     <div class="flex flex-wrap gap-5">

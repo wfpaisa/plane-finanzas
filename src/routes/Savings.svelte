@@ -1,6 +1,7 @@
 <!--
   Ahorros: bolsillos con aporte mensual y, si se quiere, compartidos con
-  otras personas. Arriba la tabla, y cada ahorro se abre en sus abonos y
+  otras personas. Arriba la tabla, con lo justo por fila: nombre, aporte,
+  meta y total. Cada ahorro se abre en dónde está el dinero y sus abonos y
   retiros; debajo, la gráfica de lo marcado: lo que ha tenido y cuánto habrá
   en N meses.
 -->
@@ -9,7 +10,6 @@
   import { SvelteSet } from "svelte/reactivity";
 
   import Money from "../components/app/Money.svelte";
-  import ColorDot from "../components/app/ColorDot.svelte";
   import MovementForm from "../components/app/MovementForm.svelte";
   import SavingForm from "../components/app/SavingForm.svelte";
   import Chart from "../components/Chart.svelte";
@@ -97,8 +97,8 @@
   }
 
 
-  // La gráfica y los movimientos muestran los ahorros marcados en la tabla;
-  // al entrar, todos. Se guarda lo desmarcado para que un ahorro nuevo
+  // La gráfica muestra los ahorros encendidos en su leyenda (las fichas de
+  // arriba, como en cualquier gráfica); al entrar, todos. Se guarda lo desmarcado para que un ahorro nuevo
   // entre marcado. La gráfica dibuja una línea por ahorro y otra con el total.
   const excluded = new SvelteSet<string>();
   const simulated = $derived(list.filter((s) => !excluded.has(s.id)));
@@ -117,7 +117,8 @@
   }
 
   const selIds = $derived(new Set(simulated.map((s) => s.id)));
-  const selCurrent = $derived(simulated.reduce((a, s) => a + store.savingCurrent(s.id), 0));
+  const listMonthly = $derived(list.reduce((a, s) => a + (s.monthly_amount || 0), 0));
+  const listCurrent = $derived(list.reduce((a, s) => a + store.savingCurrent(s.id), 0));
 
   const current = (id: string) => store.savingCurrent(id);
   // La gráfica tiene dos vistas: lo que ha tenido cada ahorro (estado) y lo
@@ -132,8 +133,10 @@
   const future = $derived(simulated.reduce((a, s) => a + valueAt(s, current(s.id), horizon), 0));
   const contributed = $derived(simulated.reduce((a, s) => a + paidAt(s, current(s.id), horizon), 0));
 
+  // Las fichas ya dicen qué línea es cada ahorro: la leyenda de Chart.js
+  // solo hace falta con uno solo en simulación (aportado e intereses).
   const chartConfig = (): ChartConfiguration =>
-    view === "estado" ? stateChart(history) : simChart(simulated, current, horizon, ym);
+    view === "estado" ? stateChart(history, false) : simChart(simulated, current, horizon, ym, !multi);
 
   async function removeMovement(id: string) {
     try {
@@ -172,23 +175,8 @@
         <table class="sv-table">
           <thead>
             <tr>
-              <th class="sv-check">
-                <button
-                  type="button"
-                  class="sv-plot"
-                  class:on={allOn}
-                  class:some={!allOn && simulated.length > 0}
-                  aria-pressed={allOn}
-                  aria-label={allOn ? "Ocultar todos de la gráfica" : "Agregar todos a la gráfica"}
-                  data-tip={allOn ? "Ocultar todos de la gráfica" : "Agregar todos a la gráfica"}
-                  onclick={toggleAll}
-                >
-                  <Icon name="activity-01" size={16} />
-                </button>
-              </th>
               <th>Ahorro</th>
               <th class="num">Al mes</th>
-              <th>Cuentas</th>
               <th class="sv-goal-col">Meta</th>
               <th class="num">Ahorrado</th>
               <th><span class="sr-only">Acciones</span></th>
@@ -201,77 +189,63 @@
               {@const holders = store.savingHolders(s.id)}
               {@const pct = s.target_amount ? Math.min(100, Math.max(0, (current / s.target_amount) * 100)) : 0}
               <tr class:sv-archived={s.archived}>
-                <td class="sv-check">
-                  <button
-                    type="button"
-                    class="sv-plot"
-                    class:on={selIds.has(s.id)}
-                    aria-pressed={selIds.has(s.id)}
-                    aria-label={selIds.has(s.id) ? `Ocultar ${s.name} de la gráfica` : `Agregar ${s.name} a la gráfica`}
-                    data-tip={selIds.has(s.id) ? "Ocultar de la gráfica" : "Agregar a la gráfica"}
-                    onclick={() => toggle(s)}
-                  >
-                    <Icon name="activity-01" size={16} />
-                  </button>
-                </td>
                 <td class="sv-name">
                   <!-- Abre o cierra sus abonos y retiros, debajo de la fila. -->
                   <button type="button" class="sv-toggle" aria-expanded={opened.has(s.id)} aria-controls="sv-movs-{s.id}" onclick={() => toggleOpen(s.id)}>
                     <Icon name="arrow-right-01" size={14} class="sv-chevron" />
-                    <span class="sv-ico"><Icon name={s.icon || "piggy-bank"} size={15} /></span>
+                    <span class="sv-ico" style:--c={colorOf(s.palette)}><Icon name={s.icon || "piggy-bank"} size={17} /></span>
                     <span class="sv-name-text">
-                      <span class="sv-title">{s.name}<ColorDot color={s.palette} /></span>
-                      <span class="sv-sub">{movsCount(s.id)}</span>
+                      <span class="sv-title">{s.name}</span>
+                      <span class="sv-sub">
+                        {movsCount(s.id)}{#if holders.length > 1}<span class="sv-dot">·</span>en {holders.length} lugares{/if}
+                        {#if s.members?.length || s.owner !== session.id}<span class="sv-dot">·</span><span class="sv-shared"><Icon name="user-multiple" size={12} />Compartido</span>{/if}
+                      </span>
                     </span>
                   </button>
-                  {#if s.members?.length || s.owner !== session.id}
-                    <span class="sv-mark" data-tip="Compartido"><Icon name="user-multiple" size={14} /></span>
-                  {/if}
                 </td>
                 <td class="num sv-cell">
-                  <Money value={s.monthly_amount} />
-                  <span class="sv-sub">
-                    {s.annual_rate ? `${s.annual_rate}% anual` : ""}{s.annual_rate && s.auto ? " · " : ""}{s.auto ? "automático" : ""}
-                  </span>
-                </td>
-                <td class="sv-cell">
-                  <!-- Dónde está, según sus movimientos. -->
-                  {#if holders.length}
-                    <span class="alloc-chips">
-                      <!-- Las cuentas propias y, debajo, lo de cada persona en las suyas. -->
-                      {#each holders as h (h.key)}
-                        {#if h.person}
-                          <span class="alloc-chip"><Icon name="user" size={11} />{store.personName(h.person)} <Money value={h.amount} /></span>
-                        {:else}
-                          <span class="alloc-chip"><i style:background={colorOf(store.account(h.account ?? "")?.palette)}></i>{accountName(h.account ?? "")} <Money value={h.amount} /></span>
-                        {/if}
-                      {/each}
-                    </span>
-                  {:else}—{/if}
+                  {#if s.monthly_amount}<Money value={s.monthly_amount} />{:else}<span class="sv-none">—</span>{/if}
+                  {#if s.annual_rate || s.auto}
+                    <span class="sv-sub">{[s.annual_rate ? `${s.annual_rate}% anual` : "", s.auto ? "Automático" : ""].filter(Boolean).join(" · ")}</span>
+                  {/if}
                 </td>
                 <td class="sv-goal-col sv-cell">
                   {#if s.target_amount}
                     <span class="sv-goal">
-                      <span class="sv-goal-top"><span>{Math.round(pct)}% de <Money value={s.target_amount} /></span></span>
+                      <span class="sv-goal-top"><b>{Math.round(pct)}%</b><span>de <Money value={s.target_amount} /></span></span>
                       <span class="bar-track"><span style:width="{pct}%" style:background={colorOf(s.palette)}></span></span>
                       <span class="sv-sub">
-                        {#if e && e.months === 0}Objetivo alcanzado{:else if e}Fecha estimada: {monthLabel(e.month)}{:else}Define un aporte para calcular la fecha estimada{/if}
+                        {#if e && e.months === 0}Objetivo alcanzado{:else if e}Llega en {monthLabel(e.month)}{:else}Sin aporte, sin fecha estimada{/if}
                       </span>
                     </span>
-                  {:else}—{/if}
+                  {:else}<span class="sv-none">Sin meta</span>{/if}
                 </td>
                 <td class="num sv-amount"><Money value={current} /></td>
                 <td class="sv-actions">
                   <span>
-                    <Button size="sm" variant="secondary" onclick={() => openMovement(s)}><Icon name="add-circle" />Movimiento</Button>
-                    <Button size="sm" variant="ghost" aria-label="Editar" onclick={() => ((editing = s), (formOpen = true))}><Icon name="edit-02" /></Button>
+                    <button type="button" class="btn-icon" aria-label="Registrar aporte o retiro en {s.name}" data-tip="Aporte o retiro" onclick={() => openMovement(s)}><Icon name="add-circle" size={17} /></button>
+                    <button type="button" class="btn-icon" aria-label="Editar {s.name}" data-tip="Editar" onclick={() => ((editing = s), (formOpen = true))}><Icon name="edit-02" size={17} /></button>
                   </span>
                 </td>
               </tr>
               {#if opened.has(s.id)}
                 {@const movs = movsBySaving.get(s.id) ?? []}
+                {@const holders = store.savingHolders(s.id)}
                 <tr class="sv-detail" class:sv-archived={s.archived} id="sv-movs-{s.id}">
-                  <td colspan="7">
+                  <td colspan="5">
+                    {#if holders.length}
+                      <!-- Dónde está, según sus movimientos: las cuentas propias y lo de cada persona en las suyas. -->
+                      <div class="sv-where">
+                        <span class="sv-where-label">Dónde está</span>
+                        {#each holders as h (h.key)}
+                          {#if h.person}
+                            <span class="alloc-chip"><Icon name="user" size={11} />{store.personName(h.person)} <Money value={h.amount} /></span>
+                          {:else}
+                            <span class="alloc-chip"><i style:background={colorOf(store.account(h.account ?? "")?.palette)}></i>{accountName(h.account ?? "")} <Money value={h.amount} /></span>
+                          {/if}
+                        {/each}
+                      </div>
+                    {/if}
                     {#if movs.length}
                       <table class="movs" aria-label="Aportes y retiros de {s.name}">
                         <thead>
@@ -350,14 +324,10 @@
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="2">
-                {allOn ? list.length : `${simulated.length} de ${list.length}`}
-                {list.length === 1 ? "ahorro" : "ahorros"}
-              </td>
-              <td class="num"><Money value={simMonthly} /></td>
-              <td></td>
+              <td>{list.length} {list.length === 1 ? "ahorro" : "ahorros"}</td>
+              <td class="num"><Money value={listMonthly} /></td>
               <td class="sv-goal-col"></td>
-              <td class="num"><Money value={selCurrent} /></td>
+              <td class="num"><Money value={listCurrent} /></td>
               <td></td>
             </tr>
           </tfoot>
@@ -369,16 +339,16 @@
       </div>
     {/if}
 
-    {#if list.length && !selected}
-      <div class="card empty-card">Marca al menos un ahorro en la tabla para verlo en la gráfica.</div>
-    {/if}
-    {#if selected}
+    {#if list.length}
       <div class="card">
         <div class="card-head">
           <div>
-            {#if multi}
+            {#if !selected}
+              <h3 class="card-title"><Icon name="chart-line-data-01" /> Gráfica</h3>
+              <p class="card-sub">Elige abajo qué ahorros ver</p>
+            {:else if multi}
               <h3 class="card-title"><Icon name="chart-line-data-01" /> {simulated.length} ahorros</h3>
-              <p class="card-sub">{simulated.map((x) => x.name).join(" + ")}</p>
+              <p class="card-sub">{view === "estado" ? "Lo que han tenido mes a mes, y el total" : "Si siguen los aportes de cada uno"}</p>
             {:else}
               <h3 class="card-title"><Icon name={selected.icon || "piggy-bank"} /> {selected.name}</h3>
               <p class="card-sub">
@@ -393,6 +363,20 @@
             </div>
           </div>
         </div>
+        <!-- La leyenda: cada ficha muestra u oculta su ahorro en la gráfica. -->
+        <div class="sv-legend" role="group" aria-label="Ahorros en la gráfica">
+          {#each list as s (s.id)}
+            <button type="button" class="sv-key" class:off={!selIds.has(s.id)} aria-pressed={selIds.has(s.id)} style:--c={colorOf(s.palette)} onclick={() => toggle(s)}>
+              <i></i>{s.name}
+            </button>
+          {/each}
+          {#if list.length > 1}
+            <button type="button" class="link small sv-key-all" onclick={toggleAll}>{allOn ? "Ocultar todos" : "Ver todos"}</button>
+          {/if}
+        </div>
+        {#if !selected}
+          <div class="card-body"><p class="sv-legend-empty">Toca un ahorro de arriba para verlo en la gráfica.</p></div>
+        {:else}
         <div class="card-body stack">
           {#if view === "estado"}
             <div class="sim-row">
@@ -418,6 +402,7 @@
           {/if}
           <Chart config={chartConfig} height={300} label={view === "estado" ? "Dinero ahorrado mes a mes" : "Cálculo del ahorro a futuro"} />
         </div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -441,7 +426,7 @@
     font-size: var(--text-sm);
 
     & th {
-      padding: var(--sp-8) var(--sp-12);
+      padding: var(--sp-10) var(--sp-16);
       border-bottom: var(--border-width) solid var(--border);
       color: var(--text-muted);
       font-size: var(--text-xs);
@@ -451,7 +436,7 @@
     }
 
     & td {
-      padding: var(--sp-10) var(--sp-12);
+      padding: var(--sp-16);
       vertical-align: middle;
       white-space: nowrap;
     }
@@ -467,7 +452,7 @@
     }
 
     & tfoot td {
-      padding: var(--sp-10) var(--sp-12);
+      padding: var(--sp-12) var(--sp-16);
       border-top: var(--border-width) solid var(--border);
       background: var(--bg-field);
       color: var(--text-muted);
@@ -501,59 +486,95 @@
     }
   }
 
-  .sv-check {
-    width: 1%;
-    padding-right: 0 !important;
+  /* La leyenda de la gráfica: una ficha por ahorro, con el color de su línea.
+     Apagada, se ve tenue y con el punto vacío. */
+  .sv-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-8);
+    padding: var(--sp-14) var(--sp-24) 0;
   }
 
-  /* Encendido: el ahorro sale en la gráfica. */
-  .sv-plot {
-    display: grid;
-    place-items: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-muted);
-    opacity: 0.35;
+  .sv-key {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-6);
+    padding: 0.3rem 0.7rem;
+    border: 1px solid color-mix(in oklab, var(--c) 35%, transparent);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--c) 10%, transparent);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
     cursor: pointer;
+    transition:
+      opacity 0.15s,
+      background 0.15s;
+
+    & i {
+      width: 0.6rem;
+      height: 0.6rem;
+      border: 2px solid var(--c);
+      border-radius: 50%;
+      background: var(--c);
+    }
 
     &:hover {
-      background: var(--bg-hover);
-      opacity: 1;
+      background: color-mix(in oklab, var(--c) 18%, transparent);
     }
 
-    &.some {
-      color: var(--vivid-blue);
-      opacity: 1;
-    }
+    &.off {
+      border-color: var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 500;
 
-    &.on {
-      --on-blue: light-dark(oklch(0.55 0.22 258), oklch(0.7 0.2 255));
-      background: color-mix(in oklab, var(--on-blue) 40%, transparent);
-      box-shadow: inset 0 0 0 1px var(--on-blue);
-      color: light-dark(oklch(0.4 0.2 260), oklch(0.93 0.07 255));
-      opacity: 1;
+      & i {
+        background: transparent;
+      }
     }
   }
 
+  .sv-key-all {
+    margin-left: var(--sp-4);
+  }
+
+  .sv-legend-empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* La ficha lleva el color del ahorro: reemplaza el punto de color. */
   .sv-ico {
     display: inline-grid;
+    flex: none;
     place-items: center;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2.25rem;
+    height: 2.25rem;
     border-radius: var(--radius-md);
-    background: var(--bg-field);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
+    background: color-mix(in oklab, var(--c) 14%, transparent);
+    color: var(--c);
   }
 
-  .sv-mark {
+  .sv-dot {
+    margin: 0 0.35em;
+    opacity: 0.6;
+  }
+
+  .sv-shared {
     display: inline-flex;
-    margin-left: var(--sp-6);
-    color: var(--text-muted);
+    align-items: center;
+    gap: 0.25rem;
+    vertical-align: bottom;
+  }
+
+  /* Lo que no aplica, apagado para que no compita con los datos. */
+  .sv-none {
+    color: var(--text-subtle);
+    font-size: var(--text-xs);
   }
 
   .sv-cell {
@@ -567,41 +588,79 @@
 
   .sv-sub {
     display: block;
+    margin-top: 0.15rem;
     font-size: var(--text-xs);
     color: var(--text-muted);
     font-weight: 400;
   }
 
   .sv-goal-col {
-    min-width: 13rem;
+    min-width: 14rem;
   }
 
+  /* Arriba el avance y la meta, en los extremos; la barra; y cuándo llega. */
   .sv-goal {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-6);
 
     & .bar-track {
       display: block;
     }
   }
 
+  .sv-goal-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-8);
+
+    & b {
+      color: var(--text-primary);
+      font-size: var(--text-sm);
+    }
+  }
+
   .sv-amount :global(.money) {
-    font-size: var(--text-base, 1rem);
+    font-size: 1.0625rem;
+    font-weight: 700 !important;
   }
 
-  .sv-actions span {
-    display: inline-flex;
-    gap: var(--sp-4);
+  /* Las acciones, discretas hasta pasar por la fila. */
+  .sv-actions {
+    width: 1%;
+
+    & span {
+      display: inline-flex;
+      gap: 2px;
+    }
+
+    & .btn-icon {
+      color: var(--text-muted);
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
   }
 
-  .alloc-chips {
+  .sv-table tbody tr:hover .sv-actions .btn-icon,
+  .sv-actions .btn-icon:focus-visible {
+    opacity: 1;
+  }
+
+  /* Dónde está el dinero del ahorro, en una línea encima de sus movimientos. */
+  .sv-where {
     display: flex;
     flex-wrap: wrap;
-    flex-direction: column;
-    align-items: flex-start;
-    max-width: 18rem;
-    gap: var(--sp-6);
+    align-items: center;
+    gap: var(--sp-8) var(--sp-16);
+    padding: var(--sp-10) var(--sp-16);
+    border-top: var(--border-width) solid var(--border);
+  }
+
+  .sv-where-label {
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
   }
 
   .alloc-chip {
@@ -610,6 +669,11 @@
     gap: 0.3rem;
     font-size: var(--text-xs);
     color: var(--text-secondary);
+
+    & :global(.money) {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
 
     & i {
       width: 0.55rem;
@@ -701,13 +765,13 @@
     border-collapse: collapse;
 
     & th {
-      padding: var(--sp-6) var(--sp-12) !important;
+      padding: var(--sp-8) var(--sp-16) !important;
       border-top: var(--border-width) solid var(--border);
       font-size: 0.6875rem;
     }
 
     & td {
-      padding: var(--sp-6) var(--sp-12) !important;
+      padding: var(--sp-8) var(--sp-16) !important;
       border-top: var(--border-width) solid var(--border);
       font-size: var(--text-xs);
       color: var(--text-secondary);
@@ -777,12 +841,12 @@
   }
 
   .mov-more {
-    margin: 0 var(--sp-12) var(--sp-8);
+    margin: 0 var(--sp-16) var(--sp-10);
   }
 
   .mov-empty {
     margin: 0;
-    padding: var(--sp-10) var(--sp-12);
+    padding: var(--sp-10) var(--sp-16);
     border-top: var(--border-width) solid var(--border);
     font-size: var(--text-xs);
     color: var(--text-muted);
