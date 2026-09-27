@@ -14,6 +14,7 @@
   import { addMonths, bucketize, budgetUse, byCategory, monthRange, today } from "../lib/finance";
   import { money, monthLabel } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
+  import { cachedList } from "../lib/offline.svelte";
   import { colorOf, tintFor } from "../lib/palettes";
   import { pb, session } from "../lib/pb.svelte";
   import { go } from "../lib/router.svelte";
@@ -33,13 +34,18 @@
     void store.txVersion;
     // Una respuesta que llega tarde no pisa la de una recarga más nueva.
     let alive = true;
-    pb.collection("transactions")
-      .getFullList<Transaction>({
-        filter: pb.filter("date >= {:from} && date < {:to}", { from, to: nextMonth }),
-        sort: "-date,-created",
-        expand: "rule",
-      })
-      .then((r) => alive && (txs = r))
+    // Lo guardado en el teléfono primero: en la app del celular el resumen
+    // también abre sin conexión.
+    cachedList(
+      `dash:${from}:${nextMonth}`,
+      () =>
+        pb.collection("transactions").getFullList<Transaction>({
+          filter: pb.filter("date >= {:from} && date < {:to}", { from, to: nextMonth }),
+          sort: "-date,-created",
+          expand: "rule",
+        }),
+      (r) => alive && (txs = r),
+    )
       .catch(notify.fail)
       .finally(() => alive && (loading = false));
     return () => (alive = false);

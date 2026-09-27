@@ -176,19 +176,22 @@
 
   const pieConfig = (): ChartConfiguration =>
     ({
-      type: "pie",
+      // La dona del resumen de escritorio, con el total en el centro.
+      type: "doughnut",
       data: {
         labels: slices.map((s) => s.label),
         datasets: [
           {
             data: slices.map((s) => s.total),
             backgroundColor: slices.map((s) => resolveColor(s.color)),
-            borderRadius: 0,
-            spacing: 1,
+            borderColor: resolveColor("var(--bg-level2)"),
+            borderWidth: 2,
+            hoverOffset: 6,
           },
         ],
       },
       options: {
+        cutout: "68%",
         // Tocar una parte la abre, igual que su fila de la lista.
         onClick: (_e, els) => {
           const s = els[0] && slices[els[0].index];
@@ -291,26 +294,42 @@
     <SlideIn key={kind} order={["expense", "income"]}>
       <SlideIn key={by} order={["category", "tag"]}>
         {#if slices.length && !byTags}
-          <div class="st-pie">
-            {#key `${kind}${ym}${yearly}${by}`}
-              <Chart config={pieConfig} height={240} label="Reparto del periodo" />
-            {/key}
+          <div class="card st-pie">
+            <div class="st-card-head">
+              <h3 class="card-title">{kind === "expense" ? "¿En qué gastaste?" : "¿De dónde entró?"}</h3>
+              <p class="card-sub">Toca una parte para ver su detalle</p>
+            </div>
+            <div class="st-donut">
+              {#key `${kind}${ym}${yearly}${by}`}
+                <Chart config={pieConfig} height={220} label="Reparto del periodo" />
+              {/key}
+              <div class="st-donut-total">
+                <span>Total</span>
+                <Money value={filteredTotal} tone={kind} />
+              </div>
+            </div>
           </div>
         {/if}
 
-        <ul class="st-list">
-          {#each slices as s (s.key)}
-            <li>
-              <button type="button" onclick={() => pick(s.key)}>
-                <span class="st-pill" style:--c={s.color}>{pctLabel(s.pct)}</span>
-                <span class="st-name">{s.label}</span>
-                <Money value={s.total} />
-              </button>
-            </li>
-          {:else}
-            {#if !loading}<li class="st-empty">Nada en este periodo.</li>{/if}
-          {/each}
-        </ul>
+        {#if slices.length}
+          <ul class="card st-list">
+            {#each slices as s (s.key)}
+              <li>
+                <button type="button" onclick={() => pick(s.key)}>
+                  <span class="st-pill" style:--c={s.color}>{pctLabel(s.pct)}</span>
+                  <span class="st-name">
+                    <span>{s.label}</span>
+                    <span class="st-bar"><span style:width="{Math.min(100, s.pct)}%" style:--c={s.color}></span></span>
+                  </span>
+                  <Money value={s.total} />
+                  <Icon name="arrow-right-01" size={14} />
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {:else if !loading}
+          <p class="st-empty">Nada en este periodo.</p>
+        {/if}
       </SlideIn>
     </SlideIn>
   </MonthSwipe>
@@ -324,12 +343,17 @@
   </TopBar>
 
   <MonthSwipe bind:ym step={yearly ? 12 : 1}>
-    <div class="st-total">
-      <span>{kind === "expense" ? "Gastos" : "Ingresos"} del {yearly ? "año" : "mes"}</span>
-      <strong><Money value={filteredTotal} /></strong>
+    <div class="card kpi st-total">
+      <div class="kpi-head">
+        <span class="kpi-ico {kind === 'expense' ? 'tone-expense' : 'tone-income'}"
+          ><Icon name={kind === "expense" ? "money-send-01" : "money-receive-01"} /></span
+        >
+        <span class="kpi-label">{kind === "expense" ? "Gastos" : "Ingresos"} del {yearly ? "año" : "mes"}</span>
+      </div>
+      <div class="kpi-val"><Money value={filteredTotal} tone={kind} /></div>
     </div>
 
-    <ul class="st-rows">
+    <ul class="card st-rows">
       <li class="on"><span>Todas</span><span>100%</span><Money value={filteredTotal} /></li>
       {#each slices as s (s.key)}
         <li>
@@ -342,7 +366,11 @@
       {/each}
     </ul>
 
-    <div class="st-line">
+    <div class="card st-line">
+      <div class="st-card-head">
+        <h3 class="card-title">Cómo ha venido</h3>
+        <p class="card-sub">{yearly ? "Últimos cinco años" : "Últimos ocho meses"}</p>
+      </div>
       {#key `${kind}${ym}${yearly}${title}`}
         <Chart config={lineConfig} height={200} label="Evolución en el tiempo" />
       {/key}
@@ -353,18 +381,22 @@
 {/if}
 
 <style>
+  /* El periodo, en una píldora como los botones de escritorio. */
   .st-period {
-    padding: var(--sp-6) var(--sp-10);
-    border: 1px solid var(--border-strong, var(--border));
-    border-radius: var(--radius-md, 8px);
+    min-height: 2.25rem;
+    padding: 0 var(--sp-12);
+    border: 0;
+    border-radius: var(--radius-pill);
     background: var(--bg-field);
+    box-shadow: var(--pillow);
     font: inherit;
     font-size: var(--text-sm);
+    font-weight: 500;
     color: var(--text-primary);
   }
 
   .st-tabs {
-    padding: var(--sp-8) var(--sp-16) 0;
+    padding: var(--sp-12) var(--sp-12) 0;
     font-size: var(--text-sm);
 
     & :global(.seg-sub) {
@@ -375,67 +407,143 @@
   .st-by {
     display: grid;
     gap: var(--sp-6);
-    padding: var(--sp-12) var(--sp-16) 0;
+    padding: var(--sp-10) var(--sp-12) var(--sp-12);
 
     & p {
       margin: 0;
+      padding: 0 var(--sp-4);
       font-size: var(--text-xs);
       color: var(--text-muted);
     }
   }
 
-  .st-pie {
-    padding: var(--sp-16);
-    border-bottom: 0.5rem solid var(--bg-hover);
+  .st-card-head {
+    padding: 0 var(--sp-4) var(--sp-10);
+
+    & h3,
+    & p {
+      margin: 0;
+    }
+
+    & p {
+      font-size: var(--text-xs);
+    }
+  }
+
+  .st-donut {
+    position: relative;
+  }
+
+  .st-donut-total {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+
+    & span {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    & :global(.money) {
+      font-size: var(--text-lg, 1.125rem);
+      font-weight: 600;
+    }
+  }
+
+  .st-pie,
+  .st-line {
+    margin: 0 var(--sp-12) var(--sp-12);
+    padding: var(--sp-16) var(--sp-16) var(--sp-12);
   }
 
   .st-list,
   .st-rows {
-    margin: 0;
-    padding: 0;
+    margin: 0 var(--sp-12) var(--sp-12);
+    padding: var(--sp-4) 0;
+    overflow: hidden;
     list-style: none;
+  }
+
+  .st-list li + li button,
+  .st-rows li + li {
+    box-shadow: inset 0 1px 0 var(--border);
   }
 
   .st-list button {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--sp-12);
     width: 100%;
-    padding: var(--sp-12) var(--sp-16);
+    min-height: 3.5rem;
+    padding: var(--sp-10) var(--sp-12) var(--sp-10) var(--sp-16);
     border: 0;
-    border-bottom: 1px solid var(--border);
     background: none;
     font: inherit;
     font-size: var(--text-sm);
     color: var(--text-primary);
     text-align: left;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 
     &:active {
       background: var(--bg-hover);
+    }
+
+    & > :global(i:last-child) {
+      color: var(--text-muted);
     }
   }
 
   .st-pill {
     min-width: 3.25rem;
     padding: 0.125rem var(--sp-6);
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-pill);
     background: var(--c);
     font-family: var(--font-num);
     font-size: var(--text-xs);
+    font-weight: 600;
     color: oklch(0.2 0 0);
     text-align: center;
   }
 
   .st-name {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    min-width: 0;
+
+    & > span:first-child {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
+  /* Cuánto pesa, en una barra fina como las de "Por categoría" en escritorio. */
+  .st-bar {
+    height: 0.25rem;
+    border-radius: var(--radius-pill);
+    background: var(--bg-hover);
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+
+    & span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--c);
+    }
   }
 
   .st-empty {
+    margin: 0 var(--sp-12);
     padding: var(--sp-40) var(--sp-16);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
     font-size: var(--text-sm);
     color: var(--text-muted);
     text-align: center;
@@ -448,20 +556,7 @@
   }
 
   .st-total {
-    display: flex;
-    flex-direction: column;
-    padding: var(--sp-16);
-    border-bottom: 1px solid var(--border);
-
-    & span {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-    }
-
-    & strong {
-      font-size: 1.375rem;
-      font-weight: 600;
-    }
+    margin: var(--sp-12) var(--sp-12);
   }
 
   .st-rows li,
@@ -474,16 +569,15 @@
   }
 
   .st-rows li {
-    border-bottom: 1px solid var(--border);
-
     &.on {
       padding: var(--sp-14, 0.875rem) var(--sp-16);
-      background: color-mix(in oklch, var(--accent) 22%, transparent);
+      font-weight: 600;
     }
 
     & > span:nth-child(2),
     & button > span:nth-child(2) {
       color: var(--text-muted);
+      font-weight: 400;
       text-align: right;
     }
   }
@@ -520,10 +614,5 @@
     height: 0.5rem;
     border-radius: 50%;
     background: var(--c);
-  }
-
-  .st-line {
-    padding: var(--sp-16) var(--sp-8) var(--sp-8);
-    border-bottom: 0.5rem solid var(--bg-hover);
   }
 </style>

@@ -6,6 +6,7 @@
 <script lang="ts">
   import Money from "../app/Money.svelte";
   import { percent } from "../../lib/format";
+  import { colorOf } from "../../lib/palettes";
   import { sumOf } from "../../lib/mobile";
   import { FIXED_TAG, hasTag } from "../../lib/tags";
   import { store } from "../../lib/store.svelte";
@@ -40,8 +41,8 @@
   );
 </script>
 
-<section class="t-block">
-  <h3>Presupuesto</h3>
+<section class="card t-block">
+  <h3 class="card-title">Presupuesto</h3>
   {#each bars as b (b.label)}
     {@const pct = b.of > 0 ? (b.spent / b.of) * 100 : 0}
     <div class="t-bar">
@@ -65,11 +66,11 @@
   {/each}
 </section>
 
-<section class="t-block">
-  <h3>Cuentas en el mes</h3>
+<section class="card t-block">
+  <h3 class="card-title">Cuentas en el mes</h3>
   {#each byAccount as r (r.a.id)}
     <div class="t-acc">
-      <span class="t-acc-name">{r.a.name}</span>
+      <span class="t-acc-name"><i style:background={colorOf(r.a.palette)}></i>{r.a.name}</span>
       <Money value={r.inc} tone="income" />
       <Money value={r.out} tone="expense" />
     </div>
@@ -80,14 +81,11 @@
 
 <style>
   .t-block {
-    padding: var(--sp-16);
-    border-bottom: 0.5rem solid var(--bg-hover);
+    margin: 0 var(--sp-12) var(--sp-12);
+    padding: var(--sp-16) var(--sp-18, 1.125rem);
 
     & h3 {
-      margin: 0 0 var(--sp-12);
-      font-size: var(--text-sm);
-      font-weight: 600;
-      color: var(--text-secondary);
+      margin: 0 0 var(--sp-14, 0.875rem);
     }
   }
 
@@ -120,11 +118,13 @@
     text-align: right;
   }
 
+  /* Hundida, como los campos: la barra se llena por dentro. */
   .t-track {
     height: 0.5rem;
-    margin: var(--sp-6) 0 var(--sp-4);
+    margin: var(--sp-8) 0 var(--sp-6);
     border-radius: var(--radius-pill, 99px);
-    background: var(--bg-hover);
+    background: var(--field-bg, var(--bg-hover));
+    box-shadow: var(--field-shadow, none);
     overflow: hidden;
 
     & span {
@@ -158,9 +158,19 @@
   }
 
   .t-acc-name {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+
+    & i {
+      flex: none;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+    }
   }
 
   .t-empty {

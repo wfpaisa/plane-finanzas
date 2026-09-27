@@ -8,9 +8,11 @@
   import TooltipLayer from "./components/TooltipLayer.svelte";
   import { ErrorNote, Loading, Modal, SuccessNote } from "./components/ui";
   import ModeToggle from "./components/ui/ModeToggle.svelte";
+  import TabBar from "./components/app/TabBar.svelte";
   import { notify } from "./lib/notify.svelte";
   import { logout, session } from "./lib/pb.svelte";
-  import { go, route } from "./lib/router.svelte";
+  import { mobileHash } from "./lib/mobile";
+  import { go, rewriteRoutes, route } from "./lib/router.svelte";
   import { start, stop, store } from "./lib/store.svelte";
   import { categoryTags } from "./lib/tags";
   import { theme } from "./lib/theme.svelte";
@@ -73,17 +75,23 @@
       });
   });
 
-  // En el teléfono la app abre en su vista (`#/m`), salvo que la persona haya
-  // elegido la completa; y quien eligió la del teléfono vuelve a ella.
-  try {
-    const vista = localStorage.getItem("finanzas-vista");
-    const phone = matchMedia("(max-width: 56rem)").matches;
-    if (
-      route.path === "/" &&
-      (vista === "sencilla" || (phone && vista !== "completa"))
-    )
-      go("/m");
-  } catch {}
+  // Quien usa la app del teléfono (`#/m`) se queda en ella: un enlace a una
+  // pantalla de escritorio abre su equivalente (ver `mobileHash`). En el
+  // teléfono es la de partida, salvo que la persona haya elegido la completa.
+  const inPhoneApp = () => {
+    try {
+      const vista = localStorage.getItem("finanzas-vista");
+      return (
+        vista === "sencilla" ||
+        (vista !== "completa" && matchMedia("(max-width: 56rem)").matches)
+      );
+    } catch {
+      return false;
+    }
+  };
+  rewriteRoutes((r) =>
+    r.path !== "/m" && inPhoneApp() ? mobileHash(r.path, r.query) : undefined,
+  );
 
   // Entrar carga todo; salir lo suelta. Solo cuenta el id (refrescar la
   // sesión trae un objeto de usuario nuevo, y eso no es entrar de nuevo), y lo
@@ -212,24 +220,20 @@
       <Icon name="add-01" size={24} />
     </button>
 
-    <nav class="bottom-nav">
-      {#each NAV.filter((n) => n.mobile) as item (item.path)}
-        <a href="#{item.path}" class:active={route.path === item.path}>
-          <Icon name={item.icon} size={20} /><span>{item.label}</span>
-        </a>
-      {/each}
-      <button
-        type="button"
-        class:active={!NAV.find((n) => n.path === route.path)?.mobile}
-        onclick={() => (moreOpen = !moreOpen)}
-      >
-        <Icon name="menu-01" size={20} /><span>Más</span>
-      </button>
+    <TabBar
+      items={[
+        ...NAV.filter((n) => n.mobile).map((n) => ({ id: n.path, label: n.label, icon: n.icon, href: `#${n.path}` })),
+        { id: "mas", label: "Más", icon: "menu-01", count: store.inboxPending },
+      ]}
+      active={moreOpen || !NAV.find((n) => n.path === route.path)?.mobile ? "mas" : route.path}
+      onPick={() => (moreOpen = !moreOpen)}
+    >
       {#if moreOpen}
         <div class="more-sheet plane-card">
           {#each NAV.filter((n) => !n.mobile) as item (item.path)}
             <a href="#{item.path}" onclick={() => (moreOpen = false)}
-              ><Icon name={item.icon} size={18} />{item.label}</a
+              ><Icon name={item.icon} size={18} />{item.label}
+              {#if item.path === "/correos" && store.inboxPending}<span class="nav-count">{store.inboxPending}</span>{/if}</a
             >
           {/each}
           <a href="#/m" onclick={() => (moreOpen = false)}
@@ -246,7 +250,7 @@
           </div>
         </div>
       {/if}
-    </nav>
+    </TabBar>
   </div>
 {/if}
 
@@ -572,44 +576,10 @@
     }
   }
 
-  .bottom-nav {
-    display: none;
-
-    @media (max-width: 56rem) {
-      position: fixed;
-      inset: auto 0 0 0;
-      z-index: 10;
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      padding: var(--sp-6) var(--sp-4)
-        calc(var(--sp-6) + env(safe-area-inset-bottom));
-      border-top: var(--border-width) solid var(--border);
-      background: var(--glass-2);
-      -webkit-backdrop-filter: blur(var(--glass-blur))
-        saturate(var(--glass-sat, 170%));
-      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
-      box-shadow: var(--glass-spec);
-
-      & > a,
-      & > button {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.125rem;
-        padding: var(--sp-4);
-        border: 0;
-        background: none;
-        font: inherit;
-        font-size: 0.6875rem;
-        color: var(--text-muted);
-        text-decoration: none;
-        cursor: pointer;
-
-        &.active {
-          color: var(--accent);
-          font-weight: 600;
-        }
-      }
+  /* La barra de abajo solo hace falta sin el menú lateral. */
+  .shell > :global(.tabbar) {
+    @media (min-width: 56.01rem) {
+      display: none;
     }
   }
 

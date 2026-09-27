@@ -47,7 +47,7 @@
   });
 </script>
 
-<div class="cal">
+<div class="card cal">
   {#each HEAD as h, i (h)}
     <span class="cal-h" class:sat={i === 5} class:sun={i === 6}>{h}</span>
   {/each}
@@ -76,11 +76,13 @@
   .cal {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    border-top: 1px solid var(--border);
+    margin: 0 var(--sp-12) var(--sp-12);
+    overflow: hidden;
   }
 
   .cal-h {
-    padding: var(--sp-4) 0;
+    padding: var(--sp-8) 0 var(--sp-6);
+    font-weight: 500;
     border-bottom: 1px solid var(--border);
     font-size: var(--text-xs);
     color: var(--text-secondary);
@@ -107,6 +109,7 @@
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
     background: none;
+    -webkit-tap-highlight-color: transparent;
     font: inherit;
     color: var(--text-primary);
     text-align: right;
@@ -116,13 +119,17 @@
       border-right: 0;
     }
 
+    /* La última semana no lleva línea: la tarjeta ya cierra. */
+    &:nth-last-child(-n + 7) {
+      border-bottom: 0;
+    }
+
     &:active {
       background: var(--bg-hover);
     }
 
     &.out {
-      background: var(--bg-hover);
-      opacity: 0.55;
+      opacity: 0.4;
     }
 
     &.today .cal-n {

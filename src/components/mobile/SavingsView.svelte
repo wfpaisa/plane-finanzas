@@ -14,6 +14,7 @@
   import Segmented from "../app/Segmented.svelte";
   import { Button } from "../ui";
   import SlideIn from "./SlideIn.svelte";
+  import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
   import { addMonths, monthsToTarget, today } from "../../lib/finance";
   import { dateShort, monthLabel, monthsLabel } from "../../lib/format";
@@ -93,8 +94,7 @@
 </script>
 
 <TopBar>
-  <button type="button" class="btn-icon sm" aria-label="Volver" onclick={onBack}><Icon name="arrow-left-01" size={18} /></button>
-  <span>Ahorros</span>
+  <BackButton label="Más" onclick={onBack} />
   {#snippet actions()}
     <button
       type="button"
@@ -112,7 +112,14 @@
   {/snippet}
 </TopBar>
 
-<div class="sv-sum">
+<header class="page-head sv-head-page">
+  <div>
+    <h1>Ahorros</h1>
+    <p>Tus metas y cuánto les aportas al mes.</p>
+  </div>
+</header>
+
+<div class="card sv-sum">
   <div><span>Ahorrado</span><Money value={totalSaved} tone="income" /></div>
   <div><span>Aporte al mes</span><Money value={totalMonthly} /></div>
 </div>
@@ -123,7 +130,7 @@
   {@const pct = s.target_amount ? Math.min(100, Math.max(0, (now / s.target_amount) * 100)) : 0}
   {@const movs = movsBySaving.get(s.id) ?? []}
   {@const open = opened.has(s.id)}
-  <section class="sv" class:archived={s.archived} style:--c={colorOf(s.palette)}>
+  <section class="card sv" class:archived={s.archived} style:--c={colorOf(s.palette)}>
     <button type="button" class="sv-head" aria-expanded={open} onclick={() => toggle(s.id)}>
       <span class="sv-ico"><Icon name={s.icon || "piggy-bank"} size={18} /></span>
       <span class="sv-name">
@@ -195,7 +202,7 @@
 {/each}
 
 {#if active.length}
-  <section class="sv-chart">
+  <section class="card sv-chart">
     <Segmented bind:value={view} options={VIEWS} tabs full label="Vista de la gráfica" />
     <SlideIn key={view} order={VIEWS.map((v) => v.id)}>
       {#if view === "estado"}
@@ -222,12 +229,21 @@
 <MovementForm open={movOpen} saving={movSaving} movement={movEditing} onClose={() => (movOpen = false)} />
 
 <style>
+  .sv-head-page {
+    margin: 0;
+    padding: var(--sp-16) var(--sp-16) 0;
+  }
+
   .sv-sum {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: var(--sp-12) var(--sp-12);
     padding: var(--sp-12) var(--sp-8);
-    border-bottom: 1px solid var(--border);
     text-align: center;
+
+    & > div + div {
+      border-left: 1px solid var(--border);
+    }
 
     & div {
       display: flex;
@@ -242,7 +258,8 @@
   }
 
   .sv {
-    border-bottom: 1px solid var(--border);
+    margin: 0 var(--sp-12) var(--sp-12);
+    overflow: hidden;
 
     &.archived {
       opacity: 0.55;
@@ -427,7 +444,10 @@
     color: var(--text-muted);
 
     &.pad {
+      margin: 0 var(--sp-12) var(--sp-12);
       padding: var(--sp-40) var(--sp-16);
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-lg);
       text-align: center;
     }
   }
@@ -436,8 +456,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-12);
+    margin: 0 var(--sp-12) var(--sp-12);
     padding: var(--sp-16);
-    border-top: 0.5rem solid var(--bg-hover);
 
     /* Lo que entra al cambiar de vista (ver SlideIn) sigue la misma columna. */
     & :global(.si-page) {

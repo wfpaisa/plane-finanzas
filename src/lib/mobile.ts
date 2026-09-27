@@ -5,7 +5,7 @@
 import { addMonths, dayOf, today, weekStart, ymd } from "./finance";
 import { dateShort, monthLabel } from "./format";
 import { store } from "./store.svelte";
-import { hasTag, tagLabel, tagsOf } from "./tags";
+import { hasTag, tagsOf } from "./tags";
 import type { Transaction } from "./types";
 
 export const WEEKDAYS_SHORT = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
@@ -21,15 +21,6 @@ export const monthDot = (s: string) => `${s.slice(5, 7)}.${s.slice(0, 4)}`;
 
 /** "2026-09-20" -> "20.9" */
 export const dayDot = (s: string) => `${Number(s.slice(8, 10))}.${Number(s.slice(5, 7))}`;
-
-/** Las dos líneas de la columna izquierda: las etiquetas de la categoría y su nombre, o solo el nombre. */
-export function leftLabel(t: Transaction): [string, string] {
-  if (t.type === "transfer") return ["Transferencia", ""];
-  const cat = store.category(t.category);
-  if (!cat) return ["Sin categoría", ""];
-  const tags = cat.tags ?? [];
-  return tags.length ? [tags.map(tagLabel).join(" · "), cat.name] : [cat.name, ""];
-}
 
 /** "Bancolombia" o "Bancolombia → Nequi". */
 export function accountLine(t: Transaction): string {
@@ -144,4 +135,60 @@ export function passes(t: Transaction, f: TxFilters): boolean {
     (!f.tags.length || f.tags.some((tag) => hasTag(t, tag))) &&
     matches(t, f.text)
   );
+}
+
+// ---------------------------------------------------------------------------
+// Las mismas secciones que en escritorio: cada pantalla de escritorio tiene
+// su lugar en la app del teléfono, y un enlace a ella lleva allá.
+// ---------------------------------------------------------------------------
+
+/** Las pestañas de abajo, en el orden del menú de escritorio. */
+export type Tab = "resumen" | "movimientos" | "cuentas" | "analisis" | "mas";
+
+/** Lo que va en `#/m?…` para abrir la pantalla de escritorio `path`. */
+export function mobileHash(path: string, query: URLSearchParams): string | undefined {
+  // La subpantalla primero; los filtros de la dirección de escritorio, detrás.
+  const with_ = (ver: string) => {
+    const q = new URLSearchParams({ ver });
+    for (const [k, v] of query) if (k !== "ver") q.set(k, v);
+    return `#/m?${q}`;
+  };
+  const tab = (t: Tab) => `#/m?pestana=${t}`;
+  switch (path) {
+    case "/":
+      return tab("resumen");
+    // Con filtros (una cuenta, una etiqueta…), el buscador; si no, el diario.
+    case "/movimientos":
+      return query.size ? with_("buscar") : tab("movimientos");
+    // Administrar cuentas: la pantalla completa, encima de Cuentas.
+    case "/cuentas":
+      return with_("cuentas");
+    case "/estados":
+      return tab("analisis");
+    case "/correos":
+      return with_("correos");
+    case "/ahorros":
+      return with_("ahorros");
+    case "/proyeccion":
+      return with_("plan");
+    case "/ajustes":
+      return with_("ajustes");
+  }
+}
+
+/** Los filtros del buscador que trae una dirección de escritorio (`?cuenta=…&tag=…`). */
+export function filtersFrom(query: URLSearchParams): TxFilters | null {
+  const account = query.get("cuenta");
+  const category = query.get("cat");
+  const tag = query.get("tag");
+  if (!account && !category && !tag) return null;
+  const month = query.get("mes");
+  return {
+    ...emptyFilters(),
+    accounts: account ? [account] : [],
+    categories: category ? [category] : [],
+    tags: tag ? [tag] : [],
+    // `mes=todo` es sin periodo; un `mes=2026-09`, ese mes.
+    ...(month && /^\d{4}-\d{2}$/.test(month) ? { period: "month" as const, ref: `${month}-01` } : {}),
+  };
 }

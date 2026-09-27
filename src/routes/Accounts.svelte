@@ -283,8 +283,11 @@
     }
   }
 
-  /* En angosto la tabla se desliza de lado dentro de su tarjeta. */
+  /* En angosto la tabla se desliza de lado dentro de su tarjeta. Lo que va
+     en posición absoluta dentro (el texto para lectores de pantalla) se ancla
+     aquí: si no, se sale de la tarjeta y ensancha toda la página. */
   .acc-table-wrap {
+    position: relative;
     padding: 0;
     overflow-x: auto;
   }

@@ -13,6 +13,7 @@
   import Segmented from "../app/Segmented.svelte";
   import { Field } from "../ui";
   import SlideIn from "./SlideIn.svelte";
+  import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
   import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../../lib/finance";
   import { monthLabel, monthName, monthsLabel } from "../../lib/format";
@@ -90,8 +91,7 @@
 </script>
 
 <TopBar>
-  <button type="button" class="btn-icon sm" aria-label="Volver" onclick={onBack}><Icon name="arrow-left-01" size={18} /></button>
-  <span>Plan futuro</span>
+  <BackButton label="Más" onclick={onBack} />
   {#snippet actions()}
     <button type="button" class="btn-icon sm" aria-label="Agregar frecuente" onclick={() => edit(null)}>
       <Icon name="add-01" size={18} />
@@ -99,7 +99,14 @@
   {/snippet}
 </TopBar>
 
-<section class="pl-top">
+<header class="page-head pl-head">
+  <div>
+    <h1>Plan futuro</h1>
+    <p>Cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
+  </div>
+</header>
+
+<section class="card pl-top">
   <div class="pl-free" class:short={plan.free < 0}>
     <span class="pl-label">Disponible para otros gastos</span>
     <Money value={plan.free} />
@@ -119,7 +126,7 @@
   </dl>
 </section>
 
-<section class="pl-block">
+<section class="card pl-block">
   <Segmented bind:value={kind} options={KINDS} tabs full label="Frecuentes" />
   <SlideIn key={kind} order={KINDS.map((k) => k.id)}>
     <ul class="pl-list">
@@ -150,13 +157,13 @@
   </SlideIn>
 </section>
 
-<section class="pl-block">
+<section class="card pl-block">
   <h3>Próximos 12 meses</h3>
   <p class="pl-sub">En qué se va el ingreso de cada mes. Si una columna pasa la línea punteada, ese mes no alcanza.</p>
   <Chart config={nextConfig} height={220} square label="Plan de los próximos 12 meses" />
 </section>
 
-<section class="pl-block">
+<section class="card pl-block">
   <h3>Simulador</h3>
   <p class="pl-sub">Hoy tienes <Money value={store.total} /> en total.</p>
   <label class="pl-slider">
@@ -208,6 +215,11 @@
 <RecurringForm open={formOpen} item={editing} kind={newKind} onClose={() => (formOpen = false)} />
 
 <style>
+  .pl-head {
+    margin: 0;
+    padding: var(--sp-16) var(--sp-16) 0;
+  }
+
   .pl-sub {
     font-size: var(--text-xs);
     color: var(--text-muted);
@@ -217,6 +229,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-12);
+    margin: var(--sp-12);
     padding: var(--sp-16);
   }
 
@@ -253,7 +266,8 @@
     height: 0.5rem;
     overflow: hidden;
     border-radius: var(--radius-pill, 99px);
-    background: var(--bg-hover);
+    background: var(--field-bg, var(--bg-hover));
+    box-shadow: var(--field-shadow, none);
   }
 
   .seg-fixed {
@@ -303,8 +317,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-10);
+    margin: 0 var(--sp-12) var(--sp-12);
     padding: var(--sp-16);
-    border-top: 0.5rem solid var(--bg-hover);
 
     /* Lo que entra al cambiar de pestaña (ver SlideIn) sigue la misma columna. */
     & :global(.si-page) {

@@ -54,7 +54,7 @@
   }
 </script>
 
-<ul class="mo">
+<ul class="card mo">
   {#each months as b (b.key)}
     {@const isOpen = open === b.key}
     <li>
@@ -98,6 +98,15 @@
     list-style: none;
   }
 
+  .mo {
+    margin: 0 var(--sp-12) var(--sp-12);
+    overflow: hidden;
+
+    & > li:last-child > :last-child {
+      border-bottom: 0;
+    }
+  }
+
   .mo-row,
   .mo-week {
     display: grid;
@@ -117,6 +126,7 @@
 
   .mo-row {
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 
     &.on {
       background: var(--bg-hover);

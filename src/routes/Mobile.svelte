@@ -1,8 +1,11 @@
 <!--
-  La app del celular (`#/m`), ordenada como las apps de gastos de siempre:
-  abajo cuatro pestañas —Movimientos, Análisis, Cuentas y Más— y en
-  Movimientos el mes visto de cuatro maneras: diario, calendario, mensual
-  (el año mes a mes) y total (presupuesto y cuentas).
+  La app del celular (`#/m`). Tiene las mismas secciones que la versión
+  completa y en el mismo orden: abajo Resumen, Movimientos, Cuentas, Análisis
+  y Más (Correos, Ahorros, Plan futuro y Ajustes). En Movimientos el mes se ve
+  de cuatro maneras: diario, calendario, mensual (el año mes a mes) y total
+  (presupuesto y cuentas). Lo que no tiene una versión propia del teléfono
+  (Resumen, Correos, Ajustes, administrar cuentas) es la misma pantalla de
+  escritorio, dentro de esta app.
 
   Funciona sin internet: lo anotado se guarda en el teléfono y se envía solo
   al volver la conexión (ver lib/offline.svelte.ts). Y si lo que anotaste a
@@ -14,7 +17,9 @@
   import Icon from "../components/Icon.svelte";
   import Money from "../components/app/Money.svelte";
   import Segmented from "../components/app/Segmented.svelte";
+  import TabBar from "../components/app/TabBar.svelte";
   import AccountsView from "../components/mobile/AccountsView.svelte";
+  import BackButton from "../components/mobile/BackButton.svelte";
   import CalendarView from "../components/mobile/CalendarView.svelte";
   import DayList from "../components/mobile/DayList.svelte";
   import MonthlyView from "../components/mobile/MonthlyView.svelte";
@@ -28,10 +33,14 @@
   import TopBar from "../components/mobile/TopBar.svelte";
   import TotalView from "../components/mobile/TotalView.svelte";
   import ModeToggle from "../components/ui/ModeToggle.svelte";
+  import Accounts from "./Accounts.svelte";
+  import Dashboard from "./Dashboard.svelte";
+  import Inbox from "./Inbox.svelte";
+  import Settings from "./Settings.svelte";
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
   import { dateLong, dateShort, monthLabel } from "../lib/format";
   import { dupeSide } from "../lib/labels";
-  import { emptyFilters, filterCount, sumOf } from "../lib/mobile";
+  import { emptyFilters, filterCount, filtersFrom, sumOf, type Tab } from "../lib/mobile";
   import { notify } from "../lib/notify.svelte";
   import { cachedList, offline } from "../lib/offline.svelte";
   import { overlay, type OutboxItem, type Pending } from "../lib/outbox";
@@ -44,15 +53,16 @@
   import { syncSheet, txModal } from "../lib/ui.svelte";
 
   type Tx = Pending<Transaction>;
-  type Tab = "trans" | "stats" | "accounts" | "more";
   type View = "diario" | "calendario" | "mensual" | "total";
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "trans", label: "Movimientos", icon: "book-open-01" },
-    { id: "stats", label: "Análisis", icon: "chart-column" },
-    { id: "accounts", label: "Cuentas", icon: "wallet-01" },
-    { id: "more", label: "Más", icon: "more-horizontal" },
-  ];
+  // Los mismos nombres e iconos que el menú de escritorio (ver App.svelte).
+  const TABS = $derived<{ id: Tab; label: string; icon: string; count?: number }[]>([
+    { id: "resumen", label: "Resumen", icon: "dashboard-square-01" },
+    { id: "movimientos", label: "Movimientos", icon: "exchange-01" },
+    { id: "cuentas", label: "Cuentas", icon: "wallet-01" },
+    { id: "analisis", label: "Análisis", icon: "pie-chart" },
+    { id: "mas", label: "Más", icon: "menu-01", count: store.inboxPending },
+  ]);
   const VIEWS: { id: View; label: string }[] = [
     { id: "diario", label: "Diario" },
     { id: "calendario", label: "Calendario" },
@@ -61,7 +71,7 @@
   ];
 
   const thisMonth = today().slice(0, 7);
-  let tab = $state<Tab>("trans");
+  let tab = $state<Tab>("resumen");
   let view = $state<View>("diario");
   let ym = $state(thisMonth);
   // Lo del buscador (ver mobile/SearchScreen.svelte): se conserva al volver.
@@ -252,39 +262,71 @@
     return () => root.classList.remove("m-app");
   });
 
-  const MORE = [
-    { href: "#/m?ver=ahorros", label: "Ahorros", icon: "piggy-bank" },
-    { href: "#/m?ver=plan", label: "Plan futuro", icon: "chart-line-data-01" },
-    { href: "#/ajustes?seccion=gmail", label: "Gmail", icon: "mail-01" },
-    {
-      href: "#/ajustes?seccion=categorias",
-      label: "Ajustes y categorías",
-      icon: "settings-01",
-    },
-  ];
+  // Lo de "Más", como en el menú de escritorio.
+  const MORE = $derived([
+    { href: "#/m?ver=correos", label: "Correos", icon: "mail-01", hint: "Lo que llega del banco", count: store.inboxPending },
+    { href: "#/m?ver=ahorros", label: "Ahorros", icon: "piggy-bank", hint: "Metas y aportes" },
+    { href: "#/m?ver=plan", label: "Plan futuro", icon: "chart-line-data-01", hint: "Cómo irá tu dinero" },
+    { href: "#/m?ver=ajustes", label: "Ajustes", icon: "settings-01", hint: "Categorías, Gmail y tu cuenta" },
+  ]);
 
-  // Ahorros y Plan futuro se abren encima de Más, en la misma ruta
-  // (`#/m?ver=ahorros`): así el botón de atrás del teléfono vuelve a Más.
-  const SUBS = ["ahorros", "plan", "buscar"];
-  const sub = $derived(
-    SUBS.includes(route.query.get("ver") ?? "") ? route.query.get("ver") : null,
-  );
+  // Las subpantallas se abren encima de su pestaña, en la misma ruta
+  // (`#/m?ver=ahorros`): así el botón de atrás del teléfono vuelve a ella.
+  const SUBS: Record<string, Tab> = {
+    buscar: "movimientos",
+    cuentas: "cuentas",
+    correos: "mas",
+    ahorros: "mas",
+    plan: "mas",
+    ajustes: "mas",
+  };
+  const sub = $derived.by(() => {
+    const v = route.query.get("ver") ?? "";
+    return v in SUBS ? v : null;
+  });
   // El detalle de Análisis va en la ruta (`#/m?categoria=…`): así el botón de
   // atrás del teléfono sube un nivel. Con él abierto, la pestaña es Análisis.
   const drilled = $derived(route.query.has("categoria") || route.query.has("etiqueta"));
+  /** Una pestaña pedida por la ruta (`#/m?pestana=analisis`), desde un enlace de escritorio. */
+  const asked = $derived.by(() => {
+    const p = route.query.get("pestana");
+    return TABS.some((t) => t.id === p) ? (p as Tab) : null;
+  });
   // Mientras está abierta se marca su pestaña; al cerrarla se vuelve a la
   // de antes (de una cuenta, a Cuentas).
   let tabBefore: Tab | null = null;
   $effect(() => {
     if (sub) {
       tabBefore ??= untrack(() => tab);
-      tab = sub === "buscar" ? "trans" : "more";
+      tab = SUBS[sub];
     } else if (tabBefore) {
       tab = tabBefore;
       tabBefore = null;
     }
-    if (drilled) tab = "stats";
+    if (drilled) tab = "analisis";
+    if (asked) tab = asked;
   });
+  // Un enlace de escritorio con filtros (`#/movimientos?cuenta=…`) llega al
+  // buscador con ellos puestos.
+  $effect(() => {
+    if (sub !== "buscar") return;
+    const f = filtersFrom(route.query);
+    if (f) untrack(() => (filters = f));
+  });
+  /** Con qué nombre se vuelve de cada subpantalla. */
+  const backLabel = $derived(TABS.find((t) => t.id === (sub ? SUBS[sub] : tab))?.label ?? "Volver");
+
+  function pickTab(id: string) {
+    const next = id as Tab;
+    if (tab === next && !sub && !drilled && !asked) return;
+    tabBefore = null;
+    // Con una subpantalla abierta la anima el cambio de ruta.
+    if (sub || drilled || asked) {
+      tab = next;
+      nextDirection("lado");
+      location.replace("#/m");
+    } else transition(() => (tab = next));
+  }
   const closeSub = () => goBack("#/m");
 </script>
 
@@ -295,7 +337,17 @@
     <PlanView onBack={closeSub} />
   {:else if sub === "buscar"}
     <SearchScreen bind:filters onBack={closeSub} />
-  {:else if tab === "trans"}
+  {:else if sub === "correos" || sub === "ajustes" || sub === "cuentas"}
+    <TopBar>
+      <BackButton label={backLabel} onclick={closeSub} />
+    </TopBar>
+    <div class="m-page">
+      {#if sub === "correos"}<Inbox />{:else if sub === "ajustes"}<Settings />{:else}<Accounts />{/if}
+    </div>
+  {:else if tab === "resumen"}
+    <TopBar brand />
+    <div class="m-page"><Dashboard /></div>
+  {:else if tab === "movimientos"}
     <TopBar>
       <MonthNav bind:ym yearly={view === "mensual"} />
       {#snippet actions()}
@@ -316,10 +368,19 @@
     </div>
 
     <MonthSwipe bind:ym step={view === "mensual" ? 12 : 1}>
-      <div class="m-sum">
-        <div><span>Ingresos</span><Money value={income} tone="income" /></div>
-        <div><span>Gastos</span><Money value={expense} tone="expense" /></div>
-        <div><span>Balance</span><Money value={income - expense} /></div>
+      <div class="card m-sum">
+        <div>
+          <span class="m-sum-label"><span class="kpi-ico tone-income"><Icon name="money-receive-01" size={14} /></span>Ingresos</span>
+          <Money value={income} tone="income" />
+        </div>
+        <div>
+          <span class="m-sum-label"><span class="kpi-ico tone-expense"><Icon name="money-send-01" size={14} /></span>Gastos</span>
+          <Money value={expense} tone="expense" />
+        </div>
+        <div>
+          <span class="m-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Balance</span>
+          <Money value={income - expense} />
+        </div>
       </div>
 
       <SlideIn key={view} order={VIEWS.map((v) => v.id)}>
@@ -327,7 +388,7 @@
           {#each dupes as t (t.id)}
             {@const pair = pairOf(t)}
             {#if pair}
-              <section class="m-dupe" aria-label="Posible movimiento repetido">
+              <section class="card m-dupe" aria-label="Posible movimiento repetido">
                 <div class="m-dupe-head">
                   <Icon name="copy-01" size={16} />
                   <strong>¿Es el mismo movimiento?</strong>
@@ -398,59 +459,77 @@
         {/if}
       </SlideIn>
     </MonthSwipe>
-  {:else if tab === "stats"}
+  {:else if tab === "analisis"}
     <StatsView onOpen={(t) => txModal.edit(t)} />
-  {:else if tab === "accounts"}
+  {:else if tab === "cuentas"}
     <AccountsView onPick={openAccount} />
   {:else}
-    <TopBar><span>Más</span></TopBar>
-    <div class="m-me">
-      <span class="m-avatar"
-        >{(session.user?.name || session.user?.email || "?")
-          .slice(0, 1)
-          .toUpperCase()}</span
-      >
-      <span class="m-txt">
-        <span class="m-desc">{session.user?.name || "Tú"}</span>
-        <span class="m-sub">{session.user?.email}</span>
-      </span>
-    </div>
-    <ul class="m-menu">
-      {#each MORE as item (item.href)}
-        <li>
-          <a href={item.href}
-            ><Icon name={item.icon} size={18} />{item.label}<Icon
-              name="arrow-right-01"
-              size={14}
-            /></a
-          >
+    <TopBar brand />
+    <div class="m-page">
+      <header class="page-head">
+        <div>
+          <h1>Más</h1>
+          <p>Las demás secciones y tus preferencias.</p>
+        </div>
+      </header>
+
+      <div class="card m-me">
+        <span class="m-avatar"
+          >{(session.user?.name || session.user?.email || "?")
+            .slice(0, 1)
+            .toUpperCase()}</span
+        >
+        <span class="m-txt">
+          <span class="m-desc">{session.user?.name || "Tú"}</span>
+          <span class="m-sub">{session.user?.email}</span>
+        </span>
+      </div>
+
+      <ul class="card m-menu" aria-label="Secciones">
+        {#each MORE as item (item.href)}
+          <li>
+            <a href={item.href}>
+              <span class="m-menu-ic"><Icon name={item.icon} size={18} /></span>
+              <span class="m-txt">
+                <span class="m-desc">{item.label}</span>
+                <span class="m-sub">{item.hint}</span>
+              </span>
+              {#if item.count}<span class="m-count">{item.count}</span>{/if}
+              <Icon name="arrow-right-01" size={14} />
+            </a>
+          </li>
+        {/each}
+      </ul>
+
+      <ul class="card m-menu" aria-label="Preferencias">
+        <li class="m-menu-row">
+          <span class="m-menu-ic"><Icon name="moon-02" size={18} /></span>
+          <span class="m-desc">Modo oscuro</span>
+          <ModeToggle
+            dark={theme.name === "dark"}
+            onToggle={(next) => theme.set(next)}
+          />
         </li>
-      {/each}
-      <li class="m-menu-row">
-        <span><Icon name="moon-02" size={18} />Modo oscuro</span>
-        <ModeToggle
-          dark={theme.name === "dark"}
-          onToggle={(next) => theme.set(next)}
-        />
-      </li>
-      <li>
-        <a href="#/" onclick={leave}
-          ><Icon name="dashboard-square-01" size={18} />Versión completa<Icon
-            name="arrow-right-01"
-            size={14}
-          /></a
-        >
-      </li>
-      <li>
-        <button type="button" class="danger" onclick={logout}
-          ><Icon name="logout-01" size={18} />Salir</button
-        >
-      </li>
-    </ul>
+        <li>
+          <a href="#/" onclick={leave}>
+            <span class="m-menu-ic"><Icon name="computer" size={18} /></span>
+            <span class="m-txt">
+              <span class="m-desc">Versión completa</span>
+              <span class="m-sub">La de escritorio, con el menú lateral</span>
+            </span>
+            <Icon name="arrow-right-01" size={14} />
+          </a>
+        </li>
+      </ul>
+
+      <button type="button" class="btn m-logout" onclick={logout}
+        ><Icon name="logout-01" size={18} />Salir</button
+      >
+    </div>
   {/if}
 </div>
 
-{#if !sub && (tab === "trans" || tab === "stats")}
+{#if !sub && (tab === "resumen" || tab === "movimientos" || tab === "analisis")}
   <button
     type="button"
     class="m-fab"
@@ -461,27 +540,7 @@
   </button>
 {/if}
 
-<nav class="m-nav">
-  {#each TABS as t (t.id)}
-    <button
-      type="button"
-      class:on={tab === t.id}
-      aria-current={tab === t.id ? "page" : undefined}
-      onclick={() => {
-        if (tab === t.id && !sub && !drilled) return;
-        tabBefore = null;
-        // Con una subpantalla abierta la anima el cambio de ruta.
-        if (sub || drilled) {
-          tab = t.id;
-          nextDirection("lado");
-          location.replace("#/m");
-        } else transition(() => (tab = t.id));
-      }}
-    >
-      <span class="m-ic"><Icon name={t.icon} size={22} /></span><span>{t.label}</span>
-    </button>
-  {/each}
-</nav>
+<TabBar items={TABS} active={tab} onPick={pickTab} />
 
 {#if daySheet}
   <div class="m-veil" role="presentation" onclick={() => (daySheet = "")}></div>
@@ -498,6 +557,7 @@
       </button>
     </div>
     <DayList
+      flat
       txs={dayTxs}
       onOpen={(t) => {
         daySheet = "";
@@ -622,6 +682,8 @@
 <style>
   :global(html.m-app) {
     font-size: 99%; /* el 110 % de escritorio, menos un 10 % */
+    /* La barra de abajo, del ancho de la columna de la app. */
+    --tabbar-max: 40rem;
   }
 
   /* Toda la pantalla, sin márgenes: las listas van de borde a borde como en
@@ -630,8 +692,7 @@
     max-width: 40rem;
     min-height: 100%;
     margin: 0 auto;
-    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
-    background: var(--glass-0, transparent);
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
   }
 
   .btn-icon.on {
@@ -653,31 +714,58 @@
     background: var(--accent);
   }
 
-  .m-views {
-    padding: var(--sp-8) var(--sp-16) var(--sp-4);
+  /* Las tarjetas de la app no desenfocan otra vez: ya lo hace el lienzo, y
+     en el teléfono cada desenfoque cuesta. */
+  .m :global(.card) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
+  .m-views {
+    padding: var(--sp-12) var(--sp-12) var(--sp-4);
+  }
+
+  /* Lo que entró y salió, como las tarjetas del resumen: el icono en su
+     círculo, la etiqueta y la cifra. */
   .m-sum {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: var(--sp-10) var(--sp-8);
-    border-bottom: 1px solid var(--border);
-    text-align: center;
+    margin: var(--sp-8) var(--sp-12) var(--sp-12);
+    padding: var(--sp-12) var(--sp-4);
 
-    & div {
+    & > div {
       display: flex;
       flex-direction: column;
+      align-items: center;
+      gap: var(--sp-4);
       min-width: 0;
       overflow: hidden;
+      padding: 0 var(--sp-6);
     }
 
-    & span:first-child {
-      font-size: var(--text-xs);
-      color: var(--text-secondary);
+    & > div + div {
+      border-left: 1px solid var(--border);
     }
 
     & :global(.money) {
+      max-width: 100%;
+      overflow: hidden;
       font-size: var(--text-sm);
+      font-weight: 600;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .m-sum-label {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-6);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+
+    & .kpi-ico {
+      width: 1.5rem;
+      height: 1.5rem;
     }
   }
 
@@ -685,12 +773,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-10);
-    margin: var(--sp-12) var(--sp-16) 0;
-    padding: var(--sp-12) var(--sp-16);
-    border: 1px solid
-      color-mix(in oklch, var(--warning, var(--accent)) 45%, var(--border));
-    border-radius: var(--radius-xl);
-    background: var(--bg-field);
+    margin: 0 var(--sp-12) var(--sp-12);
+    padding: var(--sp-14, 0.875rem) var(--sp-16);
+    border-color: color-mix(in oklch, var(--warning, var(--accent)) 45%, var(--glass-rim));
   }
 
   .m-dupe-head {
@@ -784,15 +869,30 @@
     color: var(--text-muted);
   }
 
+  /* --- Pantallas de la versión completa, dentro de la app ---
+     El mismo margen que tiene la hoja de contenido de escritorio en una
+     ventana angosta. Sus tarjetas no desenfocan otra vez: ya lo hace el
+     lienzo. */
+  .m-page {
+    padding: var(--sp-16) var(--sp-16) var(--sp-24);
+
+    & :global(.card) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
   /* --- Más --- */
   .m-me {
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: var(--sp-12);
-    padding: var(--sp-16);
-    border-bottom: 0.5rem solid var(--bg-hover);
+    margin-bottom: var(--card-gap);
+    padding: var(--sp-16) var(--sp-18, 1.125rem);
   }
 
+  /* Como la del pie del menú lateral: una almohada con la inicial. */
   .m-avatar {
     display: grid;
     flex: none;
@@ -800,54 +900,83 @@
     width: 2.75rem;
     height: 2.75rem;
     border-radius: 50%;
-    background: var(--accent);
-    color: var(--accent-text);
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
+    color: var(--text-primary);
     font-weight: 700;
   }
 
   .m-menu {
-    margin: 0;
-    padding: 0;
-    font-size: var(--text-sm);
+    margin: 0 0 var(--card-gap);
+    padding: var(--sp-6);
     list-style: none;
 
+    & li + li {
+      border-top: 1px solid var(--border);
+    }
+
     & a,
-    & button,
     & .m-menu-row {
       display: flex;
       align-items: center;
       gap: var(--sp-12);
-      width: 100%;
-      padding: var(--sp-12) var(--sp-16);
-      border: 0;
-      border-bottom: 1px solid var(--border);
-      background: none;
-      font: inherit;
+      min-height: 3.5rem;
+      padding: var(--sp-8) var(--sp-10);
+      border-radius: var(--radius-md);
       color: var(--text-primary);
-      text-align: left;
       text-decoration: none;
-      cursor: pointer;
 
-      & > :global(i:last-child:not(:first-child)) {
+      & > :global(i:last-child) {
         margin-left: auto;
         color: var(--text-muted);
       }
     }
 
-    & .m-menu-row {
-      justify-content: space-between;
-      cursor: default;
-
-      & span {
-        display: flex;
-        align-items: center;
-        gap: var(--sp-12);
-      }
+    & a:active {
+      background: var(--bg-hover);
     }
 
-    & .danger {
-      color: var(--danger);
+    & .m-menu-row > .m-desc {
+      flex: 1;
     }
+  }
+
+  /* El icono en su círculo, como en las tarjetas del resumen. */
+  .m-menu-ic {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
+    color: var(--text-secondary);
+  }
+
+  .m-count {
+    min-width: 1.375rem;
+    margin-left: auto;
+    padding: 0 0.375rem;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1.375rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+
+    & + :global(i) {
+      margin-left: 0 !important;
+    }
+  }
+
+  .m-logout {
+    width: 100%;
+    min-height: 3rem;
+    justify-content: center;
+    color: var(--danger);
   }
 
   /* --- Abajo: el botón de anotar y las pestañas --- */
@@ -869,57 +998,6 @@
 
     &:active {
       transform: scale(0.95);
-    }
-  }
-
-  .m-nav {
-    position: fixed;
-    inset: auto 0 0 0;
-    z-index: 10;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    max-width: 40rem;
-    margin: 0 auto;
-    padding: var(--sp-4) 0 calc(var(--sp-4) + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--border);
-    background: var(--glass-2, var(--bg-level1));
-    -webkit-backdrop-filter: blur(var(--glass-blur, 16px))
-      saturate(var(--glass-sat, 170%));
-    backdrop-filter: blur(var(--glass-blur, 16px))
-      saturate(var(--glass-sat, 170%));
-
-    & button {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.125rem;
-      padding: var(--sp-6) var(--sp-4);
-      border: 0;
-      background: none;
-      font: inherit;
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      cursor: pointer;
-
-      &.on {
-        color: var(--accent);
-        font-weight: 600;
-      }
-    }
-  }
-
-  /* La pestaña actual lleva el icono sobre una píldora con un tono del
-     color de acento. */
-  .m-ic {
-    display: grid;
-    place-items: center;
-    width: 3.5rem;
-    height: 1.875rem;
-    border-radius: var(--radius-pill, 99px);
-    transition: background 0.2s;
-
-    .on > & {
-      background: oklch(from var(--accent) l c h / 0.16);
     }
   }
 

@@ -71,7 +71,7 @@ Además proyecta los próximos 12 meses, tiene un **simulador** y responde pregu
 ![Plan futuro](docs/capturas/plan-futuro.png)
 
 ### En el celular
-La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono:
+La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Correos, Ahorros, Plan futuro y Ajustes). En Movimientos:
 
 - **Diario**: tus movimientos día por día, con lo que entró y salió cada día.
 - **Calendario**: el mes completo, con el gasto de cada día a la vista.

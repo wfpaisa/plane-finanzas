@@ -419,8 +419,10 @@
 <MovementForm open={movOpen} saving={movSaving} movement={movEditing} onClose={() => (movOpen = false)} />
 
 <style>
-  /* En angosto la tabla se desliza de lado dentro de su tarjeta. */
+  /* En angosto la tabla se desliza de lado dentro de su tarjeta; lo que va
+     en posición absoluta dentro se ancla aquí para no ensanchar la página. */
   .sv-table-wrap {
+    position: relative;
     padding: 0;
     overflow-x: auto;
   }

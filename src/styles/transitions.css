@@ -32,9 +32,6 @@ html[data-vt] .shell > .keys-fab {
   view-transition-name: atajos;
 }
 
-html[data-vt] .shell > .bottom-nav {
-  view-transition-name: barra;
-}
 
 ::view-transition-group(pagina) {
   animation-duration: 0.24s;
@@ -59,8 +56,8 @@ html.m-app[data-vt] .m-fab {
   view-transition-name: m-fab;
 }
 
-html.m-app[data-vt] .m-nav {
-  view-transition-name: m-nav;
+html[data-vt] .tabbar {
+  view-transition-name: barra;
 }
 
 /* Cambiar de pestaña: un fundido corto. */

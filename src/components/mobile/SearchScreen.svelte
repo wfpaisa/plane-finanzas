@@ -181,7 +181,7 @@
 {/if}
 
 {#if panel}
-  <div class="se-panel">
+  <div class="card se-panel">
     <div class="se-row">
       <span class="se-label">Periodo</span>
       <div class="se-opts">
@@ -257,7 +257,7 @@
 {:else if idle}
   <p class="se-hint">Escribe algo o elige filtros con <Icon name="filter-horizontal" size={14} /> para buscar en todos tus movimientos.</p>
 {:else}
-  <div class="se-sum">
+  <div class="card se-sum">
     <div><span>Ingresos</span><Money value={income} tone="income" /></div>
     <div><span>Gastos</span><Money value={expense} tone="expense" /></div>
     <div><span>Balance</span><Money value={income - expense} /></div>
@@ -291,14 +291,18 @@
     align-items: center;
     gap: var(--sp-8);
     margin: var(--sp-10) var(--sp-12);
-    padding: var(--sp-2, 0.125rem) var(--sp-6) var(--sp-2, 0.125rem) var(--sp-12);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg-field);
+    padding: var(--sp-2, 0.125rem) var(--sp-6) var(--sp-2, 0.125rem) var(--sp-14, 0.875rem);
+    border: 0;
+    border-radius: var(--radius-pill);
+    /* Hundido, como los campos de escritorio. */
+    background: var(--field-bg, var(--bg-field));
+    box-shadow: var(--field-shadow, 0 0 0 1px var(--border));
     color: var(--text-muted);
+    transition: background 0.2s, box-shadow 0.2s;
 
     &:focus-within {
-      border-color: var(--accent);
+      background: var(--field-bg-focus, var(--bg-field));
+      box-shadow: var(--field-shadow, none), 0 0 0 3px var(--focus-ring);
     }
 
     & input {
@@ -372,8 +376,8 @@
   }
 
   .se-panel {
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    margin: 0 var(--sp-12) var(--sp-12);
+    padding: var(--sp-4) var(--sp-4) var(--sp-12);
   }
 
   .se-row {
@@ -435,15 +439,18 @@
   .se-sum {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: var(--sp-10) var(--sp-8);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    margin: 0 var(--sp-12) var(--sp-12);
+    padding: var(--sp-12) var(--sp-8);
     text-align: center;
 
     & div {
       display: flex;
       flex-direction: column;
       min-width: 0;
+    }
+
+    & div + div {
+      border-left: 1px solid var(--border);
     }
 
     & span:first-child {

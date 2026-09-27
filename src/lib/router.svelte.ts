@@ -11,6 +11,15 @@ function read() {
   return { path: path || "/", query: new URLSearchParams(qs) };
 }
 
+type Route = ReturnType<typeof read>;
+
+/**
+ * Una dirección que en realidad lleva a otra: en el celular, las pantallas de
+ * escritorio abren su equivalente de la app del teléfono (ver `App.svelte`).
+ * Devuelve el hash nuevo, o nada si la dirección se queda como está.
+ */
+let rewrite: ((r: Route) => string | undefined) | null = null;
+
 let current = $state(read());
 
 // Cada entrada del historial lleva su posición en `history.state`: si la
@@ -32,6 +41,10 @@ const SCREEN = ["ver", "categoria", "etiqueta"];
 let lastHash = location.hash;
 
 window.addEventListener("hashchange", () => {
+  // Se reemplaza la entrada del historial sin otro `hashchange`: atrás no
+  // pasa por la dirección de escritorio.
+  const to = rewrite?.(read());
+  if (to) history.replaceState(history.state, "", to);
   lastHash = location.hash;
   let pos: number | undefined = history.state?.at;
   if (pos === undefined) {
@@ -119,6 +132,16 @@ window.addEventListener("popstate", () => {
 
 // Recargar con una capa abierta la cierra: su entrada ya no lleva a nada.
 if (history.state?.capa) history.back();
+
+/** Pone la regla de `rewrite` y la aplica ya a la dirección con la que se abrió. */
+export function rewriteRoutes(fn: (r: Route) => string | undefined) {
+  rewrite = fn;
+  const to = fn(current);
+  if (!to) return;
+  history.replaceState(history.state, "", to);
+  lastHash = location.hash;
+  current = read();
+}
 
 export const route = {
   get path() {
