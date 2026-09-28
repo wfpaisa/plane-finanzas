@@ -9,7 +9,7 @@
   import RecurringForm from "../components/app/RecurringForm.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Button, Field } from "../components/ui";
+  import { Field } from "../components/ui";
   import Tag from "../components/ui/Tag.svelte";
   import { band, flowLayout } from "../lib/analysis";
   import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../lib/finance";
@@ -109,10 +109,6 @@
     <div>
       <h1>Proyección</h1>
       <p>Calcula cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
-    </div>
-    <div class="page-actions">
-      <Button onclick={() => edit(null, "income")}><Icon name="money-receive-01" />Ingreso recurrente</Button>
-      <Button variant="secondary" onclick={() => edit(null, "expense")}><Icon name="add-01" />Gasto recurrente</Button>
     </div>
   </header>
 
