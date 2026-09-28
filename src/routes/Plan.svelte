@@ -12,6 +12,7 @@
   import Icon from "../components/Icon.svelte";
   import { Button, Field } from "../components/ui";
   import Tag from "../components/ui/Tag.svelte";
+  import { band, flowLayout } from "../lib/analysis";
   import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../lib/finance";
   import { monthLabel, monthName, monthsLabel } from "../lib/format";
   import { nextMonthsChart, simulationChart } from "../lib/planCharts";
@@ -34,11 +35,29 @@
   const incomes = $derived(store.recurring.filter((r) => r.kind === "income"));
   const expenses = $derived(store.recurring.filter((r) => r.kind === "expense"));
 
-  // La barra se mide contra el ingreso o, si lo planeado se pasa, contra lo
-  // planeado: así los tramos nunca suman más del ancho.
-  const barBase = $derived(Math.max(plan.income, plan.fixed + plan.savings));
   const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
-  const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
+  // El flujo del ingreso: a la derecha, a dónde va cada peso. Si lo
+  // planeado se pasa del ingreso, la última banda es lo que falta, y la
+  // barra del ingreso cubre solo la parte que alcanza a pagar.
+  const FLOW_W = 1000;
+  const FLOW_H = 220;
+  const NODE = 12;
+  const flow = $derived(
+    flowLayout(
+      [],
+      [
+        { id: "fixed", label: "Gastos frecuentes", value: plan.fixed, tint: "seg-fixed" },
+        { id: "save", label: "Ahorros", value: plan.savings, tint: "seg-save" },
+        plan.free < 0
+          ? { id: "short", label: "Te falta cada mes", value: -plan.free, tint: "seg-short" }
+          : { id: "free", label: "Te puedes gastar", value: plan.free, tint: "seg-free" },
+      ].filter((p) => p.value > 0),
+      FLOW_H,
+      8,
+      60,
+    ),
+  );
+  const inH = $derived(flow.total ? (FLOW_H * Math.min(plan.income, flow.total)) / flow.total : 0);
 
   // Los ahorros como los ve la simulación: lo que tienen en las cuentas
   // propias y la parte del aporte que sale de ellas. En uno compartido, lo
@@ -100,43 +119,39 @@
   </header>
 
   <div class="stack">
+    <!-- El ingreso a la izquierda se abre en bandas hacia lo que se lleva
+         cada parte, cada una del grueso de su monto. Lo que queda para
+         gastar es la respuesta, y va más grande. -->
     <div class="card plan-card">
-      <div class="plan-top">
-        <div class="stat">
-          <span class="s-label">Ingresos al mes</span>
-          <span class="s-val"><Money value={plan.income} tone="income" /></span>
+      {#if plan.income > 0}
+        <div class="pflow" style:height="{FLOW_H}px">
+          <div class="pflow-labels left">
+            <div class="pflow-label" style:top="{(Math.min(inH, FLOW_H) / 2 / FLOW_H) * 100}%">
+              <span class="pflow-name">Tu ingreso al mes</span>
+              <span class="pflow-amount"><Money value={plan.income} /></span>
+            </div>
+          </div>
+          <svg viewBox="0 0 {FLOW_W} {FLOW_H}" preserveAspectRatio="none" aria-hidden="true">
+            {#each flow.right as n (n.id)}
+              <path class="pflow-band {n.tint}" d={band(NODE, n.my, n.mh, FLOW_W - NODE, n.y, n.h)} />
+              <rect class="pflow-node {n.tint}" x={FLOW_W - NODE} y={n.y} width={NODE} height={n.h} rx="3" />
+            {/each}
+            <rect class="pflow-income" x="0" y="0" width={NODE} height={inH} rx="3" />
+          </svg>
+          <div class="pflow-labels right">
+            {#each flow.right as n (n.id)}
+              {@const main = n.id === "free" || n.id === "short"}
+              <div class="pflow-label {n.tint}" class:main style:top="{((n.y + n.h / 2) / FLOW_H) * 100}%">
+                <span class="pflow-name">{n.label} · {Math.round(share(n.value))}%</span>
+                <span class="pflow-amount"><Money value={n.value} /></span>
+                {#if n.id === "short"}<span class="pflow-sub">lo planeado supera tu ingreso</span>{/if}
+              </div>
+            {/each}
+          </div>
         </div>
-        <span class="op">−</span>
-        <div class="stat">
-          <span class="s-label">Gastos frecuentes</span>
-          <span class="s-val"><Money value={plan.fixed} tone="expense" /></span>
-        </div>
-        <span class="op">−</span>
-        <div class="stat">
-          <span class="s-label">Ahorros</span>
-          <span class="s-val saving"><Money value={plan.savings} /></span>
-        </div>
-        <span class="op">=</span>
-        <div class="stat free" class:short={plan.free < 0}>
-          <span class="s-label"><span class="free-dot"></span>Disponible para otros gastos</span>
-          <span class="s-val"><Money value={plan.free} /></span>
-          {#if plan.income > 0}
-            <span class="free-sub">
-              {plan.free < 0 ? "Te faltan cada mes" : `${Math.round(share(plan.free))}% de tus ingresos al mes`}
-            </span>
-          {/if}
-        </div>
-      </div>
-      <div class="plan-bar" aria-hidden="true">
-        <span class="seg-fixed" style:width="{width(plan.fixed)}%"></span>
-        <span class="seg-save" style:width="{width(plan.savings)}%"></span>
-        <span class="seg-free" style:width="{width(plan.free)}%"></span>
-      </div>
-      <div class="legend">
-        <span class="legend-item"><span class="swatch seg-fixed"></span>Gastos frecuentes <b>{Math.round(share(plan.fixed))}%</b></span>
-        <span class="legend-item"><span class="swatch seg-save"></span>Ahorros <b>{Math.round(share(plan.savings))}%</b></span>
-        <span class="legend-item"><span class="swatch seg-free"></span>Disponible <b>{Math.round(share(plan.free))}%</b></span>
-      </div>
+      {:else}
+        <p class="muted small">Agrega tus ingresos recurrentes para ver en qué se va cada peso.</p>
+      {/if}
     </div>
 
     <div class="split-even">
@@ -277,114 +292,109 @@
 
 <style>
   .plan-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-16);
     padding: var(--sp-20);
   }
 
-  .plan-top {
+  /* Las bandas son un SVG que se estira a lo ancho; las etiquetas, HTML
+     encima, para que la letra no se deforme. Como en MoneyFlow. */
+  .pflow {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 3fr) minmax(0, 1.4fr);
+    gap: var(--sp-12);
+
+    @media (max-width: 40rem) {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.3fr);
+      gap: var(--sp-6);
+    }
+
+    & svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .pflow-labels {
+    position: relative;
+
+    &.left .pflow-label {
+      right: 0;
+      align-items: flex-end;
+      text-align: right;
+    }
+
+    &.right .pflow-label {
+      left: 0;
+    }
+  }
+
+  .pflow-label {
+    --ink: light-dark(oklch(from var(--seg) calc(l - 0.14) c h), var(--seg));
+
+    position: absolute;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-12) var(--sp-20);
+    flex-direction: column;
+    max-width: 100%;
+    transform: translateY(-50%);
 
-    & .stat .s-val {
-      font-size: 1.375rem;
-      font-family: var(--font-num);
-      font-weight: 700;
-    }
-
-    & .saving :global(.money) {
-      color: light-dark(oklch(from var(--viz-saving) calc(l - 0.12) c h), var(--viz-saving));
-    }
-
-    /* El resultado: una tarjeta con el tinte de lo que queda --verde si
-       sobra, rojo si falta--, el mismo color de su tramo en la barra. */
-    & .free {
-      --free-tone: var(--viz-free);
-      --free-ink: light-dark(oklch(from var(--free-tone) calc(l - 0.14) c h), var(--free-tone));
-
-      position: relative;
-      gap: var(--sp-4);
-      min-width: 15rem;
-      margin-left: auto;
-      padding: var(--sp-12) var(--sp-20);
-      overflow: hidden;
-      border: var(--border-width) solid oklch(from var(--free-tone) l c h / 0.4);
-      border-radius: var(--radius-lg);
-      background:
-        radial-gradient(120% 140% at 100% 0%, oklch(from var(--free-tone) l c h / 0.28), transparent 60%),
-        oklch(from var(--free-tone) l c h / 0.1);
-      box-shadow: 0 0.5rem 1.5rem -0.75rem oklch(from var(--free-tone) l c h / 0.55);
-
-      &.short {
-        --free-tone: var(--viz-expense);
-      }
-
-      & .s-label {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--sp-6);
-        color: var(--text-secondary);
-      }
-
-      & .s-val {
-        font-size: 1.875rem;
-        line-height: 1.1;
-        letter-spacing: -0.01em;
-      }
-
-      & :global(.money) {
-        color: var(--free-ink);
-      }
+    &.main .pflow-amount {
+      font-size: 1.625rem;
+      line-height: 1.15;
     }
   }
 
-  .free-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--free-tone);
-    box-shadow: 0 0 0 0.1875rem oklch(from var(--free-tone) l c h / 0.25);
-  }
-
-  .free-sub {
-    color: var(--free-ink);
+  .pflow-name {
     font-size: var(--text-xs);
-    font-weight: 600;
-    opacity: 0.85;
+    color: var(--text-secondary);
   }
 
-  .op {
-    font-size: 1.5rem;
-    color: var(--text-subtle);
-    font-weight: 300;
+  .pflow-amount {
+    font-family: var(--font-num);
+    font-size: 1.125rem;
+    font-weight: 700;
+    white-space: nowrap;
   }
 
-  .plan-bar {
-    display: flex;
-    height: 0.875rem;
-    overflow: hidden;
-    border-radius: 99rem;
-    background: var(--bg-field);
-    gap: 2px;
+  .pflow-labels.right :is(.pflow-name, .pflow-amount :global(.money)),
+  .pflow-sub {
+    color: var(--ink);
+  }
 
-    & span {
-      transition: width 0.4s;
-    }
+  .pflow-sub {
+    font-size: var(--text-xs);
+  }
+
+  .pflow-income {
+    fill: var(--text-muted);
+  }
+
+  .pflow-node {
+    fill: var(--seg);
+  }
+
+  .pflow-band {
+    fill: var(--seg);
+    opacity: 0.28;
   }
 
   .seg-fixed {
-    background: var(--viz-expense);
+    --seg: var(--viz-expense);
   }
 
   .seg-save {
-    background: var(--viz-saving);
+    --seg: var(--viz-saving);
   }
 
   .seg-free {
-    background: var(--viz-free);
+    --seg: var(--viz-free);
+  }
+
+  .seg-short {
+    --seg: var(--viz-expense);
+
+    &.pflow-band {
+      opacity: 0.14;
+    }
   }
 
   .fixed-row {
