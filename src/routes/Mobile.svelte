@@ -1,7 +1,7 @@
 <!--
   La app del celular (`#/m`). Tiene las mismas secciones que la versión
   completa y en el mismo orden: abajo Resumen, Movimientos, Cuentas, Análisis
-  y Más (Correos, Ahorros, Plan futuro y Ajustes). En Movimientos el mes se ve
+  y Más (Correos, Ahorros, Proyección y Ajustes). En Movimientos el mes se ve
   de cuatro maneras: diario, calendario, mensual (el año mes a mes) y total
   (presupuesto y cuentas). Lo que no tiene una versión propia del teléfono
   (Resumen, Correos, Ajustes, administrar cuentas) es la misma pantalla de
@@ -267,7 +267,7 @@
   const MORE = $derived([
     { href: "#/m?ver=correos", label: "Correos", icon: "mail-01", hint: "Lo que llega del banco", count: store.inboxPending },
     { href: "#/m?ver=ahorros", label: "Ahorros", icon: "piggy-bank", hint: "Metas y aportes" },
-    { href: "#/m?ver=plan", label: "Plan futuro", icon: "chart-line-data-01", hint: "Cómo irá tu dinero" },
+    { href: "#/m?ver=plan", label: "Proyección", icon: "chart-line-data-01", hint: "Cómo irá tu dinero" },
     { href: "#/m?ver=ajustes", label: "Ajustes", icon: "settings-01", hint: "Categorías, Gmail y tu cuenta" },
   ]);
 

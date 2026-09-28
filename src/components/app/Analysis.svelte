@@ -1,21 +1,22 @@
 <!--
-  Estados: ingresos y gastos por semana (dentro de un mes), por mes (dentro
-  de un año) o por año, y el reparto por categoría y por etiqueta. Tocar una
-  categoría la aísla en la gráfica; elegir una etiqueta filtra toda la página.
+  Análisis, dentro del Resumen: ingresos y gastos por semana (dentro de un
+  mes), por mes (dentro de un año) o por año, y el reparto por categoría y
+  por etiqueta. Tocar una categoría la aísla en la gráfica; elegir una
+  etiqueta filtra toda la sección. Abre en el mes actual, por semanas.
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
 
-  import CategoryPill from "../components/app/CategoryPill.svelte";
-  import Money from "../components/app/Money.svelte";
-  import PickBar from "../components/app/PickBar.svelte";
-  import MoneyFlow from "../components/app/MoneyFlow.svelte";
-  import Segmented from "../components/app/Segmented.svelte";
-  import Chart from "../components/Chart.svelte";
-  import Icon from "../components/Icon.svelte";
-  import { MonthPicker, Select } from "../components/ui";
-  import { change, cumulative, insights, previousPeriod, topN, type FlowItem } from "../lib/analysis";
-  import { alpha, colorsFor, token } from "../lib/colors";
+  import CategoryPill from "./CategoryPill.svelte";
+  import Money from "./Money.svelte";
+  import PickBar from "./PickBar.svelte";
+  import MoneyFlow from "./MoneyFlow.svelte";
+  import Segmented from "./Segmented.svelte";
+  import Chart from "../Chart.svelte";
+  import Icon from "../Icon.svelte";
+  import { MonthPicker, Select } from "../ui";
+  import { change, cumulative, insights, previousPeriod, topN, type FlowItem } from "../../lib/analysis";
+  import { alpha, colorsFor, token } from "../../lib/colors";
   import {
     addMonths,
     bucketize,
@@ -28,20 +29,20 @@
     weeksOfMonth,
     type Granularity,
     type Kind,
-  } from "../lib/finance";
-  import { money, monthLabel, weekLabel } from "../lib/format";
-  import { notify } from "../lib/notify.svelte";
-  import { pb } from "../lib/pb.svelte";
-  import { go } from "../lib/router.svelte";
-  import { keys as shortcuts } from "../lib/keys";
-  import { store } from "../lib/store.svelte";
-  import { byTag, categoryTags, hasTag } from "../lib/tags";
-  import { tintFor } from "../lib/palettes";
-  import Tag, { type Tone } from "../components/ui/Tag.svelte";
-  import type { Transaction } from "../lib/types";
+  } from "../../lib/finance";
+  import { money, monthLabel, weekLabel } from "../../lib/format";
+  import { notify } from "../../lib/notify.svelte";
+  import { pb } from "../../lib/pb.svelte";
+  import { go } from "../../lib/router.svelte";
+  import { keys as shortcuts } from "../../lib/keys";
+  import { store } from "../../lib/store.svelte";
+  import { byTag, categoryTags, hasTag } from "../../lib/tags";
+  import { tintFor } from "../../lib/palettes";
+  import Tag, { type Tone } from "../ui/Tag.svelte";
+  import type { Transaction } from "../../lib/types";
 
   const now = today();
-  let g = $state<Granularity>("month");
+  let g = $state<Granularity>("week");
   let ym = $state(now.slice(0, 7));
   let year = $state(Number(now.slice(0, 4)));
   let kind = $state<Kind | "both">("expense");
@@ -348,10 +349,10 @@
   {/if}
 {/snippet}
 
-<div class="page">
-  <header class="page-head">
+<section class="analysis" aria-labelledby="analysis-title">
+  <header class="page-head analysis-head">
     <div>
-      <h1>Análisis de ingresos y gastos</h1>
+      <h2 id="analysis-title">Análisis de ingresos y gastos</h2>
       <p>Compara cuánto dinero entró y salió en {title}.</p>
     </div>
     <div class="page-actions">
@@ -692,9 +693,21 @@
       {/each}
     </PickBar>
   {/if}
-</div>
+</section>
 
 <style>
+  /* Separada de las tarjetas del Resumen, que van justo arriba. */
+  .analysis {
+    margin-top: var(--sp-24);
+  }
+
+  .analysis-head h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
   .filter-chip {
     display: inline-flex;
     align-items: center;

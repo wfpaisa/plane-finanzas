@@ -14,7 +14,7 @@ export const SHORTCUTS: { where: string; items: [string, string][] }[] = [
     where: "En cualquier pantalla",
     items: [
       ["N", "Agregar un movimiento"],
-      ["1 … 8", "Ir a Resumen, Movimientos, Cuentas, Análisis, Correos, Ahorros, Plan futuro o Ajustes"],
+      ["1 … 7", "Ir a Resumen, Proyección, Ahorros, Movimientos, Cuentas, Correos o Ajustes"],
       ["?", "Ver estos atajos"],
       ["Esc", "Cerrar la ventana abierta"],
     ],
@@ -33,7 +33,7 @@ export const SHORTCUTS: { where: string; items: [string, string][] }[] = [
     ],
   },
   {
-    where: "Análisis",
+    where: "Resumen (análisis)",
     items: [
       ["← →", "Periodo anterior / siguiente"],
       ["H", "Volver al periodo actual"],

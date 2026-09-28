@@ -1,12 +1,15 @@
 <!--
-  Resumen: cuánto hay, cómo va el mes, en qué se va la plata y cómo van los
-  ahorros. Lo primero que se ve al entrar.
+  Resumen: cuánto hay, cuánto queda para gastar este mes y cómo van los
+  ahorros; debajo, en escritorio, el análisis de ingresos y gastos (antes su
+  propia pantalla). Lo primero que se ve al entrar. En el celular es la
+  pestaña Resumen, que tiene su propia pestaña de Análisis: allá sigue con
+  sus gráficas de siempre.
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
 
+  import Analysis from "../components/app/Analysis.svelte";
   import Money from "../components/app/Money.svelte";
-  import TransactionList from "../components/app/TransactionList.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button } from "../components/ui";
@@ -21,7 +24,6 @@
   import { store } from "../lib/store.svelte";
   import { byTag, FIXED_TAG, hasTag, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
-  import { txModal } from "../lib/ui.svelte";
 
   // En el celular la gráfica es angosta: el eje abrevia las cifras ($14.2M)
   // y las escribe más pequeñas.
@@ -199,11 +201,12 @@
   const savingsList = $derived(
     store.activeSavings.slice(0, 5).map((s) => ({ s, current: store.savingCurrent(s.id) })),
   );
+  const savedTotal = $derived(store.activeSavings.reduce((t, x) => t + store.savingCurrent(x.id), 0));
   /** Sin meta, la barra se mide contra el ahorro más grande. */
   const savingsMax = $derived(Math.max(0, ...savingsList.map((x) => x.current)));
 </script>
 
-<div class="page page-wide">
+<div class="page">
   <header class="page-head">
     <div>
       <h1>Hola{firstName ? `, ${firstName}` : ""}</h1>
@@ -220,150 +223,167 @@
           <Icon name="alert-02" />{review} {review === 1 ? "movimiento pendiente" : "movimientos pendientes"}
         </Button>
       {/if}
-      <Button variant="secondary" onclick={() => txModal.new()}><Icon name="add-01" />Agregar movimiento</Button>
     </div>
   </header>
 
   <div class="stack dash">
-    <div class="kpis-auto">
-      <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
-        <div class="kpi-val"><Money value={store.total} /></div>
-        <div class="kpi-foot">{store.activeAccounts.length} cuentas</div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="money-receive-01" /></span><span class="kpi-label">Ingresos del mes</span></div>
-        <div class="kpi-val"><Money value={income} tone="income" /></div>
-        <div class="kpi-foot">Plan: <Money value={plan.income} /></div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="money-send-01" /></span><span class="kpi-label">Gastos del mes</span></div>
-        <div class="kpi-val"><Money value={expense} tone="expense" /></div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-head">
-          <span class="kpi-ico {left < 0 ? 'tone-expense' : left < budget * 0.15 ? 'tone-warn' : 'tone-income'}"><Icon name="coins-01" /></span>
-          <span class="kpi-label">{left >= 0 ? "Disponible para otros gastos" : "Gastaste de más"}</span>
+    {#if mobile}
+      <div class="kpis-auto">
+        <div class="card kpi">
+          <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
+          <div class="kpi-val"><Money value={store.total} /></div>
+          <div class="kpi-foot">{store.activeAccounts.length} cuentas</div>
         </div>
-        <div class="kpi-val"><Money value={Math.abs(left)} tone={left < 0 ? "expense" : undefined} /></div>
-        <progress class="progress" max="100" value={pctUsed}></progress>
-        <div class="kpi-foot">Has usado {Math.round(pctUsed)}% de lo disponible: <Money value={budget} /></div>
-        {#if use.fixedOver > 0}
-          <div class="kpi-foot">Incluye <Money value={use.fixedOver} /> de gastos fijos por encima de lo planeado.</div>
-        {/if}
-      </div>
-    </div>
-
-    <div class="dash-grid">
-      <div class="card dash-flow">
-        <div class="card-head">
-          <div>
-            <h3 class="card-title">Dinero que entró y salió</h3>
-            <p class="card-sub">Últimos 6 meses</p>
+        <div class="card kpi">
+          <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="money-receive-01" /></span><span class="kpi-label">Ingresos del mes</span></div>
+          <div class="kpi-val"><Money value={income} tone="income" /></div>
+          <div class="kpi-foot">Plan: <Money value={plan.income} /></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="money-send-01" /></span><span class="kpi-label">Gastos del mes</span></div>
+          <div class="kpi-val"><Money value={expense} tone="expense" /></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-head">
+            <span class="kpi-ico {left < 0 ? 'tone-expense' : left < budget * 0.15 ? 'tone-warn' : 'tone-income'}"><Icon name="coins-01" /></span>
+            <span class="kpi-label">{left >= 0 ? "Te puedes gastar" : "Gastaste de más"}</span>
           </div>
-        </div>
-        <div class="card-body">
-          {#if !loading}<Chart config={flowConfig} label="Ingresos y gastos por mes" />{/if}
-        </div>
-      </div>
-      <div class="card dash-cats">
-        <div class="card-head">
-          {#if catTag !== null}
-            <button type="button" class="btn-icon sm btn-rounded" aria-label="Volver a las etiquetas" onclick={() => (catTag = null)}>
-              <Icon name="arrow-left-01" />
-            </button>
-          {/if}
-          <div class="flex-1">
-            <h3 class="card-title">{catTag === null ? "¿En qué gastaste?" : catTag ? `#${catTag}` : "Sin etiqueta"}</h3>
-            <p class="card-sub">
-              {catTag === null ? `Gastos de ${monthLabel(ym, true)}` : "Sus categorías este mes"}
-            </p>
-          </div>
-          <div class="card-head-actions"><a class="link small" href="#/estados">Ver análisis</a></div>
-        </div>
-        <div class="card-body">
-          {#if showTags}
-            <Chart config={tagDoughnutConfig} height={240} label="Gastos del mes por etiqueta" />
-            <p class="small muted tag-note">Toca una etiqueta para ver sus categorías. Un gasto con varias etiquetas suma en cada una.</p>
-          {:else if cats.length}
-            {#key catTag}
-              <Chart config={doughnutConfig} height={240} label="Gastos del mes por categoría" />
-            {/key}
-          {:else}
-            <div class="empty-card">Todavía no hay gastos este mes.</div>
+          <div class="kpi-val"><Money value={Math.abs(left)} tone={left < 0 ? "expense" : undefined} /></div>
+          <progress class="progress" max="100" value={pctUsed}></progress>
+          <div class="kpi-foot">Has usado {Math.round(pctUsed)}% de lo disponible: <Money value={budget} /></div>
+          {#if use.fixedOver > 0}
+            <div class="kpi-foot">Incluye <Money value={use.fixedOver} /> de gastos fijos por encima de lo planeado.</div>
           {/if}
         </div>
       </div>
 
-      <div class="card dash-txs">
-        <div class="card-head">
-          <div><h3 class="card-title">Últimos movimientos</h3></div>
-          <div class="card-head-actions"><a class="link small" href="#/movimientos">Ver todos</a></div>
-        </div>
-        <div class="card-body">
-          {#if txs.length}
-            <TransactionList items={txs.slice(0, 8)} onOpen={(t) => txModal.edit(t)} />
-          {:else if !loading}
-            <div class="empty-card">
-              Sin movimientos todavía. Agrega uno con <b>+</b> o <a class="link" href="#/ajustes?seccion=gmail">impórtalos de Gmail</a>.
+      <div class="dash-grid">
+        <div class="card dash-flow">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">Dinero que entró y salió</h3>
+              <p class="card-sub">Últimos 6 meses</p>
             </div>
+          </div>
+          <div class="card-body">
+            {#if !loading}<Chart config={flowConfig} label="Ingresos y gastos por mes" />{/if}
+          </div>
+        </div>
+        <div class="card dash-cats">
+          <div class="card-head">
+            {#if catTag !== null}
+              <button type="button" class="btn-icon sm btn-rounded" aria-label="Volver a las etiquetas" onclick={() => (catTag = null)}>
+                <Icon name="arrow-left-01" />
+              </button>
+            {/if}
+            <div class="flex-1">
+              <h3 class="card-title">{catTag === null ? "¿En qué gastaste?" : catTag ? `#${catTag}` : "Sin etiqueta"}</h3>
+              <p class="card-sub">
+                {catTag === null ? `Gastos de ${monthLabel(ym, true)}` : "Sus categorías este mes"}
+              </p>
+            </div>
+            <div class="card-head-actions"><a class="link small" href="#/estados">Ver análisis</a></div>
+          </div>
+          <div class="card-body">
+            {#if showTags}
+              <Chart config={tagDoughnutConfig} height={240} label="Gastos del mes por etiqueta" />
+              <p class="small muted tag-note">Toca una etiqueta para ver sus categorías. Un gasto con varias etiquetas suma en cada una.</p>
+            {:else if cats.length}
+              {#key catTag}
+                <Chart config={doughnutConfig} height={240} label="Gastos del mes por categoría" />
+              {/key}
+            {:else}
+              <div class="empty-card">Todavía no hay gastos este mes.</div>
+            {/if}
+          </div>
+        </div>
+        {@render savingsCard()}
+      </div>
+    {:else}
+      <!-- Ingresos y gastos del mes van en el análisis, con su comparación;
+           el detalle de cada ahorro, en Ahorros. -->
+      <div class="kpis-auto">
+        <div class="card kpi">
+          <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
+          <div class="kpi-val"><Money value={store.total} /></div>
+          <div class="kpi-foot">{store.activeAccounts.length} cuentas</div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-head">
+            <span class="kpi-ico {left < 0 ? 'tone-expense' : left < budget * 0.15 ? 'tone-warn' : 'tone-income'}"><Icon name="coins-01" /></span>
+            <span class="kpi-label">{left >= 0 ? "Te puedes gastar" : "Gastaste de más"}</span>
+          </div>
+          <div class="kpi-val"><Money value={Math.abs(left)} tone={left < 0 ? "expense" : undefined} /></div>
+          <progress class="progress" max="100" value={pctUsed}></progress>
+          <div class="kpi-foot">Has usado {Math.round(pctUsed)}% de lo disponible: <Money value={budget} /></div>
+          {#if use.fixedOver > 0}
+            <div class="kpi-foot">Incluye <Money value={use.fixedOver} /> de gastos fijos por encima de lo planeado.</div>
           {/if}
         </div>
+        <a class="card kpi kpi-link" href="#/ahorros">
+          <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Ahorros</span></div>
+          <div class="kpi-val"><Money value={savedTotal} /></div>
+          <div class="kpi-foot"><Money value={plan.savings} /> al mes · {store.activeSavings.length} {store.activeSavings.length === 1 ? "ahorro" : "ahorros"}</div>
+        </a>
       </div>
 
-      <div class="card dash-savings">
-        <div class="card-head">
-          <div>
-            <h3 class="card-title">Ahorros</h3>
-            <p class="card-sub"><Money value={plan.savings} /> al mes</p>
-          </div>
-          <div class="card-head-actions"><a class="link small" href="#/ahorros">Ver</a></div>
-        </div>
-        <div class="card-body">
-          {#if savingsList.length}
-            <!-- Como "Por categoría" en Análisis: ver `.cr` en styles/app.css. -->
-            <ul class="cr-list">
-              {#each savingsList as { s, current } (s.id)}
-                {@const target = s.target_amount || 0}
-                {@const pct = target ? (current / target) * 100 : 0}
-                <li class="cr" style:--tinte={colorOf(s.palette)}>
-                  <a class="cr-main" href="#/ahorros">
-                    <span class="cr-ico"><Icon name={s.icon || "piggy-bank"} size={16} /></span>
-                    <span class="cr-text">
-                      <span class="cr-name">{s.name}</span>
-                      <span class="cr-meta">
-                        {#if s.monthly_amount}<Money value={s.monthly_amount} /> al mes{:else}Sin aporte mensual{/if}{#if s.target_date}
-                          · meta en {monthLabel(s.target_date.slice(0, 7), true)}{/if}
-                      </span>
-                    </span>
-                    <span class="cr-amount">
-                      <Money value={current} />
-                      <span class="cr-meta">{target ? `${Math.floor(pct)}%` : "Sin meta"}</span>
-                    </span>
-                    <span class="cr-bar">
-                      <span style:width="{target ? Math.min(100, pct) : savingsMax ? (current / savingsMax) * 100 : 0}%"></span>
-                    </span>
-                    {#if target}
-                      <span class="cr-budget">
-                        {#if current >= target}Meta cumplida: <Money value={target} />
-                        {:else}Faltan <Money value={target - current} /> de <Money value={target} />{/if}
-                      </span>
-                    {/if}
-                  </a>
-                  <a class="btn-icon sm cr-go" href="#/ahorros" aria-label="Ver {s.name}" data-tip="Ver ahorro">
-                    <Icon name="arrow-right-01" size={14} />
-                  </a>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <div class="empty-card">No hay ahorros registrados. Crea uno para consultar su avance.</div>
-          {/if}
-        </div>
-      </div>
-    </div>
+      <Analysis />
+    {/if}
   </div>
 </div>
+
+{#snippet savingsCard()}
+  <div class="card dash-savings">
+    <div class="card-head">
+      <div>
+        <h3 class="card-title">Ahorros</h3>
+        <p class="card-sub"><Money value={plan.savings} /> al mes</p>
+      </div>
+      <div class="card-head-actions"><a class="link small" href="#/ahorros">Ver</a></div>
+    </div>
+    <div class="card-body">
+      {#if savingsList.length}
+        <!-- Como "Por categoría" del análisis: ver `.cr` en styles/app.css. -->
+        <ul class="cr-list">
+          {#each savingsList as { s, current } (s.id)}
+            {@const target = s.target_amount || 0}
+            {@const pct = target ? (current / target) * 100 : 0}
+            <li class="cr" style:--tinte={colorOf(s.palette)}>
+              <a class="cr-main" href="#/ahorros">
+                <span class="cr-ico"><Icon name={s.icon || "piggy-bank"} size={16} /></span>
+                <span class="cr-text">
+                  <span class="cr-name">{s.name}</span>
+                  <span class="cr-meta">
+                    {#if s.monthly_amount}<Money value={s.monthly_amount} /> al mes{:else}Sin aporte mensual{/if}{#if s.target_date}
+                      · meta en {monthLabel(s.target_date.slice(0, 7), true)}{/if}
+                  </span>
+                </span>
+                <span class="cr-amount">
+                  <Money value={current} />
+                  <span class="cr-meta">{target ? `${Math.floor(pct)}%` : "Sin meta"}</span>
+                </span>
+                <span class="cr-bar">
+                  <span style:width="{target ? Math.min(100, pct) : savingsMax ? (current / savingsMax) * 100 : 0}%"></span>
+                </span>
+                {#if target}
+                  <span class="cr-budget">
+                    {#if current >= target}Meta cumplida: <Money value={target} />
+                    {:else}Faltan <Money value={target - current} /> de <Money value={target} />{/if}
+                  </span>
+                {/if}
+              </a>
+              <a class="btn-icon sm cr-go" href="#/ahorros" aria-label="Ver {s.name}" data-tip="Ver ahorro">
+                <Icon name="arrow-right-01" size={14} />
+              </a>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <div class="empty-card">No hay ahorros registrados. Crea uno para consultar su avance.</div>
+      {/if}
+    </div>
+  </div>
+{/snippet}
 
 <style>
   /* Las medidas se toman del ancho del resumen, no de la ventana: así se
@@ -372,13 +392,13 @@
     container-type: inline-size;
   }
 
-  /* Angosto: una columna. Mediano: el flujo a todo el ancho y debajo los
-     movimientos, con "¿En qué gastaste?" sobre los ahorros al lado. Ancho:
-     tres columnas; el flujo ocupa dos y los gastos van encima de los ahorros. */
+  /* Angosto: una columna. Mediano: el flujo a todo el ancho y debajo
+     "¿En qué gastaste?" junto a los ahorros. Ancho: tres columnas; el flujo
+     ocupa dos y a su lado van los gastos encima de los ahorros. */
   .dash-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "flow" "txs" "cats" "savings";
+    grid-template-areas: "flow" "cats" "savings";
     gap: var(--card-gap);
 
     & > .dash-flow {
@@ -389,10 +409,6 @@
       grid-area: cats;
     }
 
-    & > .dash-txs {
-      grid-area: txs;
-    }
-
     & > .dash-savings {
       grid-area: savings;
     }
@@ -401,8 +417,7 @@
       grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
       grid-template-areas:
         "flow flow"
-        "txs cats"
-        "txs savings";
+        "cats savings";
       align-items: start;
     }
 
@@ -410,7 +425,16 @@
       grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
       grid-template-areas:
         "flow flow cats"
-        "txs txs savings";
+        "flow flow savings";
+    }
+  }
+
+  .kpi-link {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--border-strong, var(--border));
     }
   }
 

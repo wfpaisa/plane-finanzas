@@ -1,5 +1,5 @@
 /**
- * Las gráficas del plan futuro, compartidas por la página de escritorio y la
+ * Las gráficas de la proyección, compartidas por la página de escritorio y la
  * del celular: en qué se va el ingreso de los próximos meses y la simulación
  * del dinero total.
  */

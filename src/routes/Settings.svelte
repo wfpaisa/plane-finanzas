@@ -427,7 +427,7 @@
     <div>
       <p class="eyebrow">Etiquetas</p>
       <TagInput bind:value={cTags} suggestions={categoryTags()} />
-      <p class="small muted cat-tag-hint">Los movimientos de esta categoría las heredan: sirven para filtrar y sumar en Movimientos, Análisis y el móvil. Con <b>#fijo</b>, el móvil la cuenta en los gastos fijos.</p>
+      <p class="small muted cat-tag-hint">Los movimientos de esta categoría las heredan: sirven para filtrar y sumar en Movimientos, Resumen y el móvil. Con <b>#fijo</b>, el móvil la cuenta en los gastos fijos.</p>
     </div>
     <Field label="Palabras clave" hint="Escribe términos separados por comas, como exito, carulla, d1. No importa si usas mayúsculas o tildes.">
       <Textarea bind:value={cKeywords} rows={3} />

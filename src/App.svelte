@@ -24,7 +24,6 @@
   import Login from "./routes/Login.svelte";
   import Mobile from "./routes/Mobile.svelte";
   import Plan from "./routes/Plan.svelte";
-  import Reports from "./routes/Reports.svelte";
   import Savings from "./routes/Savings.svelte";
   import Settings from "./routes/Settings.svelte";
   import Transactions from "./routes/Transactions.svelte";
@@ -32,21 +31,20 @@
   const NAV = [
     { path: "/", label: "Resumen", icon: "dashboard-square-01", mobile: true },
     {
+      path: "/proyeccion",
+      label: "Proyección",
+      icon: "chart-line-data-01",
+      mobile: false,
+    },
+    { path: "/ahorros", label: "Ahorros", icon: "piggy-bank", mobile: false },
+    {
       path: "/movimientos",
       label: "Movimientos",
       icon: "exchange-01",
       mobile: true,
     },
     { path: "/cuentas", label: "Cuentas", icon: "wallet-01", mobile: true },
-    { path: "/estados", label: "Análisis", icon: "pie-chart", mobile: true },
     { path: "/correos", label: "Correos", icon: "mail-01", mobile: false },
-    { path: "/ahorros", label: "Ahorros", icon: "piggy-bank", mobile: false },
-    {
-      path: "/proyeccion",
-      label: "Plan futuro",
-      icon: "chart-line-data-01",
-      mobile: false,
-    },
     { path: "/ajustes", label: "Ajustes", icon: "settings-01", mobile: false },
   ];
 
@@ -54,7 +52,6 @@
     "/": Dashboard,
     "/movimientos": Transactions,
     "/cuentas": Accounts,
-    "/estados": Reports,
     "/correos": Inbox,
     "/ahorros": Savings,
     "/proyeccion": Plan,
@@ -68,6 +65,8 @@
   $effect(() => {
     // La bandeja ahora se llama Correos: los enlaces viejos siguen sirviendo.
     if (route.path === "/bandeja") go("/correos", Object.fromEntries(route.query));
+    // Análisis ahora va dentro del Resumen.
+    if (route.path === "/estados") go("/");
     if (route.path === "/importar")
       go("/ajustes", {
         seccion: "gmail",
@@ -111,7 +110,7 @@
   const onKey = keys({
     n: () => session.user && route.path !== "/m" && txModal.new(),
     "?": () => session.user && (helpOpen = true),
-    // 1 … 8: las pantallas en el orden del menú.
+    // 1 … 7: las pantallas en el orden del menú.
     ...Object.fromEntries(
       NAV.map((item, i) => [
         String(i + 1),

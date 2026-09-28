@@ -170,7 +170,7 @@
 <Modal {open} {onClose} title={saving ? "Editar ahorro" : "Nuevo ahorro"} width="modal-panel-width-lg">
   <div class="saving-form">
     <div class="form-grid">
-      <Field label="Nombre" tip="El objetivo para el que guardas dinero. Así aparecerá en Ahorros, Resumen y Plan futuro."><Input bind:value={name} placeholder="Viajes, imprevistos, vejez…" autofocus /></Field>
+      <Field label="Nombre" tip="El objetivo para el que guardas dinero. Así aparecerá en Ahorros, Resumen y Proyección."><Input bind:value={name} placeholder="Viajes, imprevistos, vejez…" autofocus /></Field>
       {#if shared}
         <Field label="Tu aporte al mes" tip="Lo que pones tú cada mes, desde tus cuentas. Cada persona define el suyo y el aporte del ahorro es la suma. Solo tu parte deja de contarse como dinero disponible."><MoneyInput bind:value={monthly} /></Field>
       {:else}
@@ -227,7 +227,7 @@
       {#if saving}
         <span class="label-tip">
           <Switch bind:checked={archived} label="Archivado" />
-          <InfoTip text="Lo oculta de las listas y del plan futuro. También deja de crear aportes automáticos, pero conserva todo el historial." />
+          <InfoTip text="Lo oculta de las listas y de la proyección. También deja de crear aportes automáticos, pero conserva todo el historial." />
         </span>
       {/if}
     </div>

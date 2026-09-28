@@ -37,11 +37,6 @@
   margin: 0 auto;
 }
 
-/* Pantallas que aprovechan todo el ancho, como el resumen. */
-.page.page-wide {
-  max-width: none;
-}
-
 .stack {
   display: flex;
   flex-direction: column;

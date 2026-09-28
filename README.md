@@ -52,7 +52,7 @@ Nunca se duplica nada. Si anotaste un gasto a mano y luego llega el mismo desde 
 ![Importar](docs/capturas/importar.png)
 
 ### Entender en qué se va tu plata
-En **Análisis** comparas ingresos y gastos por semana, mes o año, y ves el reparto por categoría con un presupuesto para cada una.
+Debajo del **Resumen**, en el análisis, comparas ingresos y gastos por semana, mes o año, y ves el reparto por categoría con un presupuesto para cada una.
 
 ![Análisis](docs/capturas/analisis.png)
 
@@ -62,16 +62,16 @@ Crea ahorros con **meta, aporte mensual y rentabilidad**. La app calcula para cu
 ![Ahorros](docs/capturas/ahorros.png)
 
 ### Planear el futuro
-En **Plan futuro** pones tus ingresos fijos (sueldo) y tus gastos fijos (arriendo, servicios, seguros), y la app hace la cuenta:
+En **Proyección** pones tus ingresos fijos (sueldo) y tus gastos fijos (arriendo, servicios, seguros), y la app hace la cuenta:
 
 > **Ingresos − gastos fijos − ahorros = lo que puedes gastar**
 
 Además proyecta los próximos 12 meses, tiene un **simulador** y responde preguntas como "¿para cuándo tendría $10.000.000?". Los fijos que marques se crean solos cada mes.
 
-![Plan futuro](docs/capturas/plan-futuro.png)
+![Proyección](docs/capturas/plan-futuro.png)
 
 ### En el celular
-La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Correos, Ahorros, Plan futuro y Ajustes). En Movimientos:
+La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Correos, Ahorros, Proyección y Ajustes). En Movimientos:
 
 - **Diario**: tus movimientos día por día, con lo que entró y salió cada día.
 - **Calendario**: el mes completo, con el gasto de cada día a la vista.
@@ -240,7 +240,7 @@ pocketbase/
   pb_hooks/        Gmail, bandeja, reglas, respaldo, tareas automáticas
     lib/parsers.js lector de notificaciones bancarias (probado en tests/)
 src/
-  routes/          Resumen, Movimientos, Cuentas, Análisis, Ahorros, Plan futuro, Importar, Ajustes, vista móvil
+  routes/          Resumen (con el análisis), Movimientos, Cuentas, Ahorros, Proyección, Importar, Ajustes, vista móvil
   components/app/  piezas de la app (formularios, tarjetas, listas)
   components/ui/   componentes base
   lib/finance.ts   cálculos: plan, ahorros, simulación, estados

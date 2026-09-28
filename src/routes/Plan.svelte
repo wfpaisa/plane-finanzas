@@ -5,7 +5,6 @@
 <script lang="ts">
   import CategoryPill from "../components/app/CategoryPill.svelte";
   import Money from "../components/app/Money.svelte";
-  import ColorDot from "../components/app/ColorDot.svelte";
   import MoneyInput from "../components/app/MoneyInput.svelte";
   import RecurringForm from "../components/app/RecurringForm.svelte";
   import Chart from "../components/Chart.svelte";
@@ -15,7 +14,7 @@
   import { band, flowLayout } from "../lib/analysis";
   import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../lib/finance";
   import { monthLabel, monthName, monthsLabel } from "../lib/format";
-  import { nextMonthsChart, simulationChart } from "../lib/planCharts";
+  import { simulationChart } from "../lib/planCharts";
   import { store } from "../lib/store.svelte";
   import type { Recurring } from "../lib/types";
 
@@ -102,14 +101,13 @@
     return end && end < ym ? `terminó en ${monthLabel(end)}` : `empieza en ${monthLabel(r.start_date.slice(0, 7))}`;
   };
 
-  const nextConfig = () => nextMonthsChart(store.recurring, plan.savings, ym);
   const simConfig = () => simulationChart(sim, simSavings, store.total);
 </script>
 
 <div class="page">
   <header class="page-head">
     <div>
-      <h1>Plan futuro</h1>
+      <h1>Proyección</h1>
       <p>Calcula cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
     </div>
     <div class="page-actions">
@@ -181,35 +179,6 @@
           {/each}
         </div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h3 class="card-title">Ahorros del mes</h3>
-          <p class="card-sub"><Money value={plan.savings} /> · <a class="link" href="#/ahorros">administrar</a></p>
-        </div>
-      </div>
-      <div class="card-body savings-chips">
-        {#each store.activeSavings as s (s.id)}
-          <!-- En uno compartido, la parte propia: la que suma arriba. -->
-          <a class="saving-chip" href="#/ahorros">
-            <ColorDot color={s.palette} />{s.name}<Money value={(s.monthly_amount || 0) * store.savingShare(s)} />
-          </a>
-        {:else}
-          <span class="muted">Sin ahorros.</span>
-        {/each}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h3 class="card-title">Próximos 12 meses</h3>
-          <p class="card-sub">En qué se va el ingreso de cada mes según el plan. La línea punteada es el ingreso: si una columna la pasa, ese mes no alcanza.</p>
-        </div>
-      </div>
-      <div class="card-body"><Chart config={nextConfig} height={280} square label="Plan de los próximos 12 meses" /></div>
     </div>
 
     <div class="card">
@@ -450,31 +419,6 @@
     flex-direction: column;
     align-items: flex-end;
     font-weight: 600;
-  }
-
-  .savings-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-8);
-  }
-
-  .saving-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-6);
-    padding: var(--sp-6) var(--sp-12);
-    border-radius: 99rem;
-    background: var(--bg-field);
-    box-shadow: inset 0 0 0 1px var(--border);
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    text-decoration: none;
-
-    & :global(.money) {
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
   }
 
   .sim-controls {

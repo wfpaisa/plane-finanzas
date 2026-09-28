@@ -1,5 +1,5 @@
 <!--
-  Plan futuro en el celular: lo que queda libre cada mes (ingresos menos
+  Proyección en el celular: lo que queda libre cada mes (ingresos menos
   fijos y ahorros), los ingresos y gastos frecuentes, cómo se reparten los
   próximos meses y el simulador del dinero total.
 -->
@@ -101,7 +101,7 @@
 
 <header class="page-head pl-head">
   <div>
-    <h1>Plan futuro</h1>
+    <h1>Proyección</h1>
     <p>Cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
   </div>
 </header>
