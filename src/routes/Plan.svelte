@@ -7,12 +7,13 @@
   import Money from "../components/app/Money.svelte";
   import MoneyInput from "../components/app/MoneyInput.svelte";
   import RecurringForm from "../components/app/RecurringForm.svelte";
+  import RecurringMonth from "../components/app/RecurringMonth.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Field } from "../components/ui";
   import Tag from "../components/ui/Tag.svelte";
   import { band, flowLayout } from "../lib/analysis";
-  import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../lib/finance";
+  import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type TxType } from "../lib/finance";
   import { monthLabel, monthName, monthsLabel } from "../lib/format";
   import { simulationChart } from "../lib/planCharts";
   import { store } from "../lib/store.svelte";
@@ -22,7 +23,7 @@
 
   let formOpen = $state(false);
   let editing = $state<Recurring | null>(null);
-  let newKind = $state<Kind>("expense");
+  let newKind = $state<TxType>("expense");
 
   let months = $state(24);
   let spendPct = $state(100);
@@ -32,7 +33,8 @@
 
   const plan = $derived(store.plan);
   const incomes = $derived(store.recurring.filter((r) => r.kind === "income"));
-  const expenses = $derived(store.recurring.filter((r) => r.kind === "expense"));
+  // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
+  const expenses = $derived(store.recurring.filter((r) => r.kind !== "income"));
 
   const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
   // El flujo del ingreso: a la derecha, a dónde va cada peso. Si lo
@@ -81,7 +83,7 @@
   const reach = $derived(goal > store.total ? whenTotalReaches(longSim, goal) : null);
   const reachIn = $derived(reach ? longSim.indexOf(reach) + 1 : 0);
 
-  function edit(r: Recurring | null, kind: Kind = "expense") {
+  function edit(r: Recurring | null, kind: TxType = "expense") {
     editing = r;
     newKind = kind;
     formOpen = true;
@@ -92,7 +94,9 @@
       ? `Anual · ${monthName(r.month || 1)}`
       : r.frequency === "once"
         ? `Una vez · ${r.start_date?.slice(0, 10) ?? ""}`
-        : `Día ${r.day_of_month || 1}`;
+        : r.day_of_month
+          ? `Día ${r.day_of_month}`
+          : "Sin día fijo";
 
   /** Por qué un fijo no suma en el plan de este mes: ya terminó o aún no empieza. */
   const outOfPlan = (r: Recurring) => {
@@ -113,6 +117,8 @@
   </header>
 
   <div class="stack">
+    <RecurringMonth onEdit={(r) => edit(r)} />
+
     <!-- El ingreso a la izquierda se abre en bandas hacia lo que se lleva
          cada parte, cada una del grueso de su monto. Lo que queda para
          gastar es la respuesta, y va más grande. -->
@@ -242,7 +248,7 @@
     <span class="fixed-main">
       <span class="fixed-name">{r.name}</span>
       <span class="fixed-sub">
-        {freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
+        {#if r.kind === "transfer"}Transferencia · {/if}{freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
       </span>
     </span>
     {#if r.category}<CategoryPill id={r.category} />{/if}

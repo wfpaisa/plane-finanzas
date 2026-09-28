@@ -13,6 +13,9 @@ import type { Transaction } from "./types";
 /** Lo que se paga igual cada mes: la etiqueta que el móvil cuenta como "Fijos". */
 export const FIXED_TAG = "fijo";
 
+/** Las de un movimiento que sale de un fijo: las suyas y siempre "fijo". Igual en pb_hooks/lib/scheduler.js. */
+export const recurringTags = (tags: string[] | null | undefined) => [...new Set([FIXED_TAG, ...(tags ?? [])])];
+
 /** Como las escribe `TagInput`: minúsculas, sin espacios de sobra ni comas. */
 export const normTag = (raw: string) => raw.trim().toLowerCase().replace(/,/g, "");
 

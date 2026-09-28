@@ -40,7 +40,7 @@ export function nextMonthsChart(recurring: Recurring[], savings: number, ym: str
     for (const r of recurring) {
       const v = occursIn(r, m);
       if (r.kind === "income") inc += v;
-      else exp += v;
+      else if (r.kind === "expense") exp += v;
     }
     income.push(inc);
     fixed.push(exp);

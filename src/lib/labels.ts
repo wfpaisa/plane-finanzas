@@ -28,7 +28,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   manual: "Manual",
   gmail: "Gmail",
   texto: "Texto pegado",
-  recurrente: "Automático",
+  recurrente: "Recurrente",
   csv: "Registro CSV",
 };
 

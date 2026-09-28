@@ -22,7 +22,7 @@ var VERSION = 1;
 var FIELDS = {
   categories: ["name", "kind", "icon", "color", "keywords", "budget", "tags"],
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "senders", "exclude_from_total", "archived", "sort", "notes"],
-  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "paused", "auto_create"],
+  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
@@ -222,6 +222,7 @@ function restoreData(app, userId, data, counts) {
     insert("recurring", data.recurring, function (r, row) {
       r.set("category", map("categories", row.category));
       r.set("account", map("accounts", row.account));
+      r.set("to_account", map("accounts", row.to_account));
     });
     // Las reglas antes que los movimientos: cada uno dice qué regla lo ajustó.
     // Los respaldos de antes de las reglas no las traen.

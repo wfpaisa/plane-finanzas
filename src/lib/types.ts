@@ -120,15 +120,19 @@ export interface SavingMovement extends RecordModel {
 export interface Recurring extends RecordModel {
   owner: string;
   name: string;
-  kind: Kind;
+  kind: TxType;
   amount: number;
   frequency: Frequency;
+  /** 0: sin día fijo. Ver `occurrenceDate`. */
   day_of_month: number;
   month: number;
   start_date: string;
   end_date: string;
   category: string;
   account: string;
+  /** El destino, si es una transferencia. */
+  to_account: string;
+  tags: string[] | null;
   paused: boolean;
   auto_create: boolean;
 }

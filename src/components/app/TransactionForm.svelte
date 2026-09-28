@@ -29,6 +29,8 @@
     preset,
     draft,
     origin,
+    link,
+    title: titleProp,
     onClose,
     onSaved,
     knownTags = [],
@@ -41,6 +43,10 @@
     draft?: TxDraft | null;
     /** El correo del que sale: queda guardado con el movimiento tal como llegó. */
     origin?: { external_id: string; raw: string; source: "gmail" | "texto"; sender?: string } | null;
+    /** El fijo que se paga: queda unido a él por su marca (ver `recurringKey`). */
+    link?: { external_id: string } | null;
+    /** Un título propio, en vez del de siempre. */
+    title?: string;
     onClose: () => void;
     onSaved?: () => void;
     knownTags?: string[];
@@ -133,7 +139,11 @@
         tags,
       };
       // Lo que viene de un correo guarda de dónde salió; así la bandeja lo da por hecho.
-      const born = origin ? { source: origin.source, external_id: origin.external_id, raw: origin.raw.slice(0, 4000) } : { source: "manual" };
+      const born = origin
+        ? { source: origin.source, external_id: origin.external_id, raw: origin.raw.slice(0, 4000) }
+        : link
+          ? { source: "recurrente", external_id: link.external_id }
+          : { source: "manual" };
       if (files.length || removed.length) {
         // Los adjuntos van directo al servidor: necesitan conexión.
         if (files.length) data["attachments+"] = files;
@@ -171,7 +181,7 @@
     }
   }
 
-  const title = $derived(tx ? "Editar movimiento" : origin ? "Movimiento del correo" : "Nuevo movimiento");
+  const title = $derived(titleProp ?? (tx ? "Editar movimiento" : origin ? "Movimiento del correo" : "Nuevo movimiento"));
 
   /** Si vino de un correo de la bandeja: ahí se ve el correo y su regla. */
   const fromMail = (t: Transaction) => !!t.external_id && (t.source === "gmail" || t.source === "texto");

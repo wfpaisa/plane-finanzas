@@ -10,12 +10,13 @@
   import Money from "../app/Money.svelte";
   import MoneyInput from "../app/MoneyInput.svelte";
   import RecurringForm from "../app/RecurringForm.svelte";
+  import RecurringMonth from "../app/RecurringMonth.svelte";
   import Segmented from "../app/Segmented.svelte";
   import { Field } from "../ui";
   import SlideIn from "./SlideIn.svelte";
   import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
-  import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind } from "../../lib/finance";
+  import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind, type TxType } from "../../lib/finance";
   import { monthLabel, monthName, monthsLabel } from "../../lib/format";
   import { nextMonthsChart, simulationChart } from "../../lib/planCharts";
   import { store } from "../../lib/store.svelte";
@@ -31,7 +32,7 @@
 
   let formOpen = $state(false);
   let editing = $state<Recurring | null>(null);
-  let newKind = $state<Kind>("expense");
+  let newKind = $state<TxType>("expense");
   let kind = $state<Kind>("expense");
 
   let months = $state(24);
@@ -41,7 +42,8 @@
   let goal = $state(0);
 
   const plan = $derived(store.plan);
-  const items = $derived(store.recurring.filter((r) => r.kind === kind));
+  // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
+  const items = $derived(store.recurring.filter((r) => (kind === "income" ? r.kind === "income" : r.kind !== "income")));
   const barBase = $derived(Math.max(plan.income, plan.fixed + plan.savings));
   const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
   const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
@@ -70,7 +72,7 @@
   const nextConfig = () => nextMonthsChart(store.recurring, plan.savings, ym);
   const simConfig = () => simulationChart(sim, simSavings, store.total);
 
-  function edit(r: Recurring | null, k: Kind = kind) {
+  function edit(r: Recurring | null, k: TxType = kind) {
     editing = r;
     newKind = k;
     formOpen = true;
@@ -81,7 +83,9 @@
       ? `Anual · ${monthName(r.month || 1)}`
       : r.frequency === "once"
         ? `Una vez · ${r.start_date?.slice(0, 10) ?? ""}`
-        : `Día ${r.day_of_month || 1}`;
+        : r.day_of_month
+          ? `Día ${r.day_of_month}`
+          : "Sin día fijo";
 
   const outOfPlan = (r: Recurring) => {
     if (r.paused || r.frequency === "once" || activeIn(r, ym)) return "";
@@ -105,6 +109,8 @@
     <p>Cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
   </div>
 </header>
+
+<div class="pl-month"><RecurringMonth onEdit={(r) => edit(r)} /></div>
 
 <section class="card pl-top">
   <div class="pl-free" class:short={plan.free < 0}>
@@ -137,7 +143,7 @@
             <span class="pl-main">
               <span class="pl-name">{r.name}</span>
               <span class="pl-sub">
-                {freqLabel(r)}{#if r.auto_create} · automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
+                {#if r.kind === "transfer"}Transferencia · {/if}{freqLabel(r)}{#if r.auto_create} · automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
               </span>
               {#if r.category}<CategoryPill id={r.category} />{/if}
             </span>
@@ -215,6 +221,10 @@
 <RecurringForm open={formOpen} item={editing} kind={newKind} onClose={() => (formOpen = false)} />
 
 <style>
+  .pl-month {
+    margin: var(--sp-12);
+  }
+
   .pl-head {
     margin: 0;
     padding: var(--sp-16) var(--sp-16) 0;

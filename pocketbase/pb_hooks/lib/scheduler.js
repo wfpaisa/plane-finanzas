@@ -57,6 +57,17 @@ function splitByPercent(total, percents) {
   return parts;
 }
 
+/** Las etiquetas del fijo, siempre con "fijo". Igual que `recurringTags` en src/lib/tags.ts. */
+function tagsOf(r) {
+  var tags = [];
+  try {
+    tags = JSON.parse(r.getString("tags") || "[]") || [];
+  } catch (_) {}
+  if (!Array.isArray(tags)) tags = [];
+  if (tags.indexOf("fijo") < 0) tags.unshift("fijo");
+  return tags;
+}
+
 function has(app, collection, filter, params) {
   try {
     app.findFirstRecordByFilter(collection, filter, params);
@@ -80,7 +91,11 @@ function runRecurring(app, userId) {
     var freq = r.getString("frequency") || "monthly";
     var start = r.getString("start_date").slice(0, 10);
     var end = r.getString("end_date").slice(0, 10);
-    var dom = Math.min(r.getInt("day_of_month") || 1, lastDay(t.y, t.m));
+    var kind = r.getString("kind");
+    // Sin día fijo no hay cuándo crearlo: se marca a mano desde la proyección.
+    if (freq !== "once" && !r.getInt("day_of_month")) continue;
+    if (kind === "transfer" && (!r.getString("to_account") || r.getString("to_account") === r.getString("account"))) continue;
+    var dom = Math.min(r.getInt("day_of_month"), lastDay(t.y, t.m));
     var date = ym + "-" + pad(dom);
     var key = "rec:" + r.id + ":" + ym;
 
@@ -102,13 +117,14 @@ function runRecurring(app, userId) {
 
     var tx = new Record(col);
     tx.set("owner", r.getString("owner"));
-    tx.set("type", r.getString("kind"));
+    tx.set("type", kind);
     tx.set("date", date + " 12:00:00.000Z");
     tx.set("account", r.getString("account"));
-    if (r.getString("category")) tx.set("category", r.getString("category"));
+    if (kind === "transfer") tx.set("to_account", r.getString("to_account"));
+    else if (r.getString("category")) tx.set("category", r.getString("category"));
     tx.set("amount", r.getFloat("amount"));
     tx.set("description", r.getString("name"));
-    tx.set("tags", ["fijo"]);
+    tx.set("tags", tagsOf(r));
     tx.set("source", "recurrente");
     tx.set("external_id", key);
     app.save(tx);

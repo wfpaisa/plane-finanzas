@@ -102,6 +102,28 @@ describe("fijos automáticos", () => {
     expect(app.saved[0].fields).toMatchObject({ external_id: "rec:r:2026-09", tags: ["fijo"], source: "recurrente" });
   });
 
+  test("sin día fijo no se crea solo", () => {
+    at("2026-09-26");
+    const app = fakeApp({ recurring: [{ id: "r", owner: "u", account: "acc", kind: "expense", amount: 10, day_of_month: 0 }] });
+    s.runRecurring(app, "u");
+    expect(app.saved.length).toBe(0);
+  });
+
+  test("transferencia con destino y etiquetas propias", () => {
+    at("2026-09-26");
+    const app = fakeApp({
+      recurring: [
+        { id: "r", owner: "u", account: "a", to_account: "b", category: "c", kind: "transfer", amount: 10, day_of_month: 5, tags: ["tarjeta"] },
+        { id: "s", owner: "u", account: "a", to_account: "", kind: "transfer", amount: 10, day_of_month: 5 },
+      ],
+    });
+    s.runRecurring(app, "u");
+    expect(app.saved.map((r) => r.fields)).toEqual([
+      expect.objectContaining({ type: "transfer", account: "a", to_account: "b", tags: ["fijo", "tarjeta"], external_id: "rec:r:2026-09" }),
+    ]);
+    expect(app.saved[0].fields.category).toBeUndefined();
+  });
+
   test("si la persona lo borró, no vuelve", () => {
     at("2026-09-26");
     const app = fakeApp({ recurring: [{ id: "r", owner: "u", account: "acc", kind: "expense", amount: 10, day_of_month: 5 }] });

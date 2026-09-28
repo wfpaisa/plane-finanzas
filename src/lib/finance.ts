@@ -11,7 +11,8 @@ export type TxType = Kind | "transfer";
 export type Frequency = "monthly" | "yearly" | "once";
 
 export interface RecurringLike {
-  kind: Kind;
+  /** Una transferencia no es ingreso ni gasto: no suma en el plan. */
+  kind: TxType;
   amount: number;
   frequency?: Frequency | "";
   day_of_month?: number;
@@ -101,6 +102,9 @@ export function weekStart(s: string): string {
  * más corto) tiene que caer entre el inicio y el fin. Un fijo del día 5 que
  * empieza el 20 arranca el mes siguiente; uno que termina el 3 no alcanza
  * ese mes.
+ *
+ * Sin día fijo (`day_of_month` en 0) le toca el mes entero: basta con que
+ * el inicio y el fin lo toquen, y devuelve solo el mes ("AAAA-MM").
  */
 export function occurrenceDate(r: RecurringLike, ym: string): string | null {
   const start = dayOf(r.start_date ?? "");
@@ -113,11 +117,34 @@ export function occurrenceDate(r: RecurringLike, ym: string): string | null {
     date = start;
   } else {
     if (freq === "yearly" && Number(ym.slice(5)) !== (r.month || 1)) return null;
-    date = `${ym}-${pad(Math.min(r.day_of_month || 1, lastDayOf(ym)))}`;
+    if (!r.day_of_month) return activeIn(r, ym) ? ym : null;
+    date = `${ym}-${pad(Math.min(r.day_of_month, lastDayOf(ym)))}`;
     if (start && date < start) return null;
   }
   if (end && date > end) return null;
   return date;
+}
+
+/**
+ * El día en que toca pagar un fijo en el mes dado, para la lista del mes: como
+ * `occurrenceDate`, pero basta con que el inicio caiga en el mes. El fijo del
+ * día 5 que empieza el 20 ya es parte del plan de ese mes (ver `activeIn`), así
+ * que también sale para marcarlo; el programador, en cambio, no lo crea solo.
+ */
+export function dueDate(r: RecurringLike, ym: string): string | null {
+  if ((r.frequency || "monthly") === "once") return occurrenceDate(r, ym);
+  return activeIn(r, ym) ? occurrenceDate({ ...r, start_date: "" }, ym) : null;
+}
+
+/**
+ * La marca (`external_id`) del movimiento de un fijo en el mes dado: una por
+ * mes, por año en los anuales y una sola en los de una vez. Es la misma del
+ * programador, así lo que se marca a mano y lo automático no se repiten.
+ */
+export function recurringKey(r: { id: string; frequency?: Frequency | "" }, ym: string): string {
+  const freq = r.frequency || "monthly";
+  if (freq === "once") return `rec:${r.id}`;
+  return `rec:${r.id}:${freq === "yearly" ? ym.slice(0, 4) : ym}`;
 }
 
 /** Si un fijo cae en el mes dado ("AAAA-MM") y cuánto. */
@@ -141,7 +168,7 @@ export function activeIn(r: RecurringLike, ym: string): boolean {
  * otro año no son del plan de hoy.
  */
 export function monthlyEquivalent(r: RecurringLike, ym?: string): number {
-  if (r.paused) return 0;
+  if (r.paused || r.kind === "transfer") return 0;
   const freq = r.frequency || "monthly";
   if (freq === "once" || (ym && !activeIn(r, ym))) return 0;
   return freq === "yearly" ? r.amount / 12 : r.amount;
@@ -165,7 +192,7 @@ export function planSummary(recurring: RecurringLike[], savings: SavingLike[], y
   for (const r of recurring) {
     const v = monthlyEquivalent(r, ym);
     if (r.kind === "income") income += v;
-    else fixed += v;
+    else if (r.kind === "expense") fixed += v;
   }
   const sav = savings.filter((s) => !s.archived).reduce((a, s) => a + savingMonthly(s), 0);
   return { income, fixed, savings: sav, free: income - fixed - sav };
@@ -330,7 +357,7 @@ export function simulate(input: SimInput): SimRow[] {
     for (const r of input.recurring) {
       const v = occursIn(r, month);
       if (r.kind === "income") income += v;
-      else fixed += v;
+      else if (r.kind === "expense") fixed += v;
     }
     const free = income - fixed - contrib + extra;
     const spent = Math.max(0, free) * ratio;

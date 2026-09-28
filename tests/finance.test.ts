@@ -6,6 +6,7 @@ import {
   bucketize,
   budgetUse,
   daysBetween,
+  dueDate,
   futureValue,
   lastDayOf,
   monthlyEquivalent,
@@ -17,6 +18,7 @@ import {
   occursIn,
   periodSpan,
   planSummary,
+  recurringKey,
   simulate,
   splitByPercent,
   weekStart,
@@ -114,6 +116,40 @@ describe("plan", () => {
     expect(occurrenceDate(unaVez, "2026-12")).toBe("2026-12-24");
     expect(occursIn(unaVez, "2027-12")).toBe(0);
     expect(occursIn({ ...unaVez, paused: true }, "2026-12")).toBe(0);
+  });
+
+  test("sin día fijo le toca el mes entero", () => {
+    const r = { kind: "expense" as const, amount: 10, start_date: "2026-09-20", end_date: "2026-11-03" };
+    expect(["2026-08", "2026-09", "2026-10", "2026-11", "2026-12"].map((m) => occurrenceDate(r, m))).toEqual([
+      null,
+      "2026-09",
+      "2026-10",
+      "2026-11",
+      null,
+    ]);
+    expect(occursIn(r, "2026-09")).toBe(10);
+  });
+
+  test("las transferencias no suman en el plan", () => {
+    const tarjeta = { kind: "transfer" as const, amount: 900000, day_of_month: 15 };
+    const sueldo = { kind: "income" as const, amount: 2000000, day_of_month: 1 };
+    expect(planSummary([tarjeta, sueldo], [], "2026-09")).toEqual({ income: 2000000, fixed: 0, savings: 0, free: 2000000 });
+    expect(simulate({ from: "2026-09", months: 1, total: 0, recurring: [tarjeta, sueldo], savings: [], spendRatio: 0 })[0].total).toBe(2000000);
+  });
+
+  test("en la lista del mes sale lo que empieza ese mes, aunque su día ya haya pasado", () => {
+    const arriendo = { kind: "expense" as const, amount: 10, day_of_month: 5, start_date: "2026-09-20", end_date: "2026-11-03" };
+    expect(occurrenceDate(arriendo, "2026-09")).toBeNull();
+    expect(["2026-08", "2026-09", "2026-10", "2026-11"].map((m) => dueDate(arriendo, m))).toEqual([null, "2026-09-05", "2026-10-05", null]);
+    const anual = { kind: "expense" as const, amount: 10, frequency: "yearly" as const, month: 3, day_of_month: 1 };
+    expect(dueDate(anual, "2027-02")).toBeNull();
+    expect(dueDate(anual, "2027-03")).toBe("2027-03-01");
+  });
+
+  test("la marca del movimiento de un fijo, como la del programador", () => {
+    expect(recurringKey({ id: "r" }, "2026-09")).toBe("rec:r:2026-09");
+    expect(recurringKey({ id: "r", frequency: "yearly" }, "2026-09")).toBe("rec:r:2026");
+    expect(recurringKey({ id: "r", frequency: "once" }, "2026-09")).toBe("rec:r");
   });
 
   test("el plan del mes deja fuera lo que ya terminó y lo que aún no empieza", () => {
