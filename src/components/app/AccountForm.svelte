@@ -1,5 +1,5 @@
 <!--
-  Crear o editar una cuenta: nombre, tipo, color, icono, saldo y los
+  Crear o editar una cuenta: nombre, tipo, color, icono, dinero inicial y los
   remitentes de correo con los que la bandeja la reconoce.
 -->
 <script lang="ts">
@@ -41,7 +41,7 @@
   let bank = $state("");
   let icon = $state("");
   let color = $state("");
-  let balance = $state(0);
+  let initial = $state(0);
   let senders = $state<string[]>([]);
   let exclude = $state(false);
   let archived = $state(false);
@@ -49,11 +49,11 @@
   let busy = $state(false);
   let confirmDelete = $state(false);
 
-  // Con la cuenta ya creada se escribe el saldo de HOY; por debajo se ajusta
-  // el saldo inicial para que la suma cuadre sin inventar movimientos.
-  const current = $derived(account ? store.balance(account.id) : 0);
-  /** El saldo que se mostró al abrir: si no se toca, el saldo inicial no se toca. */
-  let shownBalance = 0;
+  // El saldo es el dinero inicial más la suma de los movimientos; aquí solo
+  // se edita lo primero, así los movimientos nunca se descuadran.
+  const moved = $derived(
+    account ? store.balance(account.id) - (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) : 0,
+  );
 
   // Se llena al abrir o al cambiar de account, y solo entonces: lo demás que
   // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
@@ -67,7 +67,7 @@
       bank = account?.bank ?? "";
       icon = account?.icon ?? "";
       color = account?.palette ? colorOf(account.palette) : nextColor(store.accounts.map((a) => a.palette));
-      balance = shownBalance = account ? store.balance(account.id) : 0;
+      initial = account ? (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) : 0;
       senders = [...(account?.senders ?? startSenders)];
       exclude = account?.exclude_from_total ?? false;
       archived = account?.archived ?? false;
@@ -90,21 +90,16 @@
         bank: bank.trim(),
         icon: icon || accountTypeIcon(type),
         palette: color,
+        initial_balance: initial,
         senders,
         exclude_from_total: exclude,
         archived,
         notes,
       };
       if (account) {
-        // Solo si se cambió el saldo. Si no, un movimiento que llegó con el
-        // formulario abierto (Gmail, otro dispositivo) quedaría anulado por
-        // el ajuste. Si sí, se mide contra el saldo de ahora mismo, para que
-        // quede exactamente el que se escribió.
-        const changed = balance !== shownBalance;
-        const initial = (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) + (balance - current);
-        await pb.collection("accounts").update(account.id, changed ? { ...data, initial_balance: initial } : data);
+        await pb.collection("accounts").update(account.id, data);
       } else {
-        created = await pb.collection("accounts").create<Account>({ ...data, initial_balance: balance, sort: store.accounts.length });
+        created = await pb.collection("accounts").create<Account>({ ...data, sort: store.accounts.length });
       }
       await reload("accounts");
       if (created) onCreated?.(created);
@@ -139,7 +134,7 @@
       <span class="account-preview-icon"><Icon name={icon || accountTypeIcon(type)} size={20} /></span>
       <div>
         <div class="account-preview-name"><ColorDot color={color} />{name || "Nombre de la cuenta"}</div>
-        <Money value={balance} />
+        <Money value={initial + moved} />
       </div>
     </div>
 
@@ -157,8 +152,13 @@
       <Field label="Banco o entidad">
         <Input bind:value={bank} placeholder="Bancolombia, Bold, Nequi…" />
       </Field>
-      <Field label={account ? "Dinero disponible hoy" : "Dinero que tienes hoy"} hint={type === "tarjeta" || type === "credito" ? "Escribe la deuda con signo negativo. Ejemplo: −500.000." : "Este valor será el punto de partida de la cuenta."}>
-        <MoneyInput bind:value={balance} allowNegative />
+      <Field
+        label="Dinero inicial"
+        hint={type === "tarjeta" || type === "credito"
+          ? "La deuda con la que empieza la cuenta, con signo negativo. Ejemplo: −500.000. Se suma a los movimientos."
+          : "El dinero con el que empieza la cuenta. Se suma a los movimientos."}
+      >
+        <MoneyInput bind:value={initial} allowNegative />
       </Field>
     </div>
 
