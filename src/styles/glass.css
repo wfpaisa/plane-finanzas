@@ -148,22 +148,23 @@
   --glass-blur: 30px;
   --glass-sat: 190%;
   /* Vidrio líquido: la luz entra por arriba a la izquierda y se refracta en
-     el canto. Un filo brillante arriba, cantos laterales más tenues, un
-     reflejo leve abajo (la cáustica) y un resplandor interior que baja desde
-     el borde de arriba, todo con sombras interiores: no pesa y sigue la
-     forma de cualquier radio. */
+     el canto. Un filo brillante arriba y cantos más tenues, con sombras
+     interiores de 1px que siguen la forma de cualquier radio. Sin
+     desenfoque: con él, cada tarjeta costaba varias veces más de pintar y
+     cambiar de pantalla se sentía pesado. */
   --glass-spec:
     inset 0 1px 0 oklch(1 0 0 / 0.16),
     inset 1px 0 0 oklch(1 0 0 / 0.06),
     inset -1px 0 0 oklch(1 0 0 / 0.03),
-    inset 0 -1px 0 oklch(1 0 0 / 0.05),
-    inset 0 14px 28px -20px oklch(1 0 0 / 0.14),
-    inset 0 -10px 24px -18px oklch(0.9 calc(0.04 * var(--tint-k, 1)) var(--tint-h, 190) / 0.08);
+    inset 0 -1px 0 oklch(1 0 0 / 0.05);
   /* El reflejo de la superficie: más luz arriba y en la esquina por donde
-     entra, que se apaga antes de la mitad. */
+     entra, que se apaga antes de la mitad. Va en lo que flota y en el menú;
+     las tarjetas de la hoja, que son muchas, llevan solo el degradado
+     (`--glass-sheen-lite`). */
   --glass-sheen:
     radial-gradient(130% 70% at 0% 0%, oklch(1 0 0 / 0.07), transparent 55%),
     linear-gradient(180deg, oklch(1 0 0 / 0.05), oklch(1 0 0 / 0.01) 40%, transparent 65%);
+  --glass-sheen-lite: linear-gradient(180deg, oklch(1 0 0 / 0.05), transparent 45%);
 
   --bg-level1: var(--canvas);
   --bg-level2: var(--glass-2);
@@ -304,6 +305,11 @@ body::before {
 .main .card {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* Dentro de la hoja, que tiene muchas tarjetas, el reflejo liviano. */
+.main {
+  --glass-sheen: var(--glass-sheen-lite, none);
 }
 
 .card {

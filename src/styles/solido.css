@@ -69,6 +69,7 @@
   --glass-blur: 28px;
   --glass-sat: 160%;
   --glass-sheen: none;
+  --glass-sheen-lite: none;
 }
 
 /* ---------- Claro: papel ---------- */

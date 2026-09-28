@@ -12,6 +12,12 @@
   --vt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Las fotos de la transición quedan encima de toda la página y se tragarían
+   los clics: pasan de largo a la de verdad, que ya es la de después. */
+::view-transition {
+  pointer-events: none;
+}
+
 /* El resto de la página no se anima: se ve de una vez la de después. */
 ::view-transition-old(root),
 ::view-transition-new(root) {

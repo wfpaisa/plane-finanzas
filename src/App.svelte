@@ -361,9 +361,9 @@
     padding: var(--sp-20) var(--sp-14);
     border: 1px solid var(--glass-rim);
     border-radius: var(--radius-xl);
+    /* Sin desenfoque: detrás solo está el lienzo, casi liso, y desenfocar
+       todo el alto de la ventana multiplicaba el trabajo de la GPU. */
     background: var(--glass-sheen), var(--bg-sidebar);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
     box-shadow: var(--glass-spec), var(--glass-shadow);
     overflow-y: auto;
 
