@@ -3,7 +3,7 @@
  * llama un movimiento en una lista.
  */
 import { addMonths, dayOf, today, weekStart, ymd } from "./finance";
-import { dateYmd, monthYm } from "./format";
+import { dateYmd, monthYm, plainNumber } from "./format";
 import { store } from "./store.svelte";
 import { hasTag, tagsOf } from "./tags";
 import type { Transaction } from "./types";
@@ -29,9 +29,23 @@ export function accountLine(t: Transaction): string {
   return `${from} → ${store.account(t.to_account)?.name ?? "?"}`;
 }
 
+/**
+ * Si lo buscado es un monto ("15000", "$15.000", "15,000"), si el del
+ * movimiento empieza así. Con puntos se compara escrito igual que en la app
+ * ("5.000" no encuentra 50.000); sin ellos, solo las cifras ("5000" sí).
+ */
+function amountMatches(amount: number, s: string): boolean {
+  const q = s.replace(/[$\s]/g, "").replaceAll(",", ".");
+  if (!/^\d[\d.]*$/.test(q)) return false;
+  const n = Math.round(Math.abs(amount));
+  return q.includes(".") ? plainNumber(n).startsWith(q) : String(n).startsWith(q);
+}
+
+/** Si el movimiento tiene lo buscado: en sus textos, su cuenta, sus etiquetas o su monto. */
 export function matches(t: Transaction, text: string): boolean {
   const s = text.trim().toLowerCase();
   if (!s) return true;
+  if (amountMatches(t.amount, s)) return true;
   return [
     t.description,
     t.notes,

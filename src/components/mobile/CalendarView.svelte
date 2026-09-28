@@ -12,11 +12,14 @@
   let {
     ym,
     txs,
+    picked = "",
     onPick,
   }: {
     ym: string;
     /** Los movimientos de todas las semanas que se ven, no solo del mes. */
     txs: Transaction[];
+    /** El día elegido, marcado (en escritorio, sus movimientos van debajo). */
+    picked?: string;
     onPick: (day: string) => void;
   } = $props();
 
@@ -59,6 +62,8 @@
       class="cal-d"
       class:out
       class:today={day === now}
+      class:picked={day === picked}
+      aria-pressed={picked ? day === picked : undefined}
       aria-label={day}
       onclick={() => onPick(day)}
     >
@@ -126,6 +131,11 @@
 
     &:active {
       background: var(--bg-hover);
+    }
+
+    &.picked {
+      background: var(--bg-hover);
+      box-shadow: inset 0 0 0 2px var(--accent);
     }
 
     &.out {

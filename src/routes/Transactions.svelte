@@ -1,7 +1,10 @@
 <!--
   Movimientos: la lista del mes con filtros por cuenta, categoría, tipo,
-  etiqueta y texto. Los filtros viven en la URL, así se puede llegar
+  etiqueta y texto (o monto). Los filtros viven en la URL, así se puede llegar
   filtrado desde otras pantallas (una cuenta, una categoría, "revisar").
+
+  Como en el celular, lo filtrado se ve de cuatro maneras: lista, calendario
+  (el mes), mensual (el año mes a mes) y total (presupuesto y cuentas).
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
@@ -12,6 +15,9 @@
   import PickBar from "../components/app/PickBar.svelte";
   import DupeCard from "../components/app/DupeCard.svelte";
   import TransactionList from "../components/app/TransactionList.svelte";
+  import CalendarView from "../components/mobile/CalendarView.svelte";
+  import MonthlyView from "../components/mobile/MonthlyView.svelte";
+  import TotalView from "../components/mobile/TotalView.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Input, Loading, Select } from "../components/ui";
@@ -19,13 +25,14 @@
   import Tag, { type Tone } from "../components/ui/Tag.svelte";
   import { alpha, token } from "../lib/colors";
   import { addMonths, dayOf, monthRange, today, ymd } from "../lib/finance";
-  import { dateShort, dateYmd, money, monthLabel, monthYm } from "../lib/format";
+  import { dateLong, dateShort, dateYmd, money, monthLabel, monthYm } from "../lib/format";
+  import { matches } from "../lib/mobile";
   import { notify } from "../lib/notify.svelte";
   import { tintFor } from "../lib/palettes";
   import { pb } from "../lib/pb.svelte";
   import { go, route } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
-  import { categoryTags, tagsOf } from "../lib/tags";
+  import { categoryTags } from "../lib/tags";
   import type { Transaction } from "../lib/types";
   import { keys } from "../lib/keys";
   import { txModal } from "../lib/ui.svelte";
@@ -129,18 +136,7 @@
     return () => (alive = false);
   });
 
-  const shown = $derived.by(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return items;
-    return items.filter((t) =>
-      [
-        t.description,
-        t.notes,
-        store.category(t.category)?.name,
-        ...tagsOf(t),
-      ].some((x) => x?.toLowerCase().includes(s)),
-    );
-  });
+  const shown = $derived(search.trim() ? items.filter((t) => matches(t, search)) : items);
 
   const income = $derived(
     shown.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0),
@@ -196,6 +192,44 @@
       // Sin almacenamiento, vale para esta visita.
     }
   }
+
+  // Lo que se ve: la lista, o como en el celular el calendario del mes, el
+  // año mes a mes o el total del mes. Cada una pide su periodo: elegirla lo
+  // pone, y si luego se cambia a otro que no le sirve, se ve la lista.
+  type View = "lista" | "calendario" | "mensual" | "total";
+  const VIEWS: { id: View; label: string }[] = [
+    { id: "lista", label: "Lista" },
+    { id: "calendario", label: "Calendario" },
+    { id: "mensual", label: "Mensual" },
+    { id: "total", label: "Total" },
+  ];
+  let view = $state<View>("lista");
+  const fits = (v: View, p: Period) =>
+    v === "lista" || (v === "mensual" ? p.kind === "año" : p.kind === "mes");
+  const shownView = $derived(fits(view, period) ? view : "lista");
+
+  /** El mes de referencia del periodo: el que se ve o el más cercano a hoy. */
+  const refYm = $derived.by(() => {
+    const now = today().slice(0, 7);
+    if (period.kind === "mes") return period.ym;
+    if (period.kind === "año") return now.startsWith(period.y) ? now : `${period.y}-12`;
+    if (period.kind === "rango") return period.to.slice(0, 7);
+    return now;
+  });
+
+  function setView(v: View) {
+    if (!fits(v, period))
+      period = v === "mensual" ? { kind: "año", y: refYm.slice(0, 4) } : { kind: "mes", ym: refYm };
+    view = v;
+  }
+
+  // El día tocado en el calendario: sus movimientos, debajo.
+  let day = $state("");
+  const dayItems = $derived(day ? shown.filter((t) => dayOf(t.date) === day) : []);
+  $effect(() => {
+    void period;
+    day = "";
+  });
 
   // La gráfica de abajo, siempre: lo marcado con clic derecho o, si no hay
   // nada marcado, todo lo que está a la vista.
@@ -338,7 +372,7 @@
   <div class="filters card" class:is-filtered={filtered}>
     <div class="filters-grid">
       <div bind:this={searchBox}>
-        <Input bind:value={search} class={search.trim() ? "is-on" : ""} placeholder="Buscar… ( / )" />
+        <Input bind:value={search} class={search.trim() ? "is-on" : ""} placeholder="Buscar texto o monto… ( / )" />
       </div>
       <Select bind:value={account} class={account ? "is-on" : ""}>
         <option value="">Todas las cuentas</option>
@@ -415,6 +449,19 @@
   </div>
 
   <div class="list-bar">
+    <div class="chips view-tabs" role="tablist" aria-label="Vista">
+      {#each VIEWS as v (v.id)}
+        <button
+          type="button"
+          role="tab"
+          class="chip"
+          class:active={shownView === v.id}
+          aria-selected={shownView === v.id}
+          onclick={() => setView(v.id)}>{v.label}</button
+        >
+      {/each}
+    </div>
+    {#if shownView === "lista" || day}
     <div class="chips view-tabs" role="tablist" aria-label="Vista de la lista">
       <button
         type="button"
@@ -433,6 +480,7 @@
         onclick={() => setCompact(true)}>Compacto</button
       >
     </div>
+    {/if}
   </div>
 
   <!-- Posibles repetidos (ver pb_hooks/lib/dupes.js): la persona decide. -->
@@ -442,6 +490,38 @@
 
   {#if loading && !items.length}
     <Loading />
+  {:else if shownView === "calendario"}
+    <div class="tx-view">
+      <CalendarView ym={refYm} txs={shown} picked={day} onPick={(d) => (day = day === d ? "" : d)} />
+      {#if day}
+        <div class="day-head">
+          <h3 class="card-title">{dateLong(day)}</h3>
+          <button type="button" class="btn sm" onclick={() => txModal.new({ type: "expense", date: day })}
+            ><Icon name="add-01" size={14} />Anotar</button
+          >
+        </div>
+        {#if dayItems.length}
+          <TransactionList items={dayItems} onOpen={(t) => txModal.edit(t)} showAccount={!account} {compact} {selected} />
+        {:else}
+          <div class="card empty-card">Sin movimientos este día.</div>
+        {/if}
+      {/if}
+    </div>
+  {:else if shownView === "mensual"}
+    <div class="tx-view">
+      <MonthlyView
+        ym={refYm}
+        txs={shown}
+        onPick={(m) => {
+          period = { kind: "mes", ym: m };
+          view = "lista";
+        }}
+      />
+    </div>
+  {:else if shownView === "total"}
+    <div class="tx-view">
+      <TotalView ym={refYm} txs={shown} />
+    </div>
   {:else if shown.length}
     <TransactionList
       items={shown}
@@ -624,10 +704,54 @@
 
   .list-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: var(--sp-8);
     margin-bottom: var(--sp-12);
+  }
+
+  /* Las vistas del celular, a lo ancho de la página. */
+  .tx-view {
+    & :global(.card) {
+      margin-inline: 0;
+    }
+
+    & :global(.cal-d) {
+      min-height: 6.5rem;
+      padding: var(--sp-6) var(--sp-8);
+      gap: var(--sp-4);
+    }
+
+    & :global(.cal-n),
+    & :global(.cal-v) {
+      font-size: var(--text-sm);
+    }
+
+    & :global(.mo-row),
+    & :global(.mo-week) {
+      grid-template-columns: minmax(0, 1fr) 10rem 10rem;
+    }
+
+    & :global(.t-block) {
+      margin-bottom: var(--sp-20);
+    }
+  }
+
+  .day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-8);
+    margin-bottom: var(--sp-12);
+
+    & h3 {
+      margin: 0;
+
+      &::first-letter {
+        text-transform: uppercase;
+      }
+    }
   }
 
   .tx-chart {

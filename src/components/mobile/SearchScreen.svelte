@@ -171,7 +171,7 @@
   <!-- svelte-ignore a11y_autofocus -->
   <input
     type="search"
-    placeholder="Descripción, categoría, cuenta…"
+    placeholder="Descripción, categoría, cuenta, monto…"
     enterkeyhint="search"
     bind:value={filters.text}
     autofocus={!filters.text && !filterCount(filters)}
