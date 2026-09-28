@@ -309,6 +309,7 @@
     g: () => showChart(),
     v: () => setCompact(!compact),
     "/": () => searchBox?.querySelector("input")?.focus(),
+    "mod+a": () => shown.forEach((t) => selected.add(t.id)),
   });
 
   function clear() {
