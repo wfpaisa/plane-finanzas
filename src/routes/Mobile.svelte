@@ -317,14 +317,21 @@
 
   function pickTab(id: string) {
     const next = id as Tab;
-    if (tab === next && !sub && !asked) return;
+    // Cada pestaña abre desde arriba; tocar la que ya está, también sube.
+    const top = () => window.scrollTo({ top: 0 });
+    if (tab === next && !sub && !asked) return window.scrollTo({ top: 0, behavior: "smooth" });
     tabBefore = null;
     // Con una subpantalla abierta la anima el cambio de ruta.
     if (sub || asked) {
       tab = next;
       nextDirection("lado");
       location.replace("#/m");
-    } else transition(() => (tab = next));
+      top();
+    } else
+      transition(() => {
+        tab = next;
+        top();
+      });
   }
   const closeSub = () => goBack("#/m");
 </script>
