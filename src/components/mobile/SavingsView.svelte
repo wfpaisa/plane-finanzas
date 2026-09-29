@@ -24,7 +24,8 @@
   import { store } from "../../lib/store.svelte";
   import type { Saving, SavingMovement } from "../../lib/types";
 
-  let { onBack }: { onBack: () => void } = $props();
+  /** Sin él es una pestaña: la marca arriba, sin botón de volver. */
+  let { onBack }: { onBack?: () => void } = $props();
 
   const ym = today().slice(0, 7);
   const SHOWN = 8;
@@ -95,8 +96,8 @@
   }
 </script>
 
-<TopBar>
-  <BackButton label="Más" onclick={onBack} />
+<TopBar brand={!onBack}>
+  {#if onBack}<BackButton label="Más" onclick={onBack} />{/if}
   {#snippet actions()}
     <button
       type="button"

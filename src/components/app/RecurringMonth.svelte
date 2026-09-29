@@ -14,6 +14,10 @@
   Un fijo con provisión (el predial) trae además, cada mes, lo que toca
   apartar para pagarlo: marcarlo abre el formulario del aporte a su ahorro,
   sin mover plata. En el mes en curso avisa lo que quedó sin reservar. Al pagarlo, el servidor libera lo apartado (pb_hooks/lib/provisions.js).
+
+  Con `mobile` (Proyección en el celular) el título lo pone la página, el
+  movimiento se abre en la pantalla del celular (mobile/TxScreen) y el botón
+  de atrás del teléfono cierra lo que esté abierto.
 -->
 <script lang="ts">
   import { dueDate, lastDayOf, monthRange, nextDueMonth, recurringKey, reserveMonths, today } from "../../lib/finance";
@@ -22,15 +26,19 @@
   import { cachedList, offline } from "../../lib/offline.svelte";
   import { overlay, type Pending } from "../../lib/outbox";
   import { pb } from "../../lib/pb.svelte";
+  import { closeOnBack } from "../../lib/router.svelte";
   import { store, touchTransactions } from "../../lib/store.svelte";
   import { recurringTags } from "../../lib/tags";
   import type { Recurring, Saving, SavingMovement, Transaction, TxDraft } from "../../lib/types";
   import Icon from "../Icon.svelte";
   import { Button, Modal } from "../ui";
   import MonthNav from "../mobile/MonthNav.svelte";
+  import TxScreen from "../mobile/TxScreen.svelte";
   import Money from "./Money.svelte";
   import MovementForm from "./MovementForm.svelte";
   import TransactionForm from "./TransactionForm.svelte";
+
+  let { mobile = false }: { mobile?: boolean } = $props();
 
   const now = today();
   let ym = $state(now.slice(0, 7));
@@ -321,6 +329,14 @@
     }
   }
 
+  // En el celular, el botón de atrás cierra la ventana abierta en vez de salir de Proyección.
+  $effect(() => {
+    if (mobile && pickFor) return closeOnBack(() => (pickFor = null));
+  });
+  $effect(() => {
+    if (mobile && mvOpen) return closeOnBack(() => (mvOpen = false));
+  });
+
   const doneWord = (d: Due) => (d.r.kind === "income" ? "Recibido" : "Pagado");
 
   function status(d: Due): { text: string; tone?: "late" | "today" } {
@@ -333,20 +349,29 @@
   }
 </script>
 
-<div class="card rm">
-  <div class="card-head rm-head">
-    <div>
-      <h3 class="card-title">Movimientos programados</h3>
-      <p class="card-sub">
-        {#if total}
-          {done} de {total} completados
-        {:else}
-          No hay movimientos programados para {monthLabel(ym, true)}
-        {/if}
-      </p>
+{#snippet progress()}
+  {#if total}
+    {done} de {total} completados
+  {:else}
+    No hay movimientos programados para {monthLabel(ym, true)}
+  {/if}
+{/snippet}
+
+<div class="card rm" class:mobile>
+  {#if mobile}
+    <div class="rm-head rm-head-m">
+      <MonthNav bind:ym />
+      <p class="card-sub">{@render progress()}</p>
     </div>
-    <MonthNav bind:ym />
-  </div>
+  {:else}
+    <div class="card-head rm-head">
+      <div>
+        <h3 class="card-title">Movimientos programados</h3>
+        <p class="card-sub">{@render progress()}</p>
+      </div>
+      <MonthNav bind:ym />
+    </div>
+  {/if}
 
   {#if total}
     <div class="rm-bar" aria-hidden="true"><span style:width="{(done / total) * 100}%"></span></div>
@@ -504,14 +529,25 @@
   {/snippet}
 </Modal>
 
-<TransactionForm
-  open={formOpen}
-  tx={editTx}
-  {draft}
-  {link}
-  title={link ? (draft?.type === "income" ? "Marcar como recibido" : "Marcar como pagado") : undefined}
-  onClose={() => (formOpen = false)}
-/>
+{#if mobile}
+  <TxScreen
+    open={formOpen}
+    tx={editTx}
+    {draft}
+    {link}
+    title={link ? (draft?.type === "income" ? "Marcar como recibido" : "Marcar como pagado") : undefined}
+    onClose={() => (formOpen = false)}
+  />
+{:else}
+  <TransactionForm
+    open={formOpen}
+    tx={editTx}
+    {draft}
+    {link}
+    title={link ? (draft?.type === "income" ? "Marcar como recibido" : "Marcar como pagado") : undefined}
+    onClose={() => (formOpen = false)}
+  />
+{/if}
 
 <MovementForm open={mvOpen} saving={mvSaving} movement={mvEdit} draft={mvDraft} title={mvTitle} onClose={() => (mvOpen = false)} />
 
@@ -543,6 +579,32 @@
     & .rm-text {
       flex: 1;
       min-width: 0;
+    }
+
+    /* En el teléfono no caben en una fila: el nombre arriba, el monto y el botón debajo. */
+    @media (max-width: 30rem) {
+      & li {
+        flex-wrap: wrap;
+        gap: var(--sp-6) var(--sp-12);
+      }
+
+      & .rm-text {
+        flex-basis: 100%;
+      }
+
+      & .rm-amount {
+        flex: 1;
+      }
+    }
+  }
+
+  .rm-head-m {
+    display: flex;
+    padding: var(--sp-12) var(--sp-12) 0 var(--sp-8);
+
+    & .card-sub {
+      margin: 0;
+      text-align: right;
     }
   }
 

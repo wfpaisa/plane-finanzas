@@ -164,7 +164,7 @@ export function passes(t: Transaction, f: TxFilters): boolean {
 // ---------------------------------------------------------------------------
 
 /** Las pestañas de abajo, en el orden del menú de escritorio. */
-export type Tab = "resumen" | "movimientos" | "cuentas" | "analisis" | "mas";
+export type Tab = "resumen" | "plan" | "ahorros" | "movimientos" | "mas";
 
 /** Lo que va en `#/m?…` para abrir la pantalla de escritorio `path`. */
 export function mobileHash(path: string, query: URLSearchParams): string | undefined {
@@ -181,17 +181,17 @@ export function mobileHash(path: string, query: URLSearchParams): string | undef
     // Con filtros (una cuenta, una etiqueta…), el buscador; si no, el diario.
     case "/movimientos":
       return query.size ? with_("buscar") : tab("movimientos");
-    // Administrar cuentas: la pantalla completa, encima de Cuentas.
+    // Cuentas y Análisis van en "Más".
     case "/cuentas":
       return with_("cuentas");
     case "/estados":
-      return tab("analisis");
+      return with_("analisis");
     case "/correos":
       return with_("correos");
     case "/ahorros":
-      return with_("ahorros");
+      return tab("ahorros");
     case "/proyeccion":
-      return with_("plan");
+      return tab("plan");
     case "/ajustes":
       return with_("ajustes");
   }

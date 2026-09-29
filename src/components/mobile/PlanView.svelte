@@ -17,10 +17,12 @@
   import { activeIn, monthlyEquivalent, today, type Kind, type TxType } from "../../lib/finance";
   import { monthLabel, monthName } from "../../lib/format";
   import { nextMonthsChart } from "../../lib/planCharts";
+  import { closeOnBack } from "../../lib/router.svelte";
   import { store } from "../../lib/store.svelte";
   import type { Recurring } from "../../lib/types";
 
-  let { onBack }: { onBack: () => void } = $props();
+  /** Sin él es una pestaña: la marca arriba, sin botón de volver. */
+  let { onBack }: { onBack?: () => void } = $props();
 
   const ym = today().slice(0, 7);
   const KINDS = [
@@ -39,6 +41,11 @@
   const barBase = $derived(Math.max(plan.income, plan.fixed + plan.savings));
   const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
   const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
+
+  // El botón de atrás del teléfono cierra el formulario en vez de salir de Proyección.
+  $effect(() => {
+    if (formOpen) return closeOnBack(() => (formOpen = false));
+  });
 
   const nextConfig = () => nextMonthsChart(store.recurring, plan.savings, ym);
 
@@ -64,8 +71,8 @@
   };
 </script>
 
-<TopBar>
-  <BackButton label="Más" onclick={onBack} />
+<TopBar brand={!onBack}>
+  {#if onBack}<BackButton label="Más" onclick={onBack} />{/if}
   {#snippet actions()}
     <button type="button" class="btn sm" onclick={() => edit(null)}>
       <Icon name="add-01" />Programar
@@ -80,9 +87,16 @@
   </div>
 </header>
 
-<div class="pl-month"><RecurringMonth /></div>
+<header class="section-head pl-section">
+  <div>
+    <h2>Movimientos programados</h2>
+    <p>Marca los pagos e ingresos de cada mes a medida que ocurren.</p>
+  </div>
+</header>
 
-<header class="page-head pl-head pl-section">
+<div class="pl-month"><RecurringMonth mobile /></div>
+
+<header class="section-head pl-section">
   <div>
     <h2>Tu plan mensual</h2>
     <p>Compara lo que esperas recibir con tus pagos y ahorros mensuales.</p>
@@ -140,9 +154,14 @@
   </SlideIn>
 </section>
 
-<section class="card pl-block">
-  <h3>Próximos 12 meses</h3>
-  <p class="pl-sub">Compara los ingresos con los pagos y ahorros de cada mes. Si una columna supera la línea punteada, los ingresos no alcanzan.</p>
+<header class="section-head pl-section">
+  <div>
+    <h2>Próximos 12 meses</h2>
+    <p>Compara los ingresos con los pagos y ahorros de cada mes. Si una columna supera la línea punteada, los ingresos no alcanzan.</p>
+  </div>
+</header>
+
+<section class="card pl-block pl-next">
   <Chart config={nextConfig} height={220} square label="Plan de los próximos 12 meses" />
 </section>
 
@@ -153,15 +172,9 @@
     margin: var(--sp-12);
   }
 
-  .pl-head.pl-section {
-    padding-top: var(--sp-8);
-
-    & h2 {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
+  /* Los títulos de sección van fuera de las tarjetas, alineados con su borde. */
+  .pl-section {
+    margin: var(--sp-20) var(--sp-12) 0;
   }
 
   .pl-head {
@@ -275,15 +288,10 @@
       flex-direction: column;
       gap: var(--sp-10);
     }
+  }
 
-    & h3 {
-      margin: 0;
-      font-size: var(--text-base);
-    }
-
-    & > .pl-sub {
-      margin: calc(var(--sp-6) * -1) 0 0;
-    }
+  .pl-next {
+    margin-top: var(--sp-12);
   }
 
   .pl-list {

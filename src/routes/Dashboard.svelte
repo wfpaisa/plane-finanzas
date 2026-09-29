@@ -258,33 +258,32 @@
       </div>
 
       <div class="dash-grid">
-        <div class="card dash-flow">
-          <div class="card-head">
+        <!-- En el celular cada tarjeta lleva su título encima, como sección de la página. -->
+        <section class="dash-flow">
+          <header class="section-head">
             <div>
-              <h3 class="card-title">Dinero que entró y salió</h3>
-              <p class="card-sub">Últimos 6 meses</p>
+              <h2>Dinero que entró y salió</h2>
+              <p>Últimos 6 meses</p>
             </div>
-          </div>
-          <div class="card-body">
+          </header>
+          <div class="card card-body">
             {#if !loading}<Chart config={flowConfig} label="Ingresos y gastos por mes" />{/if}
           </div>
-        </div>
-        <div class="card dash-cats">
-          <div class="card-head">
+        </section>
+        <section class="dash-cats">
+          <header class="section-head">
             {#if catTag !== null}
               <button type="button" class="btn-icon sm btn-rounded" aria-label="Volver a las etiquetas" onclick={() => (catTag = null)}>
                 <Icon name="arrow-left-01" />
               </button>
             {/if}
-            <div class="flex-1">
-              <h3 class="card-title">{catTag === null ? "¿En qué gastaste?" : catTag ? `#${catTag}` : "Sin etiqueta"}</h3>
-              <p class="card-sub">
-                {catTag === null ? `Gastos de ${monthLabel(ym, true)}` : "Sus categorías este mes"}
-              </p>
+            <div>
+              <h2>{catTag === null ? "¿En qué gastaste?" : catTag ? `#${catTag}` : "Sin etiqueta"}</h2>
+              <p>{catTag === null ? `Gastos de ${monthLabel(ym, true)}` : "Sus categorías este mes"}</p>
             </div>
-            <div class="card-head-actions"><a class="link small" href="#/estados">Ver análisis</a></div>
-          </div>
-          <div class="card-body">
+            <a class="link small" href="#/estados">Ver análisis</a>
+          </header>
+          <div class="card card-body">
             {#if showTags}
               <Chart config={tagDoughnutConfig} height={240} label="Gastos del mes por etiqueta" />
               <p class="small muted tag-note">Toca una etiqueta para ver sus categorías. Un gasto con varias etiquetas suma en cada una.</p>
@@ -296,7 +295,7 @@
               <div class="empty-card">Todavía no hay gastos este mes.</div>
             {/if}
           </div>
-        </div>
+        </section>
         {@render savingsCard()}
       </div>
     {:else}
@@ -333,15 +332,15 @@
 </div>
 
 {#snippet savingsCard()}
-  <div class="card dash-savings">
-    <div class="card-head">
+  <section class="dash-savings">
+    <header class="section-head">
       <div>
-        <h3 class="card-title">Ahorros</h3>
-        <p class="card-sub"><Money value={plan.savings} /> al mes</p>
+        <h2>Ahorros</h2>
+        <p><Money value={plan.savings} /> al mes</p>
       </div>
-      <div class="card-head-actions"><a class="link small" href="#/ahorros">Ver</a></div>
-    </div>
-    <div class="card-body">
+      <a class="link small" href="#/ahorros">Ver ahorros</a>
+    </header>
+    <div class="card card-body">
       {#if savingsList.length}
         <!-- Como "Por categoría" del análisis: ver `.cr` en styles/app.css. -->
         <ul class="cr-list">
@@ -382,7 +381,7 @@
         <div class="empty-card">No hay ahorros registrados. Crea uno para consultar su avance.</div>
       {/if}
     </div>
-  </div>
+  </section>
 {/snippet}
 
 <style>
@@ -395,6 +394,11 @@
   /* Angosto: una columna. Mediano: el flujo a todo el ancho y debajo
      "¿En qué gastaste?" junto a los ahorros. Ancho: tres columnas; el flujo
      ocupa dos y a su lado van los gastos encima de los ahorros. */
+  /* La separación entre secciones ya la da el hueco de la cuadrícula. */
+  .dash-grid .section-head {
+    margin-top: var(--sp-4);
+  }
+
   .dash-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

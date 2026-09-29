@@ -25,6 +25,34 @@
   }
 }
 
+/* El título de una sección dentro de una página del celular (Resumen,
+   Análisis, Proyección): va fuera de la tarjeta, que lleva solo el contenido. */
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-8);
+  margin: var(--sp-20) 0 var(--sp-10);
+  padding: 0 var(--sp-4);
+
+  & > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  & h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  & p {
+    margin: 0.125rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+}
+
 .page-actions {
   display: flex;
   flex-wrap: wrap;

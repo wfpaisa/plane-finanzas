@@ -1,11 +1,11 @@
 <!--
   La app del celular (`#/m`). Tiene las mismas secciones que la versión
-  completa y en el mismo orden: abajo Resumen, Movimientos, Cuentas, Análisis
-  y Más (Correos, Ahorros, Proyección y Ajustes). En Movimientos el mes se ve
-  de cuatro maneras: diario, calendario, mensual (el año mes a mes) y total
-  (presupuesto y cuentas). Lo que no tiene una versión propia del teléfono
-  (Resumen, Correos, Ajustes, administrar cuentas) es la misma pantalla de
-  escritorio, dentro de esta app.
+  completa y en el mismo orden: abajo Resumen, Proyección, Ahorros,
+  Movimientos y Más (Cuentas, Correos, Análisis y Ajustes). En Movimientos el
+  mes se ve de cuatro maneras: diario, calendario, mensual (el año mes a mes)
+  y total (presupuesto y cuentas). Lo que no tiene una versión propia del
+  teléfono (Resumen, Correos, Ajustes, administrar cuentas) es la misma
+  pantalla de escritorio, dentro de esta app.
 
   Funciona sin internet: lo anotado se guarda en el teléfono y se envía solo
   al volver la conexión (ver lib/offline.svelte.ts). Y si lo que anotaste a
@@ -59,9 +59,9 @@
   // Los mismos nombres e iconos que el menú de escritorio (ver App.svelte).
   const TABS = $derived<{ id: Tab; label: string; icon: string; count?: number }[]>([
     { id: "resumen", label: "Resumen", icon: "dashboard-square-01" },
+    { id: "plan", label: "Proyección", icon: "chart-line-data-01" },
+    { id: "ahorros", label: "Ahorros", icon: "piggy-bank" },
     { id: "movimientos", label: "Movimientos", icon: "exchange-01" },
-    { id: "cuentas", label: "Cuentas", icon: "wallet-01" },
-    { id: "analisis", label: "Análisis", icon: "pie-chart" },
     { id: "mas", label: "Más", icon: "menu-01", count: store.inboxPending },
   ]);
   const VIEWS: { id: View; label: string }[] = [
@@ -265,29 +265,26 @@
 
   // Lo de "Más", como en el menú de escritorio.
   const MORE = $derived([
-    { href: "#/m?ver=correos", label: "Correos", icon: "mail-01", hint: "Lo que llega del banco", count: store.inboxPending },
-    { href: "#/m?ver=ahorros", label: "Ahorros", icon: "piggy-bank", hint: "Metas y aportes" },
-    { href: "#/m?ver=plan", label: "Proyección", icon: "chart-line-data-01", hint: "Cómo irá tu dinero" },
+    { href: "#/m?ver=cuentas", label: "Cuentas", icon: "wallet-01", hint: "Saldos, deudas y balance de cada cuenta" },
+    { href: "#/m?ver=correos", label: "Correos", icon: "mail-01", hint: "Avisos del banco por revisar", count: store.inboxPending },
+    { href: "#/m?ver=analisis", label: "Análisis", icon: "pie-chart", hint: "En qué gastas y de dónde recibes dinero" },
     { href: "#/m?ver=ajustes", label: "Ajustes", icon: "settings-01", hint: "Categorías, Gmail y tu cuenta" },
   ]);
 
   // Las subpantallas se abren encima de su pestaña, en la misma ruta
-  // (`#/m?ver=ahorros`): así el botón de atrás del teléfono vuelve a ella.
+  // (`#/m?ver=correos`): así el botón de atrás del teléfono vuelve a ella.
   const SUBS: Record<string, Tab> = {
     buscar: "movimientos",
-    cuentas: "cuentas",
+    cuentas: "mas",
+    administrar: "mas",
     correos: "mas",
-    ahorros: "mas",
-    plan: "mas",
+    analisis: "mas",
     ajustes: "mas",
   };
   const sub = $derived.by(() => {
     const v = route.query.get("ver") ?? "";
     return v in SUBS ? v : null;
   });
-  // El detalle de Análisis va en la ruta (`#/m?categoria=…`): así el botón de
-  // atrás del teléfono sube un nivel. Con él abierto, la pestaña es Análisis.
-  const drilled = $derived(route.query.has("categoria") || route.query.has("etiqueta"));
   /** Una pestaña pedida por la ruta (`#/m?pestana=analisis`), desde un enlace de escritorio. */
   const asked = $derived.by(() => {
     const p = route.query.get("pestana");
@@ -304,7 +301,6 @@
       tab = tabBefore;
       tabBefore = null;
     }
-    if (drilled) tab = "analisis";
     if (asked) tab = asked;
   });
   // Un enlace de escritorio con filtros (`#/movimientos?cuenta=…`) llega al
@@ -315,14 +311,16 @@
     if (f) untrack(() => (filters = f));
   });
   /** Con qué nombre se vuelve de cada subpantalla. */
-  const backLabel = $derived(TABS.find((t) => t.id === (sub ? SUBS[sub] : tab))?.label ?? "Volver");
+  const backLabel = $derived(
+    sub === "administrar" ? "Cuentas" : (TABS.find((t) => t.id === (sub ? SUBS[sub] : tab))?.label ?? "Volver"),
+  );
 
   function pickTab(id: string) {
     const next = id as Tab;
-    if (tab === next && !sub && !drilled && !asked) return;
+    if (tab === next && !sub && !asked) return;
     tabBefore = null;
     // Con una subpantalla abierta la anima el cambio de ruta.
-    if (sub || drilled || asked) {
+    if (sub || asked) {
       tab = next;
       nextDirection("lado");
       location.replace("#/m");
@@ -332,13 +330,13 @@
 </script>
 
 <div class="m">
-  {#if sub === "ahorros"}
-    <SavingsView onBack={closeSub} />
-  {:else if sub === "plan"}
-    <PlanView onBack={closeSub} />
+  {#if sub === "cuentas"}
+    <AccountsView onPick={openAccount} onBack={closeSub} />
+  {:else if sub === "analisis"}
+    <StatsView onOpen={(t) => txModal.edit(t)} onBack={closeSub} />
   {:else if sub === "buscar"}
     <SearchScreen bind:filters onBack={closeSub} />
-  {:else if sub === "correos" || sub === "ajustes" || sub === "cuentas"}
+  {:else if sub === "correos" || sub === "ajustes" || sub === "administrar"}
     <TopBar>
       <BackButton label={backLabel} onclick={closeSub} />
     </TopBar>
@@ -460,10 +458,10 @@
         {/if}
       </SlideIn>
     </MonthSwipe>
-  {:else if tab === "analisis"}
-    <StatsView onOpen={(t) => txModal.edit(t)} />
-  {:else if tab === "cuentas"}
-    <AccountsView onPick={openAccount} />
+  {:else if tab === "plan"}
+    <PlanView />
+  {:else if tab === "ahorros"}
+    <SavingsView />
   {:else}
     <TopBar brand />
     <div class="m-page">
@@ -546,7 +544,7 @@
   {/if}
 </div>
 
-{#if !sub && (tab === "resumen" || tab === "movimientos" || tab === "analisis")}
+{#if (!sub && (tab === "resumen" || tab === "movimientos")) || sub === "analisis"}
   <button
     type="button"
     class="m-fab"

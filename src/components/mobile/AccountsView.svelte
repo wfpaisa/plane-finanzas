@@ -6,12 +6,13 @@
 <script lang="ts">
   import Icon from "../Icon.svelte";
   import Money from "../app/Money.svelte";
+  import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
   import { ACCOUNT_TYPES, accountTypeIcon } from "../../lib/labels";
   import { colorOf } from "../../lib/palettes";
   import { store } from "../../lib/store.svelte";
 
-  let { onPick }: { onPick: (accountId: string) => void } = $props();
+  let { onPick, onBack }: { onPick: (accountId: string) => void; onBack?: () => void } = $props();
 
   const counted = $derived(store.activeAccounts.filter((a) => !a.exclude_from_total));
   const capital = $derived(counted.reduce((s, a) => s + Math.max(0, store.balance(a.id)), 0));
@@ -26,9 +27,10 @@
   );
 </script>
 
-<TopBar brand>
+<TopBar brand={!onBack}>
+  {#if onBack}<BackButton label="Más" onclick={onBack} />{/if}
   {#snippet actions()}
-    <a href="#/m?ver=cuentas" class="btn-icon sm" aria-label="Administrar cuentas">
+    <a href="#/m?ver=administrar" class="btn-icon sm" aria-label="Administrar cuentas">
       <Icon name="settings-01" size={18} />
     </a>
   {/snippet}
@@ -40,7 +42,7 @@
       <h1>Cuentas</h1>
       <p>El saldo neto de tus cuentas es <b><Money value={store.total} /></b></p>
     </div>
-    <a href="#/m?ver=cuentas" class="btn sm">Administrar</a>
+    <a href="#/m?ver=administrar" class="btn sm">Administrar</a>
   </header>
 
   <div class="card ac-sum">
@@ -88,7 +90,7 @@
       </ul>
     </section>
   {:else}
-    <p class="ac-empty">Todavía no tienes cuentas. <a class="link" href="#/m?ver=cuentas">Crea la primera</a>.</p>
+    <p class="ac-empty">Todavía no tienes cuentas. <a class="link" href="#/m?ver=administrar">Crea la primera</a>.</p>
   {/each}
 </div>
 

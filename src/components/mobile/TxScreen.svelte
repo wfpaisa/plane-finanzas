@@ -7,6 +7,9 @@
   Al anotar, cada elección pasa sola a la siguiente: cuenta → categoría →
   importe → descripción. "Continuar" guarda y deja la pantalla lista para otro con
   la misma fecha y cuenta.
+
+  Con `draft` llega ya llenado (un pago programado de Proyección) y, con
+  `link`, queda unido a su programación: se guarda como pagado.
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -22,7 +25,7 @@
   import { pb, session } from "../../lib/pb.svelte";
   import { closeOnBack } from "../../lib/router.svelte";
   import { store, touchTransactions } from "../../lib/store.svelte";
-  import type { Transaction } from "../../lib/types";
+  import type { Transaction, TxDraft } from "../../lib/types";
   import type { TxPreset } from "../../lib/ui.svelte";
   import Icon from "../Icon.svelte";
   import Segmented from "../app/Segmented.svelte";
@@ -32,11 +35,19 @@
     open,
     tx = null,
     preset,
+    draft = null,
+    link = null,
+    title,
     onClose,
   }: {
     open: boolean;
     tx?: Transaction | null;
     preset?: TxPreset;
+    /** Los datos de partida de uno nuevo, completos. */
+    draft?: TxDraft | null;
+    /** La marca que lo une a su programación (ver RecurringMonth). */
+    link?: { external_id: string } | null;
+    title?: string;
     onClose: () => void;
   } = $props();
 
@@ -69,19 +80,21 @@
     void tx;
     untrack(() => {
       editing = tx;
-      type = tx?.type ?? preset?.type ?? "expense";
-      date = tx ? tx.date.slice(0, 10) : (preset?.date ?? today());
-      account = tx?.account ?? (preset?.account || store.activeAccounts[0]?.id || "");
-      toAccount = tx?.to_account ?? "";
-      category = tx?.category ?? preset?.category ?? "";
-      expr = tx ? String(Math.round(tx.amount)) : "";
-      description = tx?.description ?? "";
-      notes = tx?.notes ?? "";
-      tags = [...(tx?.tags ?? [])];
+      type = tx?.type ?? draft?.type ?? preset?.type ?? "expense";
+      date = tx ? tx.date.slice(0, 10) : (draft?.date ?? preset?.date ?? today());
+      account = tx?.account ?? (draft?.account || preset?.account || store.activeAccounts[0]?.id || "");
+      toAccount = tx?.to_account ?? draft?.to_account ?? "";
+      category = tx?.category ?? draft?.category ?? preset?.category ?? "";
+      const start = tx?.amount ?? draft?.amount;
+      expr = start ? String(Math.round(start)) : "";
+      description = tx?.description ?? draft?.description ?? "";
+      notes = tx?.notes ?? draft?.notes ?? "";
+      tags = [...(tx?.tags ?? draft?.tags ?? [])];
       files = [];
       showRaw = false;
       // Al anotar se empieza por la cuenta, ya elegida: un toque la confirma.
-      panel = tx ? null : "account";
+      // Uno ya llenado solo se revisa y se guarda.
+      panel = tx || draft ? null : "account";
     });
   });
 
@@ -198,6 +211,8 @@
   const catColor = (id: string) => colorsFor([store.category(id)?.color || "tint-10"])[0];
 
   // --- Guardar ---------------------------------------------------------------
+  const origin = $derived(link ? { source: "recurrente", external_id: link.external_id } : { source: "manual" });
+
   async function save(again = false) {
     if (!amount) {
       panel = "amount";
@@ -229,19 +244,21 @@
         // Las fotos van directo al servidor: necesitan conexión.
         data["attachments+"] = files;
         if (editing) await pb.collection("transactions").update(editing.id, data);
-        else await pb.collection("transactions").create({ ...data, source: "manual" });
+        else await pb.collection("transactions").create({ ...data, ...origin });
         touchTransactions();
       } else if (editing) {
         await offline.update("transactions", editing.id, data, editing);
       } else {
-        await offline.create("transactions", { ...data, source: "manual" });
+        await offline.create("transactions", { ...data, ...origin });
       }
       notify.done(
         !offline.online
           ? "Guardado en el teléfono: se envía al volver la conexión"
           : editing
             ? "Guardado"
-            : `${TITLE[type]} anotado`,
+            : link
+              ? `${description.trim() || TITLE[type]} quedó ${type === "income" ? "recibido" : "pagado"}`
+              : `${TITLE[type]} anotado`,
       );
       if (!again) return onClose();
       // Otro con la misma fecha, tipo y cuenta.
@@ -292,7 +309,7 @@
       <button type="button" class="btn-icon" aria-label="Volver" onclick={onClose}>
         <Icon name="arrow-left-01" size={22} />
       </button>
-      <strong>{editing ? `Editar ${TITLE[type].toLowerCase()}` : TITLE[type]}</strong>
+      <strong>{title ?? (editing ? `Editar ${TITLE[type].toLowerCase()}` : TITLE[type])}</strong>
     </header>
 
     <div class="ts-body" class:padded={!!panel} bind:this={bodyEl} lang="es">
@@ -407,7 +424,10 @@
           <button type="button" class="ts-btn main" disabled={busy} onclick={() => save()}>{busy ? "Guardando…" : "Guardar"}</button>
         {:else}
           <button type="button" class="ts-btn main wide" disabled={busy} onclick={() => save()}>{busy ? "Guardando…" : "Guardar"}</button>
-          <button type="button" class="ts-btn" disabled={busy} onclick={() => save(true)}>Continuar</button>
+          <!-- Uno unido a su programación es uno solo: no hay otro que anotar detrás. -->
+          {#if !link}
+            <button type="button" class="ts-btn" disabled={busy} onclick={() => save(true)}>Continuar</button>
+          {/if}
         {/if}
       </div>
     </div>

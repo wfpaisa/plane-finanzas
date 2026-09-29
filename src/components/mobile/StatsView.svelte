@@ -16,6 +16,7 @@
   import MonthNav from "./MonthNav.svelte";
   import MonthSwipe from "./MonthSwipe.svelte";
   import SlideIn from "./SlideIn.svelte";
+  import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
   import { resolveColor } from "../../lib/colors";
   import { addMonths, today } from "../../lib/finance";
@@ -32,15 +33,15 @@
 
   type Tx = Pending<Transaction>;
 
-  let { onOpen }: { onOpen: (t: Tx) => void } = $props();
+  let { onOpen, onBack }: { onOpen: (t: Tx) => void; onBack?: () => void } = $props();
 
   let ym = $state(today().slice(0, 7));
   let yearly = $state(false);
   let kind = $state<"expense" | "income">("expense");
   /**
    * Dónde se está: arriba, en una etiqueta o en una categoría. Va en la ruta
-   * (`#/m?etiqueta=…&categoria=…`, "" es "sin …") para que el botón de atrás
-   * del teléfono suba un nivel.
+   * (`#/m?ver=analisis&etiqueta=…&categoria=…`, "" es "sin …") para que el
+   * botón de atrás del teléfono suba un nivel.
    */
   const path = $derived.by(() => {
     const q = route.query;
@@ -50,11 +51,10 @@
     };
   });
   const hashOf = (p: { tag?: string; category?: string }) => {
-    const q = new URLSearchParams();
+    const q = new URLSearchParams({ ver: "analisis" });
     if (p.tag !== undefined) q.set("etiqueta", p.tag);
     if (p.category !== undefined) q.set("categoria", p.category);
-    const s = q.toString();
-    return `#/m${s ? `?${s}` : ""}`;
+    return `#/m?${q}`;
   };
   /** Arriba, por categoría o por etiqueta. */
   let by = $state<"category" | "tag">("category");
@@ -255,6 +255,7 @@
 
 {#if top}
   <TopBar>
+    {#if onBack}<BackButton label="Más" onclick={onBack} />{/if}
     <MonthNav bind:ym {yearly} />
     {#snippet actions()}
       <select class="st-period" aria-label="Periodo" bind:value={yearly}>
@@ -293,12 +294,17 @@
 
     <SlideIn key={kind} order={["expense", "income"]}>
       <SlideIn key={by} order={["category", "tag"]}>
+        {#if slices.length}
+          <header class="section-head st-section">
+            <div>
+              <h2>{kind === "expense" ? "¿En qué gastaste?" : "¿De dónde entró?"}</h2>
+              <p>Toca {byTags ? "una etiqueta" : "una categoría"} para ver sus movimientos.</p>
+            </div>
+          </header>
+        {/if}
+
         {#if slices.length && !byTags}
           <div class="card st-pie">
-            <div class="st-card-head">
-              <h3 class="card-title">{kind === "expense" ? "¿En qué gastaste?" : "¿De dónde entró?"}</h3>
-              <p class="card-sub">Toca una parte para ver su detalle</p>
-            </div>
             <div class="st-donut">
               {#key `${kind}${ym}${yearly}${by}`}
                 <Chart config={pieConfig} height={220} label="Reparto del periodo" />
@@ -366,11 +372,13 @@
       {/each}
     </ul>
 
-    <div class="card st-line">
-      <div class="st-card-head">
-        <h3 class="card-title">Cómo ha venido</h3>
-        <p class="card-sub">{yearly ? "Últimos cinco años" : "Últimos ocho meses"}</p>
+    <header class="section-head st-section">
+      <div>
+        <h2>Cómo ha venido</h2>
+        <p>{yearly ? "Últimos cinco años" : "Últimos ocho meses"}</p>
       </div>
+    </header>
+    <div class="card st-line">
       {#key `${kind}${ym}${yearly}${title}`}
         <Chart config={lineConfig} height={200} label="Evolución en el tiempo" />
       {/key}
@@ -417,17 +425,9 @@
     }
   }
 
-  .st-card-head {
-    padding: 0 var(--sp-4) var(--sp-10);
-
-    & h3,
-    & p {
-      margin: 0;
-    }
-
-    & p {
-      font-size: var(--text-xs);
-    }
+  /* Los títulos de sección van fuera de las tarjetas, alineados con su borde. */
+  .st-section {
+    margin: var(--sp-8) var(--sp-12) var(--sp-10);
   }
 
   .st-donut {
