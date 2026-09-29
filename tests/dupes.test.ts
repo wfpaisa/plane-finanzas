@@ -34,6 +34,12 @@ describe("pairable", () => {
     expect(pairable(transfer, tx({ external_id: "m2", account: "a3" }))).toBe(false);
   });
 
+  test("dos transferencias entre las mismas cuentas propias, aunque las dos vengan de Gmail", () => {
+    const a = tx({ type: "transfer", account: "a1", to_account: "a2" });
+    expect(pairable(a, tx({ type: "transfer", account: "a1", to_account: "a2", external_id: "m2" }))).toBe(true);
+    expect(pairable(a, tx({ type: "transfer", account: "a1", to_account: "a3", external_id: "m2" }))).toBe(false);
+  });
+
   test("una transferencia anotada a mano contra el gasto que trajo el banco", () => {
     const mine = tx({ type: "transfer", account: "a1", to_account: "a2", source: "manual", external_id: "" });
     expect(pairable(mine, tx({}))).toBe(true);

@@ -24,32 +24,12 @@ var parsers = require(__hooks + "/lib/parsers.js");
 var rules = require(__hooks + "/lib/rules.js");
 var merchants = require(__hooks + "/lib/merchants.js");
 var ignored = require(__hooks + "/lib/ignored.js");
-
-function jsonList(record, field) {
-  try {
-    var v = JSON.parse(record.getString(field) || "[]");
-    return Array.isArray(v) ? v : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-/** Remitentes comparables: sin tildes, en minúscula, sin vacíos. */
-function sendersOf(list) {
-  return (list || [])
-    .map(function (s) {
-      return parsers.norm(s);
-    })
-    .filter(Boolean);
-}
+var refs = require(__hooks + "/lib/refs.js");
 
 function load(app, userId) {
-  var accounts = app.findRecordsByFilter("accounts", "owner = {:u} && archived = false", "sort,created", 500, 0, { u: userId });
   var categories = app.findRecordsByFilter("categories", "owner = {:u}", "name", 500, 0, { u: userId });
   return {
-    accounts: accounts.map(function (a) {
-      return { id: a.id, name: a.getString("name"), senders: sendersOf(jsonList(a, "senders")) };
-    }),
+    accounts: refs.accounts(app, userId),
     categories: categories.map(function (c) {
       var cat = { id: c.id, name: c.getString("name"), kind: c.getString("kind"), keywords: c.getString("keywords") };
       // Partidas una vez, no una por mensaje.
@@ -98,22 +78,34 @@ function fullText(mail) {
  */
 function suggest(mail, ctx) {
   var parsed = parsers.parseMessage(mail);
-  var acc = accountBySender(mail.from, ctx.accounts);
   var type = parsed ? parsed.type : "expense";
+  // Las terminaciones y llaves dicen la cuenta con certeza; si no, el remitente.
+  var found = refs.resolve(parsed, fullText(mail), ctx.accounts);
+  var acc = found.mine || accountBySender(mail.from, ctx.accounts);
+  var other = found.other;
+  if (!other && parsed && parsed.operation === "retiro" && type === "expense") other = refs.cash(ctx.accounts);
+  if (other && acc && other.id === acc.id) other = null;
+  // Sin comercio, la cuenta o llave de la otra persona hace de comercio: así
+  // se le pone nombre con un alias y sirve {comercio}.
+  var merchant = parsed ? parsed.merchant || found.counterparty : "";
+  var original = parsed ? parsed.description : String(mail.subject || "").slice(0, 200);
+  if (parsed && !parsed.merchant && found.counterparty) original = parsed.description + (type === "income" ? " de " : " a ") + found.counterparty;
+
   var category = null;
+  var aliasCategory = "";
   // El alias del comercio pone el nombre y, si la tiene, la categoría (antes
-  // que las palabras clave). Una categoría de otro tipo no vale.
-  var alias = parsed ? merchants.find(parsed.merchant || parsed.description, ctx.merchants) : null;
+  // que las palabras clave y que la de la regla). Una de otro tipo no vale.
+  var alias = parsed ? merchants.find(merchant || parsed.description, ctx.merchants) : null;
   if (alias && alias.category) {
     for (var i = 0; i < ctx.categories.length; i++) {
       if (ctx.categories[i].id === alias.category && ctx.categories[i].kind === type) category = ctx.categories[i];
     }
+    if (category) aliasCategory = category.id;
   }
   if (parsed && !category) {
-    category = parsers.categorize(parsed.merchant + " " + parsed.description + " " + (mail.subject || ""), type, ctx.categories);
+    category = parsers.categorize(merchant + " " + parsed.description + " " + (mail.subject || ""), type, ctx.categories);
     if (!category) category = fallbackCategory(ctx.categories, type);
   }
-  var original = parsed ? parsed.description : String(mail.subject || "").slice(0, 200);
   var base = {
     type: type,
     amount: parsed ? parsed.amount : 0,
@@ -124,21 +116,53 @@ function suggest(mail, ctx) {
     // Con alias, su nombre; la regla puede cambiarla con {original} o {comercio}.
     description: alias ? alias.name : original,
     original: original,
-    merchant: parsed ? parsed.merchant || "" : "",
+    merchant: merchant,
     merchantName: alias ? alias.name : "",
+    aliasCategory: aliasCategory,
+    accountKnown: !!found.mine,
     notes: "",
     tags: parsed && parsed.bank ? [parsers.norm(parsed.bank)] : [],
     accountUnknown: !acc,
   };
-  var rule = ctx.rules.length ? rules.find(fullText(mail), ctx.rules, base.amount, mail.from) : null;
+  // A otra cuenta propia: es una transferencia, sin categoría.
+  if (other && acc) {
+    var income = type === "income";
+    base.type = "transfer";
+    base.account = income ? other.id : acc.id;
+    base.to_account = income ? acc.id : other.id;
+    base.category = "";
+    base.aliasCategory = "";
+    base.accountKnown = true;
+    base.ownTransfer = true;
+    if (!alias) {
+      var op = parsed.operation;
+      base.description =
+        op === "retiro" ? "Retiro en cajero" : income ? "Transferencia desde " + other.name : (op === "pago" ? "Pago de " : "Transferencia a ") + other.name;
+    }
+  }
+  var rejected = !!(parsed && parsed.rejected);
+  // Lo rechazado no pasó: se descarta aunque una regla lo reconozca.
+  var rule = !rejected && ctx.rules.length ? rules.find(fullText(mail), ctx.rules, base.amount, mail.from) : null;
   return {
-    parsed: parsed ? { amount: parsed.amount, type: parsed.type, description: parsed.description, merchant: parsed.merchant, bank: parsed.bank } : null,
+    parsed: parsed
+      ? {
+          amount: parsed.amount,
+          type: parsed.type,
+          description: parsed.description,
+          merchant: parsed.merchant,
+          bank: parsed.bank,
+          operation: parsed.operation,
+          rejected: parsed.rejected,
+          refs: parsed.refs,
+        }
+      : null,
     rule: rule,
+    rejected: rejected,
     tx: rule && !discards(rule) ? withRule(rule, base) : strip(base),
     pattern: { sender: address(mail.from), match: parsed && parsed.merchant ? parsed.merchant : "" },
     // El comercio que se leyó y su alias, para ponerle nombre desde la bandeja.
     merchant: {
-      text: parsed ? parsed.merchant || "" : "",
+      text: merchant,
       alias: alias ? { id: alias.id, name: alias.name, match: alias.match, category: alias.category } : null,
     },
   };
@@ -265,7 +289,7 @@ function ingest(app, userId, mails, opts) {
       continue;
     }
     var s = suggest(mail, ctx);
-    if (discards(s.rule)) {
+    if (discards(s.rule) || s.rejected) {
       ignored.remember(app, userId, mail.id);
       out.skipped++;
       continue;
@@ -298,18 +322,23 @@ function ingest(app, userId, mails, opts) {
   return out;
 }
 
-/** Pasa las reglas por lo pendiente. @returns {number} cuántos se volvieron movimiento o se descartaron */
-function processPending(app, userId) {
+/**
+ * Pasa las reglas por lo pendiente. Con `report` ({ changes: [] }), anota qué
+ * pasó con cada correo. @returns {number} cuántos se volvieron movimiento o se
+ * descartaron
+ */
+function processPending(app, userId, report) {
   var ctx = load(app, userId);
-  if (!ctx.rules.length) return 0;
   var rows = app.findRecordsByFilter("inbox", "owner = {:u} && status = 'pendiente'", "date", 0, 0, { u: userId });
   var n = 0;
   for (var i = 0; i < rows.length; i++) {
     var mail = mailOf(rows[i]);
     var s = suggest(mail, ctx);
-    if (discards(s.rule)) {
+    var note = { inbox: rows[i].id, date: mail.date, subject: mail.subject, rule: s.rule ? s.rule.name : "" };
+    if (discards(s.rule) || s.rejected) {
       // Al borrarlo queda en ignored_imports (ver main.pb.js).
       app.delete(rows[i]);
+      if (report) report.changes.push(Object.assign(note, { action: "descartar", reason: s.rejected ? "El aviso dice que la operación fue rechazada." : "" }));
       n++;
       continue;
     }
@@ -318,6 +347,7 @@ function processPending(app, userId) {
     rows[i].set("status", "procesado");
     rows[i].set("rule", s.rule.id);
     app.save(rows[i]);
+    if (report) report.changes.push(Object.assign(note, { action: "registrar", tx: s.tx }));
     n++;
   }
   return n;

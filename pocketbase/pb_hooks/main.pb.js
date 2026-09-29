@@ -401,11 +401,11 @@ routerAdd(
   "/api/finanzas/inbox/rule",
   (e) => {
     const inbox = require(`${__hooks}/lib/inbox.js`);
+    const dryrun = require(`${__hooks}/lib/dryrun.js`);
     const body = e.requestInfo().body || {};
-    let r;
-    e.app.runInTransaction((tx) => {
-      r = inbox.saveRule(tx, e.auth.id, body);
-    });
+    const dry = dryrun.wanted(body);
+    const r = dryrun.run(e.app, dry, (tx) => inbox.saveRule(tx, e.auth.id, body));
+    if (dry) r.dry_run = true;
     return e.json(200, r);
   },
   $apis.requireAuth("users"),
@@ -416,11 +416,11 @@ routerAdd(
   "/api/finanzas/inbox/process",
   (e) => {
     const inbox = require(`${__hooks}/lib/inbox.js`);
-    let created = 0;
-    e.app.runInTransaction((tx) => {
-      created = inbox.processPending(tx, e.auth.id);
-    });
-    return e.json(200, { created });
+    const dryrun = require(`${__hooks}/lib/dryrun.js`);
+    const dry = dryrun.wanted(e.requestInfo().body);
+    const report = { changes: [] };
+    const created = dryrun.run(e.app, dry, (tx) => inbox.processPending(tx, e.auth.id, report));
+    return e.json(200, { created, dry_run: dry, changes: report.changes.slice(0, 300) });
   },
   $apis.requireAuth("users"),
 );
@@ -499,12 +499,12 @@ routerAdd(
   "/api/finanzas/rules/apply",
   (e) => {
     const rules = require(`${__hooks}/lib/rules.js`);
+    const dryrun = require(`${__hooks}/lib/dryrun.js`);
     const body = e.requestInfo().body || {};
-    let changed = 0;
-    e.app.runInTransaction((tx) => {
-      changed = rules.applyExisting(tx, e.auth.id, String(body.rule || ""));
-    });
-    return e.json(200, { changed });
+    const dry = dryrun.wanted(body);
+    const report = { changes: [] };
+    const changed = dryrun.run(e.app, dry, (tx) => rules.applyExisting(tx, e.auth.id, String(body.rule || ""), report));
+    return e.json(200, { changed, dry_run: dry, changes: report.changes.slice(0, 300) });
   },
   $apis.requireAuth("users"),
 );
@@ -516,12 +516,12 @@ routerAdd(
   "/api/finanzas/merchants/apply",
   (e) => {
     const merchants = require(`${__hooks}/lib/merchants.js`);
+    const dryrun = require(`${__hooks}/lib/dryrun.js`);
     const body = e.requestInfo().body || {};
-    let changed = 0;
-    e.app.runInTransaction((tx) => {
-      changed = merchants.applyExisting(tx, e.auth.id, String(body.id || ""));
-    });
-    return e.json(200, { changed });
+    const dry = dryrun.wanted(body);
+    const report = { changes: [], skipped: [] };
+    const changed = dryrun.run(e.app, dry, (tx) => merchants.applyExisting(tx, e.auth.id, String(body.id || ""), report));
+    return e.json(200, { changed, dry_run: dry, changes: report.changes.slice(0, 300), skipped: report.skipped.slice(0, 300) });
   },
   $apis.requireAuth("users"),
 );

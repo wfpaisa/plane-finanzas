@@ -33,6 +33,8 @@ export interface Account extends RecordModel {
   initial_balance: number;
   /** Remitentes de correo que la reconocen: "alertas@banco.com", "banco.com". */
   senders: string[] | null;
+  /** Terminaciones y llaves con que la nombran los avisos: "*1234", "@ana123". */
+  refs?: string[] | null;
   exclude_from_total: boolean;
   archived: boolean;
   sort: number;

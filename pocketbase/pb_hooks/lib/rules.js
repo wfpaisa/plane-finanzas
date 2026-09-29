@@ -17,6 +17,7 @@
 
 var parsers = require(__hooks + "/lib/parsers.js");
 var merchants = require(__hooks + "/lib/merchants.js");
+var refs = require(__hooks + "/lib/refs.js");
 
 function listOf(text) {
   return String(text || "")
@@ -111,11 +112,18 @@ function render(template, date, original, comercio, alias) {
  * to_account, amount, description, notes, category y tags; devuelve los
  * mismos campos (menos la fecha) ya ajustados. Lo que la regla no dice se
  * queda como venía.
+ *
+ * Lo que el aviso dice con certeza gana a la regla, que queda como valor por
+ * defecto: la cuenta nombrada por su terminación o llave (`accountKnown`),
+ * la transferencia a otra cuenta propia (`ownTransfer`) y la categoría del
+ * alias del comercio (`aliasCategory`). Así una regla general por banco sirve
+ * para todas sus tarjetas y comercios.
  */
 function apply(rule, tx) {
+  var own = !!tx.ownTransfer && rule.type !== "discard";
   var out = {
-    type: rule.type || tx.type,
-    account: rule.account || tx.account || "",
+    type: own ? "transfer" : rule.type || tx.type,
+    account: tx.accountKnown ? tx.account : rule.account || tx.account || "",
     to_account: tx.to_account || "",
     amount: +rule.set_amount > 0 ? +rule.set_amount : +tx.amount || 0,
     category: tx.category || "",
@@ -124,7 +132,7 @@ function apply(rule, tx) {
     notes: tx.notes || "",
   };
   if (out.type === "transfer") {
-    out.to_account = rule.to_account || out.to_account;
+    out.to_account = own ? tx.to_account : rule.to_account || out.to_account;
     // Volverlo transferencia sin destino, o a la misma cuenta, no vale: se
     // queda como venía.
     if (tx.type !== "transfer" && (!out.to_account || out.to_account === out.account)) {
@@ -141,7 +149,7 @@ function apply(rule, tx) {
     out.category = "";
     known = true;
   } else if (rule.category) {
-    out.category = rule.category;
+    out.category = tx.aliasCategory && out.type === tx.type ? tx.aliasCategory : rule.category;
     known = true;
   } else if (out.type !== tx.type) {
     // La del otro tipo ya no vale.
@@ -230,15 +238,26 @@ function onlyLabels(rule) {
   return out;
 }
 
+/** Lo que cambió, campo por campo, para el informe de `applyExisting`. */
+function changesOf(before, after) {
+  var out = {};
+  var keys = ["type", "account", "to_account", "amount", "category", "description", "notes"];
+  for (var i = 0; i < keys.length; i++) {
+    if (after[keys[i]] !== before[keys[i]]) out[keys[i]] = { from: before[keys[i]], to: after[keys[i]] };
+  }
+  if (after.tags.join(",") !== before.tags.join(",")) out.tags = { from: before.tags, to: after.tags };
+  return out;
+}
+
 /**
  * Aplica las reglas a lo ya guardado. Con `ruleId`, solo esa regla. Busca en
  * la descripción, las notas y el texto original del correo. A lo importado
  * le aplica la plantilla completa; a lo anotado a mano, solo categoría,
  * etiquetas, descripción y notas: el tipo, la cuenta y el valor que alguien
- * escribió no se tocan.
+ * escribió no se tocan. Con `report` ({ changes: [] }), anota cada cambio.
  * @returns {number} cuántos movimientos cambiaron
  */
-function applyExisting(app, userId, ruleId) {
+function applyExisting(app, userId, ruleId, report) {
   // Las que descartan son para los correos: no cambian movimientos.
   var rules = load(app, userId).filter(function (r) {
     return (!ruleId || r.id === ruleId) && r.type !== "discard";
@@ -249,6 +268,10 @@ function applyExisting(app, userId, ruleId) {
   });
   var senders = withSender ? sendersByExternalId(app, userId) : {};
   var aliases = merchants.load(app, userId);
+  var accounts = refs.accounts(app, userId);
+  var kinds = {};
+  var cats = app.findRecordsByFilter("categories", "owner = {:u}", "", 0, 0, { u: userId });
+  for (var c = 0; c < cats.length; c++) kinds[cats[c].id] = cats[c].getString("kind");
   var list = app.findRecordsByFilter("transactions", "owner = {:u}", "", 0, 0, { u: userId });
   var changed = 0;
   for (var i = 0; i < list.length; i++) {
@@ -269,8 +292,19 @@ function applyExisting(app, userId, ruleId) {
       tags: jsonList(r, "tags"),
     };
     var alias = merchants.find(before.description, aliases);
-    if (alias) before.merchantName = alias.name;
+    if (alias) {
+      before.merchantName = alias.name;
+      if (alias.category && kinds[alias.category] === before.type) before.aliasCategory = alias.category;
+    }
     var imported = ext && (r.getString("source") === "gmail" || r.getString("source") === "texto");
+    if (imported) {
+      // Lo que el aviso dice con certeza también gana aquí (ver `apply`).
+      var raw = r.getString("raw");
+      var parsed = parsers.parseMessage({ text: raw });
+      var found = refs.resolve(parsed, raw, accounts);
+      if (found.mine || found.other) before.accountKnown = true;
+      if (before.type === "transfer" && (found.other || (parsed && parsed.operation === "retiro"))) before.ownTransfer = true;
+    }
     var after = apply(imported ? rule : onlyLabels(rule), before);
     var same =
       after.type === before.type &&
@@ -290,6 +324,7 @@ function applyExisting(app, userId, ruleId) {
       }
       continue;
     }
+    if (report) report.changes.push({ id: r.id, date: before.date, rule: rule.id, changes: changesOf(before, after) });
     r.set("rule", rule.id);
     r.set("type", after.type);
     r.set("account", after.account);

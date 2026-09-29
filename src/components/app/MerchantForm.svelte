@@ -123,14 +123,14 @@
     </Field>
     <Field
       label="El comercio del correo contiene"
-      hint="Una o varias partes del nombre que trae el correo, separadas por comas. No importan mayúsculas ni tildes."
+      hint="Una o varias partes del nombre que trae el correo, separadas por comas. También sirve la cuenta o la llave a la que enviaste dinero, como 12345678901 o @ana123. No importan mayúsculas ni tildes."
     >
       <Input bind:value={match} maxlength={500} placeholder="ikea" required />
     </Field>
     {#if !recognized}
       <p class="merchant-warn"><Icon name="alert-02" size={14} />«{sample}» no contiene ninguno de estos textos: este correo no quedaría con el nombre nuevo.</p>
     {/if}
-    <Field label="Categoría (opcional)" hint="Si eliges una, los movimientos de este comercio la tendrán, aunque las palabras clave digan otra.">
+    <Field label="Categoría (opcional)" hint="Si eliges una, los movimientos de este comercio la tendrán, aunque las palabras clave o la regla digan otra.">
       <Select bind:value={category}>
         <option value="">Sin categoría: usar las palabras clave</option>
         {#each cats as c (c.id)}
@@ -140,7 +140,7 @@
     </Field>
     <Switch bind:checked={applyOld} label="Cambiar también los movimientos que ya existen" />
     <p class="small muted merchant-note">
-      Solo cambian los movimientos importados de correos. No se tocan los que anotaste a mano ni los que una regla nombró con un texto fijo.
+      Solo cambian los movimientos importados de correos o de archivos del banco. No se tocan los que anotaste a mano ni los que una regla nombró con un texto fijo.
     </p>
   </form>
   {#snippet footer()}

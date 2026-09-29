@@ -46,7 +46,7 @@
     <div>
       <h3 class="card-title">Comercios</h3>
       <p class="card-sub">
-        El nombre con que quieres ver cada comercio en tus movimientos y, si quieres, su categoría. Por ejemplo, «IKEA ENVIGADO» se registra
+        El nombre con que quieres ver cada comercio o destinatario en tus movimientos y, si quieres, su categoría. Por ejemplo, «IKEA ENVIGADO» se registra
         como «Ikea». Lo más fácil es nombrarlos desde un correo en <a class="link" href="#/correos">Correos</a>.
       </p>
     </div>

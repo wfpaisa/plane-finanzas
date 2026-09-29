@@ -219,7 +219,9 @@ function inspect(mails, ctx) {
     var action;
     var lack = "";
 
-    if (winner && winner.type === "discard") action = "descartar";
+    // Lo rechazado se descarta solo, sin regla (ver inbox.suggest).
+    if (s.rejected) action = "descartar";
+    else if (winner && winner.type === "discard") action = "descartar";
     else if (winner) {
       lack = inbox.missing(s.tx);
       action = lack ? "pendiente" : "registrar";
@@ -237,7 +239,7 @@ function inspect(mails, ctx) {
                 : " Elige la cuenta de destino en la regla."),
         );
       }
-    } else {
+    } else if (!s.rejected) {
       action = "pendiente";
       summary.withoutRule++;
     }
@@ -326,6 +328,8 @@ function inspect(mails, ctx) {
         return ref(x.rule);
       }),
       action: action,
+      rejected: s.rejected,
+      merchant: s.merchant,
       tx: action === "registrar" ? named(s.tx, ctx) : null,
       differences: diff,
       pattern: s.pattern,

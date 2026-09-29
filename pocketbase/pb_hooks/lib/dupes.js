@@ -59,6 +59,9 @@ function daysApart(a, b) {
  *   CSV, o texto pegado) y en las mismas cuentas: es la misma compra avisada
  *   dos veces. De la misma fuente, dos compras iguales el mismo día sí pasan,
  *   y esas no se marcan.
+ * - Dos transferencias entre las mismas cuentas propias, aunque vengan de la
+ *   misma fuente: cada punta manda su aviso ("pagaste" y "recibimos tu pago")
+ *   y el lector reconoce las dos cuentas en ambos (ver refs.js).
  * - Un gasto o un ingreso se parece a una transferencia si su cuenta es una
  *   de las dos puntas.
  */
@@ -72,7 +75,8 @@ function pairable(a, b) {
   if (manualB && b.external_id) return false;
   if (a.type === b.type) {
     if (manualA || manualB) return true;
-    return a.source !== b.source && a.account === b.account && (a.to_account || "") === (b.to_account || "");
+    var sameAccounts = a.account === b.account && (a.to_account || "") === (b.to_account || "");
+    return sameAccounts && (a.source !== b.source || a.type === "transfer");
   }
   var t = a.type === "transfer" ? a : b.type === "transfer" ? b : null;
   if (!t) return false;

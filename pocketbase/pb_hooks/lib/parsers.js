@@ -187,6 +187,82 @@ function sourceLast4(sentence) {
   return after.length ? after[0] : null;
 }
 
+// Las referencias a un producto: "*1234", "cuenta 12345678901", "terminada en
+// 1234", "llave 3001234567" o una llave "@ana123". Con ellas se sabe de qué
+// cuenta propia sale o a cuál llega el dinero (ver lib/refs.js).
+var REF_DIGITS_RE = /(?:\*{1,4}\s?|x{2,4}|terminad[ao] en\s|llave\s|(?:cuenta|tarjeta|producto)(?: de)?(?: ahorros| corriente| credito| debito)?\s(?:no\.?\s)?)(\d{4,20})\b/gi;
+var REF_HANDLE_RE = /(^|[^a-z0-9._@-])(@[a-z0-9._-]{3,40})/gi;
+var ROLE_WORDS = /\b(desde|con|del|de|al|a|hacia|para|en|t\.? ?deb|t\.? ?cred)\b/g;
+
+/**
+ * Qué es la referencia según lo que la precede en la misma frase: "from" si
+ * de ahí sale el dinero ("desde tu cuenta", "de la llave"), "to" si ahí llega
+ * ("a la tarjeta", "en tu cuenta") o "" si no lo dice ("con tu T.Deb").
+ */
+function roleBefore(before) {
+  var w = norm(before).slice(-45);
+  var cutAt = Math.max(w.lastIndexOf(". "), w.lastIndexOf("; "), w.lastIndexOf(": "), w.lastIndexOf("$"));
+  if (cutAt >= 0) w = w.slice(cutAt + 1);
+  w = w.replace(/\bde (ahorros|credito|debito|nomina)\b/g, " ");
+  var last = "";
+  var m;
+  ROLE_WORDS.lastIndex = 0;
+  while ((m = ROLE_WORDS.exec(w))) last = m[1];
+  if (/^(desde|con|de|del)$/.test(last)) return "from";
+  if (/^(a|al|hacia|para|en)$/.test(last)) return "to";
+  return "";
+}
+
+/** Las referencias del texto, en orden y sin repetir: `[{ ref, role }]`. */
+function findRefs(text) {
+  var found = [];
+  var m;
+  REF_DIGITS_RE.lastIndex = 0;
+  while ((m = REF_DIGITS_RE.exec(text))) found.push({ at: m.index, ref: m[1] });
+  REF_HANDLE_RE.lastIndex = 0;
+  while ((m = REF_HANDLE_RE.exec(text))) found.push({ at: m.index + m[1].length, ref: m[2].toLowerCase().replace(/[._-]+$/, "") });
+  found.sort(function (a, b) {
+    return a.at - b.at;
+  });
+  var out = [];
+  var seen = {};
+  for (var i = 0; i < found.length; i++) {
+    if (seen[found[i].ref]) continue;
+    seen[found[i].ref] = true;
+    out.push({ ref: found[i].ref, role: roleBefore(text.slice(0, found[i].at)) });
+  }
+  return out;
+}
+
+/** Qué operación fue, para decidir sin reglas: retiro, nómina, compra… */
+function operationOf(lower, type) {
+  if (/\b(retir|avance)/.test(lower)) return "retiro";
+  if (/nomina/.test(lower)) return "nomina";
+  if (/\b(devolucion|reembolso|reverso)\b/.test(lower)) return "devolucion";
+  if (type === "income") return "ingreso";
+  if (/\b(compra|compraste)\b/.test(lower)) return "compra";
+  if (/\b(transferiste|transferencia|enviaste|envio)\b/.test(lower)) return "transferencia";
+  if (/\b(pagaste|pago)\b/.test(lower)) return "pago";
+  return "otro";
+}
+
+var REJECTED_RE = /\b(rechazad[ao]s?|declinad[ao]s?|fallid[ao]s?|no (?:fue |ha sido |pudo ser )?(?:aprobad[ao]|exitos[ao]|procesad[ao]|realizad[ao])|no se (?:pudo|realizo|aprobo))\b/g;
+
+/**
+ * Si el aviso dice que la operación no se hizo. "Si esta compra no fue
+ * realizada por ti…" es el pie de muchos avisos, no un rechazo: lo que va
+ * después de un "si" no cuenta.
+ */
+function isRejected(text) {
+  var t = norm(text);
+  var m;
+  REJECTED_RE.lastIndex = 0;
+  while ((m = REJECTED_RE.exec(t))) {
+    if (!/\bsi\b/.test(t.slice(Math.max(0, m.index - 40), m.index))) return true;
+  }
+  return false;
+}
+
 var STOP = /\s(?:con\s|desde\s|el\s\d|el dia|a las|por\s\$|por valor|t\.?\s?(?:cred|deb)|tarjeta|cuenta|en su|en tu|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})|[,.;]\s|[,.;]$|\n/i;
 
 function cut(s) {
@@ -202,8 +278,8 @@ function findMerchant(sentence, type) {
       ? [/\s(?:de|desde)\s+(?!tu\b|su\b|la cuenta|cuenta|nomina|pago)(.{2,60})/i, /\sen\s+(.{2,60})/i]
       : [
           // "en la tarjeta de credito *1234" es un producto, no un comercio.
-          /\sen\s+(?!tu\b|su\b|la cuenta|cuenta|la tarjeta|tarjeta)(.{2,60})/i,
-          /\s(?:a|al)\s+(?!la cuenta|tu\b|su\b|las\s\d|la tarjeta|tarjeta)(.{2,60})/i,
+          /\sen\s+(?!tu\b|su\b|la cuenta|cuenta|la tarjeta|tarjeta|la llave|llave)(.{2,60})/i,
+          /\s(?:a|al)\s+(?!la cuenta|tu\b|su\b|las\s\d|la tarjeta|tarjeta|la llave|llave|@)(.{2,60})/i,
         ];
   for (var i = 0; i < patterns.length; i++) {
     var m = patterns[i].exec(sentence);
@@ -220,7 +296,9 @@ function findMerchant(sentence, type) {
  *
  * @param {{ text: string, from?: string, subject?: string, date?: string }} mail
  * @returns {null | { amount: number, type: "income"|"expense", merchant: string,
- *   description: string, last4: string[], date: string, bank: string|null }}
+ *   description: string, last4: string[], date: string, bank: string|null,
+ *   verb: string, operation: string, rejected: boolean,
+ *   refs: { ref: string, role: "from"|"to"|"" }[] }}
  */
 function parseMessage(mail) {
   var raw = plain(String(mail.subject || "") + "\n" + String(mail.text || ""));
@@ -266,6 +344,9 @@ function parseMessage(mail) {
     date: parseDate(sentence) || parseDate(flat) || (mail.date ? String(mail.date).slice(0, 10) : today()),
     bank: bank ? bank.name : null,
     verb: verb,
+    operation: operationOf(lower, type),
+    rejected: isRejected(String(mail.subject || "")) || isRejected(sentence),
+    refs: findRefs(flat),
   };
 }
 
@@ -423,6 +504,9 @@ module.exports = {
   categorize: categorize,
   detectBank: detectBank,
   findLast4: findLast4,
+  findRefs: findRefs,
+  roleBefore: roleBefore,
+  isRejected: isRejected,
   htmlToText: htmlToText,
   BANKS: BANKS,
 };

@@ -43,6 +43,7 @@
   let color = $state("");
   let initial = $state(0);
   let senders = $state<string[]>([]);
+  let refs = $state<string[]>([]);
   let exclude = $state(false);
   let archived = $state(false);
   let notes = $state("");
@@ -69,6 +70,7 @@
       color = account?.palette ? colorOf(account.palette) : nextColor(store.accounts.map((a) => a.palette));
       initial = account ? (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) : 0;
       senders = [...(account?.senders ?? startSenders)];
+      refs = [...(account?.refs ?? [])];
       exclude = account?.exclude_from_total ?? false;
       archived = account?.archived ?? false;
       notes = account?.notes ?? "";
@@ -92,6 +94,7 @@
         palette: color,
         initial_balance: initial,
         senders,
+        refs,
         exclude_from_total: exclude,
         archived,
         notes,
@@ -167,6 +170,13 @@
       hint="Los correos de estos remitentes se leen y se asignan a esta cuenta. Basta con una parte del remitente: «nu@» o «nu.com» reconocen a nu@nu.com.co. Pulsa Enter para agregarla. Si varias cuentas coinciden, se propone la primera; una regla puede elegir otra."
     >
       <TagInput bind:value={senders} prefix="" placeholder="alertas@banco.com, banco.com…" suggestions={knownSenders} limit={30} />
+    </Field>
+
+    <Field
+      label="Terminaciones y llaves"
+      hint="Cómo nombran los avisos a esta cuenta: los últimos dígitos de la tarjeta o la cuenta (*1234) o una llave (@ana123). Con ellas, un aviso de compra se registra en esta cuenta, y uno que menciona otra de tus cuentas se registra como transferencia entre las dos. Pulsa Enter para agregar cada una."
+    >
+      <TagInput bind:value={refs} prefix="" placeholder="*1234, @ana123…" limit={20} />
     </Field>
 
     <div>

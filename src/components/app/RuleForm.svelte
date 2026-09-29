@@ -292,7 +292,8 @@
 
       {#if !discarding}
       <p class="rule-template-note">
-        Los correos que coincidan crearán movimientos con estos datos.
+        Los correos que coincidan crearán movimientos con estos datos. Si el correo nombra la terminación o la llave de una de tus cuentas, se
+        usa esa cuenta, y si nombra dos de tus cuentas, se registra una transferencia entre ellas.
       </p>
 
       <div class="form-grid">
@@ -317,7 +318,7 @@
             <AccountSelect bind:value={toAccount} placeholder="Elige…" exclude={account} />
           </Field>
         {:else}
-          <Field label="Categoría">
+          <Field label="Categoría" tip="Si el comercio del correo tiene una categoría propia en Comercios, se usa esa. Esta se usa para los demás.">
             <Select bind:value={category}>
               <option value="">Por palabras clave</option>
               {#each cats as c (c.id)}

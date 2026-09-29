@@ -210,13 +210,15 @@ function find(text, list) {
 
 /**
  * Pone el nombre (y la categoría, si el alias la tiene y es del mismo tipo) a
- * los movimientos importados que ya existen. Con `id`, solo ese alias. No toca
- * lo anotado a mano ni lo que una regla nombró con un texto fijo
- * ("Arriendo {mes}"): solo lo que no tiene regla o cuya regla usa {comercio}
- * o no tiene descripción.
+ * los movimientos importados que ya existen (de Gmail, texto pegado o CSV).
+ * Con `id`, solo ese alias. No toca lo anotado a mano ni lo que una regla
+ * nombró con un texto fijo ("Arriendo {mes}"): solo lo que no tiene regla o
+ * cuya regla usa {comercio} o no tiene descripción. Con `report`
+ * ({ changes: [], skipped: [] }), anota cada cambio y por qué se saltó cada
+ * movimiento que el alias reconoce.
  * @returns {number} cuántos movimientos cambiaron
  */
-function applyExisting(app, userId, id) {
+function applyExisting(app, userId, id, report) {
   var list = load(app, userId).filter(function (m) {
     return !id || m.id === id;
   });
@@ -224,33 +226,49 @@ function applyExisting(app, userId, id) {
   var kinds = {};
   var cats = app.findRecordsByFilter("categories", "owner = {:u}", "", 0, 0, { u: userId });
   for (var c = 0; c < cats.length; c++) kinds[cats[c].id] = cats[c].getString("kind");
-  var named = {};
+  var fixed = {};
   var rules = app.findRecordsByFilter("rules", "owner = {:u}", "", 0, 0, { u: userId });
   for (var r = 0; r < rules.length; r++) {
     var d = rules[r].getString("description");
-    named[rules[r].id] = !!d && !/\{\s*comercio/i.test(d);
+    if (d && !/\{\s*comercio/i.test(d)) fixed[rules[r].id] = rules[r].getString("name");
   }
-  var txs = app.findRecordsByFilter("transactions", "owner = {:u} && (source = 'gmail' || source = 'texto')", "", 0, 0, { u: userId });
+  var txs = app.findRecordsByFilter("transactions", "owner = {:u}", "", 0, 0, { u: userId });
   var changed = 0;
+  function skip(tx, alias, why) {
+    if (report) report.skipped.push({ id: tx.id, date: tx.getString("date").slice(0, 10), description: tx.getString("description"), alias: alias.name, reason: why });
+  }
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
-    if (named[tx.getString("rule")]) continue;
     var alias = find(tx.getString("description"), list);
     if (!alias) continue;
-    var dirty = false;
-    if (tx.getString("description") !== alias.name) {
-      tx.set("description", alias.name.slice(0, 200));
-      dirty = true;
+    var source = tx.getString("source");
+    if (source !== "gmail" && source !== "texto" && source !== "csv") {
+      skip(tx, alias, source === "recurrente" ? "Lo creó un movimiento programado." : "Se anotó a mano.");
+      continue;
+    }
+    if (fixed[tx.getString("rule")] !== undefined) {
+      skip(tx, alias, "La regla «" + fixed[tx.getString("rule")] + "» le pone una descripción fija, sin {comercio}.");
+      continue;
     }
     var type = tx.getString("type");
-    if (alias.category && kinds[alias.category] === type && tx.getString("category") !== alias.category) {
-      tx.set("category", alias.category);
-      dirty = true;
+    var next = { description: tx.getString("description"), category: tx.getString("category") };
+    if (next.description !== alias.name) next.description = alias.name.slice(0, 200);
+    if (alias.category && kinds[alias.category] === type) next.category = alias.category;
+    else if (alias.category && type !== "transfer") skip(tx, alias, "La categoría del alias es de otro tipo: solo cambia el nombre.");
+    if (next.description === tx.getString("description") && next.category === tx.getString("category")) continue;
+    if (report) {
+      report.changes.push({
+        id: tx.id,
+        date: tx.getString("date").slice(0, 10),
+        amount: tx.getFloat("amount"),
+        description: { from: tx.getString("description"), to: next.description },
+        category: { from: tx.getString("category"), to: next.category },
+      });
     }
-    if (dirty) {
-      app.save(tx);
-      changed++;
-    }
+    tx.set("description", next.description);
+    tx.set("category", next.category);
+    app.save(tx);
+    changed++;
   }
   return changed;
 }
