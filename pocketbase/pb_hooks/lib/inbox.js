@@ -22,6 +22,7 @@
 
 var parsers = require(__hooks + "/lib/parsers.js");
 var rules = require(__hooks + "/lib/rules.js");
+var merchants = require(__hooks + "/lib/merchants.js");
 var ignored = require(__hooks + "/lib/ignored.js");
 
 function jsonList(record, field) {
@@ -56,6 +57,7 @@ function load(app, userId) {
       return cat;
     }),
     rules: rules.load(app, userId),
+    merchants: merchants.load(app, userId),
   };
 }
 
@@ -99,10 +101,19 @@ function suggest(mail, ctx) {
   var acc = accountBySender(mail.from, ctx.accounts);
   var type = parsed ? parsed.type : "expense";
   var category = null;
-  if (parsed) {
+  // El alias del comercio pone el nombre y, si la tiene, la categoría (antes
+  // que las palabras clave). Una categoría de otro tipo no vale.
+  var alias = parsed ? merchants.find(parsed.merchant || parsed.description, ctx.merchants) : null;
+  if (alias && alias.category) {
+    for (var i = 0; i < ctx.categories.length; i++) {
+      if (ctx.categories[i].id === alias.category && ctx.categories[i].kind === type) category = ctx.categories[i];
+    }
+  }
+  if (parsed && !category) {
     category = parsers.categorize(parsed.merchant + " " + parsed.description + " " + (mail.subject || ""), type, ctx.categories);
     if (!category) category = fallbackCategory(ctx.categories, type);
   }
+  var original = parsed ? parsed.description : String(mail.subject || "").slice(0, 200);
   var base = {
     type: type,
     amount: parsed ? parsed.amount : 0,
@@ -110,7 +121,11 @@ function suggest(mail, ctx) {
     account: acc ? acc.id : "",
     to_account: "",
     category: category ? category.id : "",
-    description: parsed ? parsed.description : String(mail.subject || "").slice(0, 200),
+    // Con alias, su nombre; la regla puede cambiarla con {original} o {comercio}.
+    description: alias ? alias.name : original,
+    original: original,
+    merchant: parsed ? parsed.merchant || "" : "",
+    merchantName: alias ? alias.name : "",
     notes: "",
     tags: parsed && parsed.bank ? [parsers.norm(parsed.bank)] : [],
     accountUnknown: !acc,
@@ -121,6 +136,11 @@ function suggest(mail, ctx) {
     rule: rule,
     tx: rule && !discards(rule) ? withRule(rule, base) : strip(base),
     pattern: { sender: address(mail.from), match: parsed && parsed.merchant ? parsed.merchant : "" },
+    // El comercio que se leyó y su alias, para ponerle nombre desde la bandeja.
+    merchant: {
+      text: parsed ? parsed.merchant || "" : "",
+      alias: alias ? { id: alias.id, name: alias.name, match: alias.match, category: alias.category } : null,
+    },
   };
 }
 
@@ -138,6 +158,9 @@ function strip(base) {
     to_account: base.to_account,
     category: base.category,
     description: base.description,
+    original: base.original,
+    merchant: base.merchant,
+    merchantName: base.merchantName,
     notes: base.notes,
     tags: base.tags,
     rule: "",
@@ -331,7 +354,7 @@ function applyRule(app, userId, row, rule) {
   }
   var ctx = load(app, userId);
   var mail = mailOf(row);
-  var base = suggest(mail, { accounts: ctx.accounts, categories: ctx.categories, rules: [] });
+  var base = suggest(mail, { accounts: ctx.accounts, categories: ctx.categories, merchants: ctx.merchants, rules: [] });
   var tx = withRule(rule, Object.assign({ accountUnknown: !base.tx.account }, base.tx));
   var lack = missing(tx);
   if (lack) throw new BadRequestError("Falta " + lack + " para crear el movimiento.");
@@ -477,6 +500,7 @@ function suggestFor(app, userId, id) {
     tx: s.tx,
     parsed: s.parsed,
     pattern: s.pattern,
+    merchant: s.merchant,
     rule: rule,
     transaction: tx ? tx.id : "",
   };

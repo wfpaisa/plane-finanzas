@@ -52,10 +52,13 @@ function daysApart(a, b) {
  *
  * - Lo anotado a mano contra lo del banco, como siempre. Lo anotado a mano
  *   que ya se unió trae el external_id del banco: ese ya tiene pareja.
- * - Dos del banco solo si uno es transferencia y el otro no: el mismo pago
- *   lo avisan las dos puntas (Bancolombia: "pagaste"; Nu: "recibimos tu
- *   pago"), y el segundo correo no siempre dice a qué cuenta fue. Dos compras
- *   iguales el mismo día sí pasan, y esas no se marcan.
+ * - Dos del banco si uno es transferencia y el otro no: el mismo pago lo
+ *   avisan las dos puntas (Bancolombia: "pagaste"; Nu: "recibimos tu pago"),
+ *   y el segundo correo no siempre dice a qué cuenta fue.
+ * - Dos del banco del mismo tipo solo si vienen de fuentes distintas (Gmail y
+ *   CSV, o texto pegado) y en las mismas cuentas: es la misma compra avisada
+ *   dos veces. De la misma fuente, dos compras iguales el mismo día sí pasan,
+ *   y esas no se marcan.
  * - Un gasto o un ingreso se parece a una transferencia si su cuenta es una
  *   de las dos puntas.
  */
@@ -67,7 +70,10 @@ function pairable(a, b) {
   if (!isBank(b.source) && !manualB) return false;
   if (manualA && a.external_id) return false;
   if (manualB && b.external_id) return false;
-  if (a.type === b.type) return manualA || manualB;
+  if (a.type === b.type) {
+    if (manualA || manualB) return true;
+    return a.source !== b.source && a.account === b.account && (a.to_account || "") === (b.to_account || "");
+  }
   var t = a.type === "transfer" ? a : b.type === "transfer" ? b : null;
   if (!t) return false;
   var o = t === a ? b : a;

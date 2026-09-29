@@ -205,6 +205,21 @@ export interface Suggestion {
   rule: Rule | null;
   /** El movimiento que ya tiene, si lo tiene. */
   transaction: string;
+  /** El comercio que se leyó y su alias (nombre limpio), si tiene. */
+  merchant?: { text: string; alias: { id: string; name: string; match: string; category: string } | null };
+}
+
+/**
+ * El nombre limpio de un comercio: los correos cuyo comercio contiene alguno
+ * de los textos de `match` se registran con `name` y, si la tiene, `category`.
+ * Ver pb_hooks/lib/merchants.js.
+ */
+export interface Merchant extends RecordModel {
+  owner: string;
+  /** Textos separados por coma; basta con que aparezca uno. */
+  match: string;
+  name: string;
+  category: string;
 }
 
 /**
@@ -228,7 +243,7 @@ export interface Rule extends RecordModel {
   set_amount: number;
   category: string;
   tags: string[] | null;
-  /** Admite {mes}, {año} y {original}. */
+  /** Admite {mes}, {año}, {original} y {comercio}, con filtros: {comercio|capitalizar}. */
   description: string;
   notes: string;
   paused: boolean;

@@ -7,6 +7,12 @@ const { pairable } = require("../pocketbase/pb_hooks/lib/dupes.js");
 const tx = (o: Record<string, string>) => ({ type: "expense", account: "a1", to_account: "", source: "gmail", external_id: "m1", ...o });
 
 describe("pairable", () => {
+  test("Gmail contra CSV: la misma compra en la misma cuenta; de la misma fuente, no", () => {
+    expect(pairable(tx({ source: "gmail", external_id: "g1" }), tx({ source: "csv", external_id: "csv:1" }))).toBe(true);
+    expect(pairable(tx({ source: "gmail", external_id: "g1" }), tx({ source: "csv", external_id: "csv:1", account: "otra" }))).toBe(false);
+    expect(pairable(tx({ source: "gmail", external_id: "g1" }), tx({ source: "gmail", external_id: "g2" }))).toBe(false);
+  });
+
   test("lo anotado a mano contra lo del banco, del mismo tipo", () => {
     expect(pairable(tx({ source: "manual", external_id: "" }), tx({}))).toBe(true);
   });

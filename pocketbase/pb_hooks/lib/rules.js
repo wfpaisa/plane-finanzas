@@ -16,8 +16,7 @@
  */
 
 var parsers = require(__hooks + "/lib/parsers.js");
-
-var MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+var merchants = require(__hooks + "/lib/merchants.js");
 
 function listOf(text) {
   return String(text || "")
@@ -79,16 +78,32 @@ function find(text, rules, amount, from) {
   return best;
 }
 
-/** La descripción de la regla con sus marcas resueltas; `date` es "AAAA-MM-DD". */
-function render(template, date, original) {
-  var y = String(date || "").slice(0, 4);
-  var m = +String(date || "").slice(5, 7);
-  return String(template || "")
-    .replace(/\{mes\}/gi, MONTHS[m - 1] || "")
-    .replace(/\{año\}|\{ano\}/gi, y)
-    .replace(/\{original\}/gi, original || "")
-    .replace(/\s+/g, " ")
-    .trim();
+/**
+ * Todas las reglas que le quedan a un texto, de la más precisa a la menos,
+ * con su puntaje: la primera es la que `find` elige (a igual puntaje, la que
+ * va antes en la lista).
+ */
+function matching(text, rules, amount, from) {
+  var hay = " " + parsers.norm(text) + " ";
+  var who = parsers.norm(from);
+  var out = [];
+  for (var i = 0; i < rules.length; i++) {
+    var sc = score(rules[i], hay, who, amount);
+    if (sc > 0) out.push({ rule: rules[i], score: sc, order: i });
+  }
+  out.sort(function (a, b) {
+    return b.score - a.score || a.order - b.order;
+  });
+  return out;
+}
+
+/**
+ * La descripción de la regla con sus marcas resueltas; `date` es "AAAA-MM-DD".
+ * `comercio`: el que se leyó del correo; `alias`: su nombre limpio, que no
+ * pasa por los filtros. Ver merchants.js para las marcas y los filtros.
+ */
+function render(template, date, original, comercio, alias) {
+  return merchants.render(template, date, { original: original, comercio: comercio, alias: alias });
 }
 
 /**
@@ -144,9 +159,11 @@ function apply(rule, tx) {
     var t = String(ruleTags[i]).trim().toLowerCase().replace(/,/g, "");
     if (t && out.tags.indexOf(t) < 0) out.tags.push(t);
   }
-  var original = tx.description || "";
+  // `original`: lo que se leyó del correo, aunque el alias del comercio ya haya
+  // puesto su nombre en la descripción.
+  var original = tx.original || tx.description || "";
   if (rule.description) {
-    var next = render(rule.description, tx.date, original);
+    var next = render(rule.description, tx.date, original, tx.merchant || "", tx.merchantName || "");
     if (next) out.description = next;
   }
   var ruleNotes = String(rule.notes || "").trim();
@@ -231,6 +248,7 @@ function applyExisting(app, userId, ruleId) {
     return r.senders.length;
   });
   var senders = withSender ? sendersByExternalId(app, userId) : {};
+  var aliases = merchants.load(app, userId);
   var list = app.findRecordsByFilter("transactions", "owner = {:u}", "", 0, 0, { u: userId });
   var changed = 0;
   for (var i = 0; i < list.length; i++) {
@@ -250,6 +268,8 @@ function applyExisting(app, userId, ruleId) {
       category: r.getString("category"),
       tags: jsonList(r, "tags"),
     };
+    var alias = merchants.find(before.description, aliases);
+    if (alias) before.merchantName = alias.name;
     var imported = ext && (r.getString("source") === "gmail" || r.getString("source") === "texto");
     var after = apply(imported ? rule : onlyLabels(rule), before);
     var same =
@@ -286,4 +306,4 @@ function applyExisting(app, userId, ruleId) {
   return changed;
 }
 
-module.exports = { find: find, render: render, apply: apply, plain: plain, load: load, applyExisting: applyExisting };
+module.exports = { find: find, matching: matching, render: render, apply: apply, plain: plain, load: load, applyExisting: applyExisting };

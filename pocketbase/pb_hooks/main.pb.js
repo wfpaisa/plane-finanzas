@@ -7,6 +7,51 @@
  * este archivo, por eso cada uno hace su propio `require`.
  */
 
+// ---------- Tokens de acceso: la API sin la clave (ver lib/tokens.js) ----------
+// Corre antes que el de PocketBase (-1020): si el token es de los nuestros deja
+// `e.auth` puesto y aquel no hace nada.
+routerUse(
+  new Middleware(
+    (e) => {
+      const tokens = require(`${__hooks}/lib/tokens.js`);
+      const raw = tokens.fromHeader(e.request.header.get("Authorization"));
+      if (!raw) return e.next();
+      const r = tokens.authenticate(e.app, raw);
+      const why = tokens.denied(r.token.getString("scope"), e.request.method, e.request.url.path);
+      if (why) throw new ForbiddenError(why);
+      e.auth = r.user;
+      e.set("apiToken", r.token);
+      return e.next();
+    },
+    -1030,
+    "finanzasApiToken",
+  ),
+);
+
+routerAdd(
+  "POST",
+  "/api/finanzas/tokens",
+  (e) => {
+    const tokens = require(`${__hooks}/lib/tokens.js`);
+    return e.json(200, tokens.create(e.app, e.auth.id, e.requestInfo().body));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "GET",
+  "/api/finanzas/guia",
+  (e) => {
+    const tokens = require(`${__hooks}/lib/tokens.js`);
+    // Detrás de un proxy (Nginx, Caddy…) la dirección pública viene en las X-Forwarded-*.
+    const proto = e.request.header.get("X-Forwarded-Proto") || (e.request.tls ? "https" : "http");
+    const host = e.request.header.get("X-Forwarded-Host") || e.request.host;
+    const md = tokens.guide(e.app, e.auth, e.get("apiToken") || null, `${proto}://${host}`);
+    return e.string(200, md);
+  },
+  $apis.requireAuth("users"),
+);
+
 // ---------- Usuario nuevo: sus categorías de partida ----------
 onRecordAfterCreateSuccess((e) => {
   const backup = require(`${__hooks}/lib/backup.js`);
@@ -232,6 +277,65 @@ routerAdd(
   $apis.requireAuth("users"),
 );
 
+// ---------- Revisar: los correos de Gmail y las reglas, sin guardar nada (ver lib/review.js) ----------
+
+// Los correos tal como están en Gmail, incluidos la papelera y el spam, y lo
+// que ya pasó con cada uno en la app y lo que haría hoy con él.
+routerAdd(
+  "GET",
+  "/api/finanzas/gmail/messages",
+  (e) => {
+    const review = require(`${__hooks}/lib/review.js`);
+    const q = e.request.url.query();
+    const opts = {
+      q: q.get("q"),
+      all: q.get("all") === "true" || q.get("all") === "1",
+      days: q.has("days") ? q.get("days") : 90,
+      max: Math.min(100, +q.get("max") || 25),
+      pageToken: q.get("pageToken"),
+    };
+    let src;
+    try {
+      src = review.fromGmail(e.app, e.auth.id, opts);
+    } catch (err) {
+      // Los errores ya explicados (sin Gmail, sin permiso) pasan tal cual.
+      if (err && err.status) throw err;
+      throw new BadRequestError("No se pudo leer Gmail: " + (err && err.message ? err.message : err));
+    }
+    const r = review.inspect(src.mails, review.load(e.app, e.auth.id));
+    const full = q.get("full") === "true" || q.get("full") === "1";
+    for (const m of r.messages) if (!full) m.text = m.text.slice(0, 500);
+    return e.json(200, { query: src.query, next: src.next, estimate: src.estimate, count: r.messages.length, messages: r.messages });
+  },
+  $apis.requireAuth("users"),
+);
+
+// Qué harían las reglas con los correos, y qué tienen mal. Con `rule` se prueba
+// una regla sin guardarla.
+routerAdd(
+  "POST",
+  "/api/finanzas/rules/check",
+  (e) => {
+    const review = require(`${__hooks}/lib/review.js`);
+    const body = e.requestInfo().body || {};
+    const opts = { q: body.q, all: !!body.all, days: body.days === undefined ? 90 : body.days, max: body.max || 200, pageToken: body.pageToken };
+    let src;
+    try {
+      src = body.source === "bandeja" ? review.fromInbox(e.app, e.auth.id, opts) : review.fromGmail(e.app, e.auth.id, opts);
+    } catch (err) {
+      // Los errores ya explicados (sin Gmail, sin permiso) pasan tal cual.
+      if (err && err.status) throw err;
+      throw new BadRequestError("No se pudo leer Gmail: " + (err && err.message ? err.message : err));
+    }
+    const r = review.inspect(src.mails, review.load(e.app, e.auth.id, body.rule || null));
+    // Por defecto solo los correos que importan: con problemas o sin regla.
+    const messages = body.messages === "all" ? r.messages : r.messages.filter((m) => m.problems.length || !m.rule);
+    for (const m of messages) m.text = m.text.slice(0, 500);
+    return e.json(200, { query: src.query, next: src.next, summary: r.summary, rules: r.rules, messages });
+  },
+  $apis.requireAuth("users"),
+);
+
 // ---------- Pegar texto: SMS o correos copiados, a la bandeja ----------
 
 routerAdd(
@@ -399,6 +503,23 @@ routerAdd(
     let changed = 0;
     e.app.runInTransaction((tx) => {
       changed = rules.applyExisting(tx, e.auth.id, String(body.rule || ""));
+    });
+    return e.json(200, { changed });
+  },
+  $apis.requireAuth("users"),
+);
+
+// ---------- Comercios: su nombre a los movimientos que ya existen ----------
+
+routerAdd(
+  "POST",
+  "/api/finanzas/merchants/apply",
+  (e) => {
+    const merchants = require(`${__hooks}/lib/merchants.js`);
+    const body = e.requestInfo().body || {};
+    let changed = 0;
+    e.app.runInTransaction((tx) => {
+      changed = merchants.applyExisting(tx, e.auth.id, String(body.id || ""));
     });
     return e.json(200, { changed });
   },

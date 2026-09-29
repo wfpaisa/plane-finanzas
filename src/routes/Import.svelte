@@ -10,6 +10,7 @@
   import { go, route } from "../lib/router.svelte";
   import { reload, store, touchTransactions } from "../lib/store.svelte";
   import type { SyncResult } from "../lib/types";
+  import MerchantsCard from "../components/app/MerchantsCard.svelte";
   import RulesCard from "../components/app/RulesCard.svelte";
   import TagInput from "../components/app/TagInput.svelte";
 
@@ -191,6 +192,8 @@
   </div>
 
   <RulesCard initialMatch={route.query.get("regla") ?? ""} />
+
+  <MerchantsCard />
 </div>
 
 <style>

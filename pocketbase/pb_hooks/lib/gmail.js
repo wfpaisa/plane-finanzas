@@ -159,6 +159,28 @@ function listIds(token, query, max) {
   return ids;
 }
 
+/**
+ * Una página de ids, para recorrer la búsqueda por partes: `next` es la
+ * siguiente ("" si no hay más) y `estimate` el total aproximado que da Gmail.
+ * También incluye la papelera y el spam.
+ */
+function listPage(token, query, pageToken, max) {
+  var r = api(
+    token,
+    "messages?includeSpamTrash=true&maxResults=" +
+      Math.max(1, Math.min(500, max || 100)) +
+      (query ? "&q=" + encodeURIComponent(query) : "") +
+      (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""),
+  );
+  return {
+    ids: (r.messages || []).map(function (m) {
+      return m.id;
+    }),
+    next: r.nextPageToken || "",
+    estimate: +r.resultSizeEstimate || 0,
+  };
+}
+
 // ---------- base64url -> texto UTF-8, sin ayuda del entorno ----------
 
 var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -247,6 +269,8 @@ function getMessage(token, id, htmlToText, htmlToRich) {
     date: local,
     text: bodyText(parts, htmlToText) || m.snippet || "",
     rich: parts.html && htmlToRich ? htmlToRich(parts.html) : "",
+    // INBOX, TRASH, SPAM, UNREAD…: para saber si está en la papelera.
+    labels: m.labelIds || [],
   };
 }
 
@@ -265,6 +289,7 @@ module.exports = {
   accessToken: accessToken,
   profile: profile,
   listIds: listIds,
+  listPage: listPage,
   getMessage: getMessage,
   getHtml: getHtml,
   decodeBase64Url: decodeBase64Url,

@@ -53,14 +53,100 @@ export function mailMisses(cond: { sender: string; match: string; amount?: numbe
   };
 }
 
-/** La descripción de la regla con sus marcas resueltas; `date` es "AAAA-MM-DD". */
-export function renderDescription(template: string, date: string, original: string): string {
+// ---------- Descripción: marcas y filtros (como pb_hooks/lib/merchants.js) ----------
+
+/** Municipios que los bancos ponen al final del comercio. Igual que en merchants.js. */
+const CITIES = new Set([
+  "bogota", "bogota dc", "bogota d.c", "bogota d.c.", "medellin", "cali", "barranquilla", "cartagena", "cucuta", "bucaramanga",
+  "pereira", "manizales", "armenia", "ibague", "villavicencio", "santa marta", "pasto", "neiva", "monteria", "valledupar",
+  "sincelejo", "popayan", "tunja", "riohacha", "quibdo", "florencia", "yopal", "leticia", "san andres", "mocoa", "arauca",
+  "envigado", "sabaneta", "itagui", "bello", "la estrella", "caldas", "copacabana", "girardota", "rionegro", "la ceja",
+  "marinilla", "guarne", "el retiro", "la union", "el carmen de viboral", "carmen de viboral", "santa fe de antioquia",
+  "apartado", "turbo", "caucasia", "soacha", "chia", "cajica", "zipaquira", "mosquera", "funza", "madrid", "facatativa",
+  "fusagasuga", "girardot", "cota", "tocancipa", "sopo", "la calera", "tenjo", "tabio", "palmira", "jamundi", "yumbo",
+  "tulua", "buga", "cartago", "buenaventura", "soledad", "malambo", "puerto colombia", "floridablanca", "giron",
+  "piedecuesta", "barrancabermeja", "dosquebradas", "santa rosa de cabal", "la dorada", "duitama", "sogamoso", "chiquinquira",
+  "espinal", "melgar", "colombia", "col", "co",
+]);
+const SMALL = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "en"]);
+
+const words = (t: string) => String(t ?? "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+
+export const TEXT_FILTERS: Record<string, (t: string) => string> = {
+  capitalizar: (t) =>
+    words(t)
+      .map((w, i) => {
+        const low = w.toLowerCase();
+        if (i > 0 && SMALL.has(low)) return low;
+        if (/^([a-z]\.)+[a-z]?\.?$/i.test(w)) return w.toUpperCase();
+        return low.charAt(0).toUpperCase() + low.slice(1);
+      })
+      .join(" "),
+  mayusculas: (t) => String(t ?? "").toUpperCase(),
+  minusculas: (t) => String(t ?? "").toLowerCase(),
+  sin_ciudad: (t) => {
+    let list = words(t);
+    for (let round = 0; round < 2; round++) {
+      let cut = 0;
+      for (let n = Math.min(4, list.length - 1); n >= 1; n--) {
+        if (CITIES.has(norm(list.slice(list.length - n).join(" ")))) {
+          cut = n;
+          break;
+        }
+      }
+      if (!cut) break;
+      list = list.slice(0, list.length - cut);
+    }
+    return list.join(" ");
+  },
+  primera_palabra: (t) => words(t)[0] ?? "",
+};
+
+const MARK = /\{\s*([a-zñ]+)\s*((?:\|\s*[a-z_]*\s*)*)\}/gi;
+
+/**
+ * La descripción de la regla con sus marcas resueltas; `date` es "AAAA-MM-DD".
+ * `comercio`: el que se leyó del correo (sin él, `original`); `alias`: su
+ * nombre limpio, que gana y no pasa por los filtros ({comercio|capitalizar}
+ * no vuelve «EPM» «Epm»).
+ */
+export function renderDescription(template: string, date: string, original: string, comercio = "", alias = ""): string {
+  const values: Record<string, string> = {
+    mes: monthName(+date.slice(5, 7)) ?? "",
+    año: date.slice(0, 4),
+    ano: date.slice(0, 4),
+    original,
+    comercio: alias || comercio || original,
+  };
   return template
-    .replace(/\{mes\}/gi, monthName(+date.slice(5, 7)) ?? "")
-    .replace(/\{año\}|\{ano\}/gi, date.slice(0, 4))
-    .replace(/\{original\}/gi, original)
+    .replace(MARK, (raw, mark: string, filters: string) => {
+      const key = mark.toLowerCase();
+      if (!(key in values)) return raw;
+      if (key === "comercio" && alias) return values[key];
+      return filters
+        .split("|")
+        .map((f) => f.trim().toLowerCase())
+        .filter(Boolean)
+        .reduce((v, f) => (TEXT_FILTERS[f] ? TEXT_FILTERS[f](v) : v), values[key]);
+    })
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** El alias que le queda a un comercio (el de texto más largo), como merchants.find en el servidor. */
+export function findMerchant<T extends { match: string }>(text: string, list: readonly T[]): T | null {
+  const hay = ` ${norm(text)} `;
+  let best: T | null = null;
+  let len = 0;
+  for (const m of list) {
+    for (const k of m.match.split(",").map(norm).filter(Boolean)) {
+      if (k.length > len && hay.includes(k)) {
+        best = m;
+        len = k.length;
+      }
+    }
+  }
+  return best;
 }
 
 /** Cómo se llama una regla en la lista: su nombre, o sus textos. */

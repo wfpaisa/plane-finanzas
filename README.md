@@ -91,9 +91,11 @@ Además **funciona sin internet**: lo que anotes sin señal se guarda en el tel�
 
 ### Y además…
 - **Reglas automáticas**: "si el movimiento dice *Netflix*, es Entretenimiento". Las categorías también aprenden con palabras clave (por ejemplo `exito, carulla, d1` → Mercado).
+- **Nombres de comercios**: «IKEA ENVIGADO» se registra como «Ikea», con su categoría si quieres. Se nombran desde un correo en Correos o en *Ajustes → Gmail → Comercios*. En la descripción de una regla, `{comercio}` pone ese nombre, y los filtros limpian el de los comercios sin nombre: `{comercio|sin_ciudad|capitalizar}`. Así una sola regla por tarjeta sirve para todas las compras.
 - **Modo claro y oscuro**, y un estilo sólido (sin degradados) para quien prefiere colores planos.
 - **Respaldo**: exporta todos tus datos a un archivo y vuelve a cargarlos cuando quieras, incluso en otro servidor.
-- **Varios usuarios**: cada persona se registra con su correo y solo ve sus datos.
+- **Varios usuarios**: cada persona se registra con su correo y solo ve sus datos. La clave se cambia en *Ajustes → Cuenta y datos*.
+- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas un token (solo consultar, o consultar y cambiar, con vencimiento) y copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, revisar tus correos pendientes y proponerte las reglas. También puede listar tus correos de Gmail tal como están (incluidos la papelera y el spam) y validar las reglas contra ellos sin guardar nada: qué regla gana en cada correo, qué movimiento crearía y qué está mal (cuentas o categorías borradas, remitentes que Gmail no lee, reglas que nunca coinciden o que empatan). Ningún token puede cambiar tu clave, conectar Gmail, cargar un respaldo ni borrar todos tus datos.
 
 ![Modo oscuro](docs/capturas/resumen-oscuro.png)
 

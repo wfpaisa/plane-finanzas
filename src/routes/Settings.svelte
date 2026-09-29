@@ -4,12 +4,15 @@
     categoriza lo que llega de Gmail. Gasto e ingreso en la misma lista.
   - Reglas: "si el movimiento dice X, es tal cosa".
   - Apariencia: el tinte del fondo de la app.
-  - Cuenta y datos: el perfil, lo automático y el respaldo.
+  - Cuenta y datos: el perfil, la clave, lo automático y el respaldo.
+  - Acceso por API: los tokens para asistentes y programas.
   La sección va en la URL (`?seccion=`), así se puede enlazar.
 -->
 <script lang="ts">
+  import ApiTokens from "../components/app/ApiTokens.svelte";
   import IconSelect from "../components/app/IconSelect.svelte";
   import MoneyInput from "../components/app/MoneyInput.svelte";
+  import PasswordCard from "../components/app/PasswordCard.svelte";
   import Money from "../components/app/Money.svelte";
   import Segmented from "../components/app/Segmented.svelte";
   import TagInput from "../components/app/TagInput.svelte";
@@ -33,6 +36,7 @@
     { id: "cuenta", label: "Cuenta y datos", icon: "user-circle" },
     { id: "categorias", label: "Categorías", icon: "tag-01" },
     { id: "gmail", label: "Gmail", icon: "mail-01" },
+    { id: "api", label: "Acceso por API", icon: "key-01" },
   ] as const;
   type Section = (typeof SECTIONS)[number]["id"];
 
@@ -318,6 +322,8 @@
     </div>
   {:else if section === "gmail"}
     <Import />
+  {:else if section === "api"}
+    <ApiTokens />
   {:else}
     <div class="stack">
       <div class="split-even">
@@ -328,16 +334,18 @@
             <div><Button loading={savingName} onclick={saveName}>Guardar</Button></div>
           </div>
         </div>
-        <div class="card">
-          <div class="card-head">
-            <div>
-              <h3 class="card-title">Movimientos recurrentes</h3>
-              <p class="card-sub">A las 6:00 a. m., la aplicación revisa si debe registrar un ingreso, gasto o aporte programado. Este proceso no mueve dinero en el banco.</p>
-            </div>
+        <PasswordCard />
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Movimientos recurrentes</h3>
+            <p class="card-sub">A las 6:00 a. m., la aplicación revisa si debe registrar un ingreso, gasto o aporte programado. Este proceso no mueve dinero en el banco.</p>
           </div>
-          <div class="card-body">
-            <Button loading={running} onclick={runAutomatic}><Icon name="repeat" />Revisar ahora</Button>
-          </div>
+        </div>
+        <div class="card-body">
+          <Button loading={running} onclick={runAutomatic}><Icon name="repeat" />Revisar ahora</Button>
         </div>
       </div>
 

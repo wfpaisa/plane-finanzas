@@ -147,7 +147,10 @@
   );
   const date = $derived(mail?.suggestion.tx.date ?? new Date().toISOString().slice(0, 10));
   const original = $derived(mail?.suggestion.parsed?.description || mail?.row.subject || match.split(",")[0]?.trim().toUpperCase() || "GOU PAYMENTS S A");
-  const preview = $derived(description.trim() ? renderDescription(description, date, original) : original);
+  /** El comercio que se leyó del correo y, si lo tiene, su nombre (que no pasa por los filtros). */
+  const comercio = $derived(mail?.suggestion.parsed?.merchant || "");
+  const alias = $derived(mail?.suggestion.merchant?.alias?.name || "");
+  const preview = $derived(description.trim() ? renderDescription(description, date, original, comercio, alias) : alias || comercio || original);
 
   const title = $derived(usedHere ? "Regla de este movimiento" : rule ? "Editar regla" : "Nueva regla");
 
@@ -325,8 +328,11 @@
         {/if}
       </div>
 
-      <Field label="Descripción" tip={"Puedes usar {mes}, {año} y {original}. Vacía, usa la del correo."}>
-        <Input bind:value={description} placeholder={"Arriendo {mes}"} />
+      <Field
+        label="Descripción"
+        tip={"Puedes usar {mes}, {año}, {original} (la descripción del correo) y {comercio} (el nombre que le diste al comercio en Comercios o, si no tiene, el que trae el correo). Para limpiar el texto de los comercios sin nombre, agrega filtros: {comercio|sin_ciudad|capitalizar}; el nombre que le diste a un comercio se usa tal cual. Si la dejas vacía, se usa el nombre del comercio o la descripción del correo."}
+      >
+        <Input bind:value={description} placeholder={"{comercio|sin_ciudad|capitalizar}"} />
       </Field>
       {#if description.includes("{")}
         <p class="rule-preview">

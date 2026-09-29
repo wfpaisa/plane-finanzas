@@ -13,10 +13,11 @@
   import { accountsBySender, ruleLabel } from "../../lib/rules";
   import { store } from "../../lib/store.svelte";
   import { categoryTags } from "../../lib/tags";
-  import type { InboxRow, Suggestion, Transaction } from "../../lib/types";
+  import type { InboxRow, Merchant, Suggestion, Transaction } from "../../lib/types";
   import Icon from "../Icon.svelte";
   import { Button, Loading, Modal } from "../ui";
   import MailText from "./MailText.svelte";
+  import MerchantForm from "./MerchantForm.svelte";
   import Money from "./Money.svelte";
   import RuleForm from "./RuleForm.svelte";
   import TransactionForm from "./TransactionForm.svelte";
@@ -34,6 +35,7 @@
   /** El movimiento ya creado, abierto encima del correo; al cerrarlo se vuelve aquí. */
   let editOpen = $state(false);
   let ruleOpen = $state(false);
+  let merchantOpen = $state(false);
   /** Al abrir la regla desde un pendiente: completar la que ya coincide, o una nueva. */
   let completeRule = $state(false);
   let busy = $state(false);
@@ -109,6 +111,12 @@
     return "algo";
   }
 
+  /** El comercio del correo con nombre nuevo: se relee la propuesta, que ya lo usa. */
+  function merchantSaved() {
+    if (id) void load(id);
+    onChanged();
+  }
+
   /** Al volver del movimiento se relee el correo: pudo cambiar o borrarse. */
   function closeEdit() {
     editOpen = false;
@@ -122,7 +130,7 @@
   }
 </script>
 
-<Modal open={!!id && !txOpen && !editOpen && !ruleOpen} {onClose} title={row?.subject || "Correo"} icon="mail-01" width="modal-panel-width-lg">
+<Modal open={!!id && !txOpen && !editOpen && !ruleOpen && !merchantOpen} {onClose} title={row?.subject || "Correo"} icon="mail-01" width="modal-panel-width-lg">
   {#if !row || !suggestion}
     <Loading label="Abriendo el correo" />
   {:else}
@@ -171,6 +179,20 @@
           bind:images
         />
       </article>
+
+      {#if suggestion.merchant?.text}
+        {@const alias = suggestion.merchant.alias}
+        <p class="rule-hint">
+          <Icon name="store-01" size={14} />
+          {#if alias}
+            <span>El comercio <b>{suggestion.merchant.text}</b> se registra como <b>«{alias.name}»</b>.</span>
+            <Button size="sm" variant="ghost" onclick={() => (merchantOpen = true)}>Cambiar nombre</Button>
+          {:else}
+            <span>El comercio se llama <b>{suggestion.merchant.text}</b> en el correo.</span>
+            <Button size="sm" variant="ghost" onclick={() => (merchantOpen = true)}>Nombrar comercio</Button>
+          {/if}
+        </p>
+      {/if}
 
       {#if pending && suggestion.rule}
         <p class="rule-hint">
@@ -243,6 +265,14 @@
 </Modal>
 
 {#if row && suggestion}
+  <MerchantForm
+    open={merchantOpen}
+    merchant={(suggestion.merchant?.alias as Merchant | null) ?? null}
+    sample={suggestion.merchant?.text ?? ""}
+    kind={suggestion.tx.type}
+    onClose={() => (merchantOpen = false)}
+    onSaved={merchantSaved}
+  />
   <TransactionForm
     open={txOpen}
     draft={suggestion.tx}

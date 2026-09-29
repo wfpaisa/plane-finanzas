@@ -27,6 +27,7 @@ var FIELDS = {
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes", "kind"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
   rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "paused"],
+  merchants: ["match", "name", "category"],
   inbox: ["external_id", "source", "sender", "subject", "date", "text", "rich", "parsed", "status", "rule"],
   ignored_imports: ["external_id"],
 };
@@ -44,7 +45,7 @@ function own(app, name, userId) {
 
 function exportData(app, userId) {
   var data = {};
-  var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules", "inbox", "ignored_imports"];
+  var names = ["categories", "accounts", "recurring", "transactions", "savings", "rules", "merchants", "inbox", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     data[names[i]] = own(app, names[i], userId).map(function (r) {
       var row = plainOf(r, FIELDS[names[i]]);
@@ -108,7 +109,7 @@ function clean(app, userId) {
   var counts = {};
   // Primero lo que depende de otros, para que ningún borrado en cascada
   // descuadre la cuenta.
-  var names = ["inbox", "rules", "transactions", "recurring", "savings", "accounts", "categories", "ignored_imports"];
+  var names = ["inbox", "rules", "merchants", "transactions", "recurring", "savings", "accounts", "categories", "ignored_imports"];
   for (var i = 0; i < names.length; i++) {
     var list = own(app, names[i], userId);
     for (var j = 0; j < list.length; j++) app.delete(list[j]);
@@ -232,6 +233,10 @@ function restoreData(app, userId, data, counts) {
       r.set("category", map("categories", row.category));
       r.set("account", map("accounts", row.account));
       r.set("to_account", map("accounts", row.to_account));
+    });
+    // Los respaldos de antes de los comercios no los traen.
+    insert("merchants", data.merchants, function (r, row) {
+      r.set("category", map("categories", row.category));
     });
     insert("transactions", data.transactions, function (r, row) {
       r.set("account", map("accounts", row.account));
