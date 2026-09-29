@@ -10,6 +10,8 @@ const refs = require("../pocketbase/pb_hooks/lib/refs.js");
 const inbox = require("../pocketbase/pb_hooks/lib/inbox.js");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const review = require("../pocketbase/pb_hooks/lib/review.js");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const rules = require("../pocketbase/pb_hooks/lib/rules.js");
 
 describe("el lector entiende la operación", () => {
   const read = (text: string) => p.parseMessage({ text });
@@ -103,6 +105,14 @@ describe("cuentas por terminación y llave", () => {
     // Un pago entre cuentas propias sigue siendo transferencia.
     const pago = "Banco Principal: Pagaste $600.000 en la tarjeta *5678 desde la cuenta *1234, el 25/09/2026.";
     expect(inbox.suggest(mail(pago), ctx({ rules: [general] })).tx).toMatchObject({ type: "transfer", to_account: "tarjeta", category: "" });
+  });
+
+  test("aplicar una regla después (desde la bandeja) tampoco pisa lo que el aviso dice", () => {
+    const general = { id: "r1", name: "Todo el banco", sender: "bancoprincipal", type: "expense", account: "ahorros", category: "c-personal" };
+    const pago = "Banco Principal: Pagaste $600.000 en la tarjeta *5678 desde la cuenta *1234, el 25/09/2026.";
+    // Así lo hace inbox.applyRule: lo leído sin reglas y la regla encima.
+    const leido = inbox.suggest(mail(pago), ctx()).tx;
+    expect(rules.apply(general, leido)).toMatchObject({ type: "transfer", account: "ahorros", to_account: "tarjeta", category: "" });
   });
 
   test("lo rechazado se descarta aunque una regla lo reconozca", () => {

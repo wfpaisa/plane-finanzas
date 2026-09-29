@@ -66,7 +66,7 @@ En **Proyección** pones tus ingresos fijos (sueldo) y tus gastos fijos (arriend
 
 > **Ingresos − gastos fijos − ahorros = lo que puedes gastar**
 
-Además proyecta los próximos 12 meses, tiene un **simulador** y responde preguntas como "¿para cuándo tendría $10.000.000?". Los fijos que marques se crean solos cada mes.
+Además proyecta los próximos 12 meses, tiene un **simulador** y responde preguntas como "¿para cuándo tendría $10.000.000?". Los fijos que marques se crean solos cada mes. Al marcar un pago como hecho, si ya está registrado (por ejemplo, llegó por Gmail), la app te propone usar ese movimiento en vez de crear otro.
 
 ![Proyección](docs/capturas/plan-futuro.png)
 
@@ -96,7 +96,7 @@ Además **funciona sin internet**: lo que anotes sin señal se guarda en el tel�
 - **Modo claro y oscuro**, y un estilo sólido (sin degradados) para quien prefiere colores planos.
 - **Respaldo**: exporta todos tus datos a un archivo y vuelve a cargarlos cuando quieras, incluso en otro servidor.
 - **Varios usuarios**: cada persona se registra con su correo y solo ve sus datos. La clave se cambia en *Ajustes → Cuenta y datos*.
-- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas un token (solo consultar, o consultar y cambiar, con vencimiento) y copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, revisar tus correos pendientes y proponerte las reglas. También puede listar tus correos de Gmail tal como están (incluidos la papelera y el spam) y validar las reglas contra ellos sin guardar nada: qué regla gana en cada correo, qué movimiento crearía y qué está mal (cuentas o categorías borradas, remitentes que Gmail no lee, reglas que nunca coinciden o que empatan). Antes de cambiar algo, el asistente puede simularlo (`dry_run`) y mostrarte qué movimientos cambiarían. Ningún token puede cambiar tu clave, conectar Gmail, cargar un respaldo ni borrar todos tus datos.
+- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas un token (solo consultar, o consultar y cambiar, con vencimiento) y copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, revisar tus correos pendientes y proponerte las reglas. También puede listar tus correos de Gmail tal como están (incluidos la papelera y el spam) y validar las reglas contra ellos sin guardar nada: qué regla gana en cada correo, qué movimiento crearía y qué está mal (cuentas o categorías borradas, remitentes que Gmail no lee, reglas que nunca coinciden o que empatan). También conoce la proyección: qué pagos programados tocan cada mes, cuáles están vencidos y cuáles ya se pagaron, y puede marcarlos. Antes de cambiar algo, el asistente puede simularlo (`dry_run`) y mostrarte qué movimientos cambiarían. Ningún token puede cambiar tu clave, conectar Gmail, cargar un respaldo ni borrar todos tus datos.
 
 ![Modo oscuro](docs/capturas/resumen-oscuro.png)
 

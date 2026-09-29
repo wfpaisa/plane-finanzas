@@ -150,6 +150,21 @@ describe("inspect: reglas", () => {
     expect(problems({ ...pan, paused: true })).toContain("en pausa");
   });
 
+  test("un pedazo del remitente no es falsa alarma si sus correos llegan", () => {
+    const aviso = { ...compra, from: "Alertas <alertasynotificaciones@an.notificacionesbancoprincipal.com>" };
+    const leidos = { readSenders: ["notificacionesbancoprincipal.com"] };
+    for (const sender of ["notificacionesbancoprincipal", "alertasynotificaciones"]) {
+      const r = review.inspect([aviso], ctx([{ ...pan, sender }], leidos));
+      expect(r.messages[0].autoRead).toBe(true);
+      expect(r.rules[0].problems.join(" ")).not.toContain("Gmail no");
+    }
+    // Sin correos revisados, el pedazo que es palabra de un remitente leído tampoco avisa.
+    expect(review.inspect([], ctx([{ ...pan, sender: "notificacionesbancoprincipal" }], leidos)).rules[0].problems.join(" ")).not.toContain("Gmail no");
+    // Si sus correos no llegan, sí avisa, con el dominio que hay que agregar.
+    const nada = review.inspect([aviso], ctx([{ ...pan, sender: "alertasynotificaciones" }]));
+    expect(nada.rules[0].problems.join(" ")).toContain("Agrega «an.notificacionesbancoprincipal.com»");
+  });
+
   test("regla que no coincide con ningún correo revisado", () => {
     const r = review.inspect([promo], ctx([pan]));
     expect(r.rules[0].problems.join(" ")).toContain("No coincidió con ninguno de los 1 correos");

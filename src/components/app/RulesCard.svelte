@@ -29,6 +29,10 @@
   let formOpen = $state(false);
   let prefill = $state("");
   let applying = $state(false);
+  let showPaused = $state(false);
+
+  const pausedCount = $derived(rules.filter((r) => r.paused).length);
+  const visible = $derived(showPaused ? rules : rules.filter((r) => !r.paused));
 
   async function load() {
     try {
@@ -80,6 +84,11 @@
       </p>
     </div>
     <div class="card-head-actions">
+      {#if pausedCount}
+        <Button size="sm" variant="ghost" aria-pressed={showPaused} onclick={() => (showPaused = !showPaused)}>
+          <Icon name={showPaused ? "view-off" : "view"} />{showPaused ? "Ocultar en pausa" : `Mostrar en pausa (${pausedCount})`}
+        </Button>
+      {/if}
       {#if rules.some((r) => !r.paused)}
         <Button size="sm" variant="ghost" loading={applying} onclick={applyAll}><Icon name="repeat" />Aplicar a todo</Button>
       {/if}
@@ -87,9 +96,9 @@
     </div>
   </div>
   <div class="card-body">
-    {#if rules.length}
+    {#if visible.length}
       <ul class="rule-list">
-        {#each rules as r (r.id)}
+        {#each visible as r (r.id)}
           {@const cat = store.category(r.category)}
           {@const acc = store.account(r.account)}
           {@const to = store.account(r.to_account)}
@@ -124,6 +133,10 @@
           </li>
         {/each}
       </ul>
+    {:else if rules.length}
+      <p class="muted small empty">
+        Todas tus reglas están en pausa, así que ningún correo se vuelve movimiento. Usa «Mostrar en pausa» para verlas y reactivarlas.
+      </p>
     {:else}
       <p class="muted small empty">
         Todavía no hay reglas. Ejemplo: si el correo viene de <b>alertas@banco.com</b> y dice <b>GOU PAYMENTS</b>, que sea un gasto de

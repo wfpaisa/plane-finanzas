@@ -88,13 +88,17 @@ onRecordCreate((e) => {
 // ---------- Lo importado que se borra no vuelve (ver lib/ignored.js) ----------
 onRecordDelete((e) => {
   const ext = e.record.getString("external_id");
+  // El pago unido a un programado: el registro automático tampoco lo vuelve a crear.
+  const key = e.record.collection().name === "transactions" ? e.record.getString("recurring_key") : "";
   const owner = e.record.getString("owner");
   e.next();
   const dupes = require(`${__hooks}/lib/dupes.js`);
   // Al cargar un respaldo o borrarlo todo no es la persona descartando algo.
-  if (!ext || dupes.restoring(e.app, owner)) return;
+  if ((!ext && !key) || dupes.restoring(e.app, owner)) return;
   try {
-    require(`${__hooks}/lib/ignored.js`).remember(e.app, owner, ext);
+    const ignored = require(`${__hooks}/lib/ignored.js`);
+    if (ext) ignored.remember(e.app, owner, ext);
+    if (key) ignored.remember(e.app, owner, key);
   } catch (err) {
     console.log("[finanzas] borrados: " + err);
   }
@@ -522,6 +526,37 @@ routerAdd(
     const report = { changes: [], skipped: [] };
     const changed = dryrun.run(e.app, dry, (tx) => merchants.applyExisting(tx, e.auth.id, String(body.id || ""), report));
     return e.json(200, { changed, dry_run: dry, changes: report.changes.slice(0, 300), skipped: report.skipped.slice(0, 300) });
+  },
+  $apis.requireAuth("users"),
+);
+
+// ---------- Proyección: el plan de un mes y marcar lo programado (ver lib/plan.js) ----------
+
+routerAdd(
+  "GET",
+  "/api/finanzas/plan",
+  (e) => {
+    const plan = require(`${__hooks}/lib/plan.js`);
+    const q = e.request.url.query();
+    const ym = String(q.get("ym") || plan.today().slice(0, 7));
+    if (!/^\d{4}-\d{2}$/.test(ym)) throw new BadRequestError("El mes va como AAAA-MM, por ejemplo 2026-09.");
+    const months = q.get("months");
+    return e.json(200, plan.monthPlan(e.app, e.auth.id, ym, { only: String(q.get("recurring") || ""), months: months === "" ? undefined : months }));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "POST",
+  "/api/finanzas/recurring/mark",
+  (e) => {
+    const plan = require(`${__hooks}/lib/plan.js`);
+    const dryrun = require(`${__hooks}/lib/dryrun.js`);
+    const body = e.requestInfo().body || {};
+    const dry = dryrun.wanted(body);
+    const r = dryrun.run(e.app, dry, (tx) => plan.mark(tx, e.auth.id, body));
+    r.dry_run = dry;
+    return e.json(200, r);
   },
   $apis.requireAuth("users"),
 );

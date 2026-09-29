@@ -73,6 +73,11 @@ export interface Transaction extends RecordModel {
   attachments: string[];
   source: "manual" | "gmail" | "texto" | "recurrente" | "csv" | "";
   external_id: string;
+  /**
+   * La marca del programado que paga (`rec:<id>:<AAAA-MM>`), si es un
+   * movimiento que ya existía y se unió a él. Ver pb_hooks/lib/plan.js.
+   */
+  recurring_key?: string;
   raw: string;
   /** Posible repetido: el movimiento que parece el mismo (ver pb_hooks/lib/dupes.js). */
   dup_of: string;

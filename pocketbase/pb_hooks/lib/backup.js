@@ -23,7 +23,7 @@ var FIELDS = {
   categories: ["name", "kind", "icon", "color", "keywords", "budget", "tags"],
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "senders", "refs", "exclude_from_total", "archived", "sort", "notes"],
   recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "saving", "paused", "auto_create"],
-  transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
+  transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "recurring_key", "raw", "rule"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes", "kind"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
   rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "paused"],
@@ -189,6 +189,13 @@ function restoreData(app, userId, data, counts) {
     function map(name, id) {
       return id ? ids[name][id] || "" : "";
     }
+    // Las marcas de lo programado llevan el id del programado (`rec:<id>:…`,
+    // `prov:<id>:…`, `pay:rec:<id>:…`): con los ids nuevos, lo pagado sigue pagado.
+    function remapKey(key) {
+      var m = /^(pay:)?(rec|prov):([^:]+)(.*)$/.exec(String(key || ""));
+      if (!m || !ids.recurring[m[3]]) return key;
+      return (m[1] || "") + m[2] + ":" + ids.recurring[m[3]] + m[4];
+    }
 
     function insert(name, rows, fix) {
       var col = tx.findCollectionByNameOrId(name);
@@ -243,6 +250,8 @@ function restoreData(app, userId, data, counts) {
       r.set("to_account", map("accounts", row.to_account));
       r.set("category", map("categories", row.category));
       r.set("rule", map("rules", row.rule));
+      if (row.external_id) r.set("external_id", remapKey(row.external_id));
+      if (row.recurring_key) r.set("recurring_key", remapKey(row.recurring_key));
     });
     // Para subir los adjuntos: viejo id -> nuevo, de los que traen alguno.
     counts.files = {};
@@ -285,6 +294,7 @@ function restoreData(app, userId, data, counts) {
       // existe aquí; su cuenta no viaja en el respaldo y queda vacía.
       r.set("created_by", userExists(tx, row.created_by) ? row.created_by : userId);
       r.set("account", map("accounts", row.account));
+      if (row.external_id) r.set("external_id", remapKey(row.external_id));
     });
 
     // Cada recurrente con su provisión, ya con los ids nuevos de los dos.
@@ -303,7 +313,9 @@ function restoreData(app, userId, data, counts) {
     });
 
     // Lo borrado a propósito; los respaldos de antes no lo traen.
-    insert("ignored_imports", data.ignored_imports);
+    insert("ignored_imports", data.ignored_imports, function (r, row) {
+      r.set("external_id", remapKey(row.external_id));
+    });
 
     // Nombre y color de fondo; los respaldos de antes no los traen.
     if (data.profile) {

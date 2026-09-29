@@ -7,9 +7,18 @@
  * Al borrar el pago, el retiro se borra y lo apartado vuelve.
  */
 
+/**
+ * La marca de pago de un movimiento: la que puso la app (`external_id`) o la
+ * de un movimiento que ya existía y se unió al programado (`recurring_key`).
+ */
+function keyOf(tx) {
+  var ext = tx.getString("external_id");
+  return tx.getString("recurring_key") || (ext.indexOf("rec:") === 0 ? ext : "");
+}
+
 /** El recurrente de un movimiento marcado (`rec:<id>:…`), si tiene provisión. */
 function provisionOf(app, tx) {
-  var ext = tx.getString("external_id");
+  var ext = keyOf(tx);
   if (ext.indexOf("rec:") !== 0) return null;
   var id = ext.split(":")[1];
   try {
@@ -34,7 +43,7 @@ function onPaid(app, tx) {
   var r = provisionOf(app, tx);
   if (!r) return null;
   var saving = r.getString("saving");
-  var key = "pay:" + tx.getString("external_id");
+  var key = "pay:" + keyOf(tx);
   try {
     app.findFirstRecordByFilter("saving_movements", "saving = {:s} && external_id = {:k}", { s: saving, k: key });
     return null;
@@ -54,9 +63,9 @@ function onPaid(app, tx) {
   return mv;
 }
 
-/** El pago se borró: lo apartado vuelve. */
-function onUnpaid(app, tx) {
-  var ext = tx.getString("external_id");
+/** El pago se borró o se desmarcó: lo apartado vuelve. `key`: la marca que tenía, si ya se la quitaron. */
+function onUnpaid(app, tx, key) {
+  var ext = key || keyOf(tx);
   if (ext.indexOf("rec:") !== 0) return;
   var list = app.findRecordsByFilter("saving_movements", "external_id = {:k} && created_by = {:u}", "", 0, 0, {
     k: "pay:" + ext,

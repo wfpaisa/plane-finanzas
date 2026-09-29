@@ -74,6 +74,18 @@ function gmailReads(from, read) {
   return false;
 }
 
+/**
+ * Si un remitente de regla (un pedazo del "De:", como "notificacionesbanco" o
+ * "alertas@banco") puede llegar con los remitentes que se leen, sin mirar
+ * ningún correo: sus palabras son las de un remitente leído, o al revés.
+ */
+function likelyRead(fragment, read) {
+  var part = tokens(fragment);
+  if (gmailReads(fragment, read)) return true;
+  for (var i = 0; i < read.length; i++) if (contains(tokens(read[i]), part)) return true;
+  return false;
+}
+
 /** Un término para agregar a los remitentes de Gmail: el dominio del correo. */
 function domainOf(from) {
   var m = /@([^>\s]+)/.exec(String(from || ""));
@@ -81,7 +93,7 @@ function domainOf(from) {
 }
 
 /** Los problemas de una regla que se ven sin mirar ningún correo. */
-function staticProblems(rule, ctx, all) {
+function staticProblems(rule, ctx, all, mails) {
   var out = [];
   var accounts = ctx.allAccounts;
   var cats = ctx.categoriesById;
@@ -95,8 +107,29 @@ function staticProblems(rule, ctx, all) {
   }
   if (ctx.readSenders) {
     for (var s = 0; s < senders.length; s++) {
-      // Sin el correo no se sabe el nombre del remitente: se compara el texto de la regla.
-      if (!gmailReads(senders[s], ctx.readSenders)) {
+      // Los correos revisados de ese remitente son la prueba: si alguno llega, llega.
+      var from = (mails || []).filter(function (m) {
+        return parsers.norm(m.from).indexOf(senders[s]) >= 0;
+      });
+      if (from.length) {
+        var read = from.some(function (m) {
+          return gmailReads(m.from, ctx.readSenders);
+        });
+        if (!read) {
+          out.push(
+            "Gmail no lee los " +
+              from.length +
+              " correos revisados de «" +
+              senders[s] +
+              "»: ningún remitente de Gmail es una palabra de su dirección. Agrega «" +
+              (domainOf(from[0].from) || senders[s]) +
+              "» a los remitentes de Gmail o de una cuenta.",
+          );
+        }
+        continue;
+      }
+      // Sin correos de ese remitente, se compara el texto de la regla.
+      if (!likelyRead(senders[s], ctx.readSenders)) {
         out.push(
           "Es posible que Gmail no lea correos de «" +
             senders[s] +
@@ -341,7 +374,7 @@ function inspect(mails, ctx) {
   var byRule = byId(ctx.rules);
   var ruleList = ctx.rules.map(function (r) {
     var st = stats[r.id];
-    var problems = staticProblems(r, ctx, ctx.rules);
+    var problems = staticProblems(r, ctx, ctx.rules, mails);
     if (!r.paused && mails.length) {
       if (!st.won && !st.blocked && !st.lost) problems.push("No coincidió con ninguno de los " + mails.length + " correos revisados.");
       else if (!st.won && !st.blocked && st.lost) {

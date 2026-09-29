@@ -188,6 +188,10 @@ function strip(base) {
     notes: base.notes,
     tags: base.tags,
     rule: "",
+    // Lo que el aviso dice con certeza: aplicar una regla después no lo pisa (ver rules.apply).
+    accountKnown: !!base.accountKnown,
+    ownTransfer: !!base.ownTransfer,
+    aliasCategory: base.aliasCategory || "",
   };
 }
 
@@ -395,14 +399,29 @@ function applyRule(app, userId, row, rule) {
   return tx;
 }
 
+/** Lo que se compara de un movimiento antes y después de aplicarle una regla. */
+function snapshot(r) {
+  return {
+    type: r.getString("type"),
+    account: r.getString("account"),
+    to_account: r.getString("to_account"),
+    category: r.getString("category"),
+    amount: r.getFloat("amount"),
+    description: r.getString("description"),
+  };
+}
+
 /**
- * Vuelve a crear, desde su correo, los movimientos de una regla: los que
- * creó y los procesados que la cumplen. Así el valor y la descripción salen
- * del correo y no de lo que el movimiento tenga hoy. Los que se borraron no
- * vuelven. @returns {number} cuántos
+ * Vuelve a crear, desde su correo, los movimientos de una regla: los
+ * procesados donde esta regla es la que gana hoy (o los que creó, si ninguna
+ * otra gana). Un correo que otra regla más precisa reconoce no se toca. Así
+ * el valor y la descripción salen del correo y no de lo que el movimiento
+ * tenga hoy. Los que se borraron no vuelven. Con `report` ({ changes: [] }),
+ * anota lo que cambió en cada movimiento. @returns {number} cuántos
  */
-function reapply(app, userId, rule) {
+function reapply(app, userId, rule, report) {
   if (discards(rule)) return 0;
+  var active = rules.load(app, userId);
   var rows = app.findRecordsByFilter("inbox", "owner = {:u} && status = 'procesado'", "", 0, 0, { u: userId });
   var n = 0;
   for (var i = 0; i < rows.length; i++) {
@@ -412,13 +431,23 @@ function reapply(app, userId, rule) {
       parsed = JSON.parse(rows[i].getString("parsed") || "null");
     } catch (_) {}
     var amount = parsed && parsed.amount ? parsed.amount : 0;
-    if (rows[i].getString("rule") !== rule.id && !rules.find(fullText(mail), [rule], amount, mail.from)) continue;
-    if (!txOf(app, userId, mail.id)) continue;
+    var winner = rules.find(fullText(mail), active, amount, mail.from);
+    if (winner ? winner.id !== rule.id : rows[i].getString("rule") !== rule.id) continue;
+    var tx = txOf(app, userId, mail.id);
+    if (!tx) continue;
+    var before = snapshot(tx);
     try {
       applyRule(app, userId, rows[i], rule);
       n++;
     } catch (err) {
       // Si con la regla nueva le falta algo, se queda como estaba.
+      continue;
+    }
+    if (report) {
+      var after = snapshot(txOf(app, userId, mail.id));
+      var diff = {};
+      for (var k in before) if (before[k] !== after[k]) diff[k] = { from: before[k], to: after[k] };
+      if (Object.keys(diff).length) report.changes.push({ id: tx.id, inbox: rows[i].id, date: mail.date, subject: mail.subject, changes: diff });
     }
   }
   return n;
@@ -449,6 +478,14 @@ var RULE_FIELDS = ["name", "sender", "match", "type", "account", "to_account", "
  */
 function saveRule(app, userId, body) {
   var data = body.rule || {};
+  // Al editar, lo que no se manda queda como estaba: `{id, paused: true}` basta para pausarla.
+  if (data.id && body.scope !== "this") {
+    var old = rules.plain(mine(app, "rules", String(data.id), userId));
+    var merged = {};
+    for (var key in old) merged[key] = old[key];
+    for (var key2 in data) merged[key2] = data[key2];
+    data = merged;
+  }
   var row = body.inbox ? mine(app, "inbox", String(body.inbox), userId) : null;
   var clean = {};
   for (var i = 0; i < RULE_FIELDS.length; i++) clean[RULE_FIELDS[i]] = String(data[RULE_FIELDS[i]] || "").trim();
@@ -502,11 +539,12 @@ function saveRule(app, userId, body) {
     created++;
   }
   var updated = 0;
+  var report = { changes: [] };
   if (existed && body.apply !== false && !clean.paused) {
-    updated = discards(rule) ? 0 : reapply(app, userId, rule) + rules.applyExisting(app, userId, rec.id);
+    updated = discards(rule) ? 0 : reapply(app, userId, rule, report) + rules.applyExisting(app, userId, rec.id, report);
   }
-  var pending = clean.paused ? 0 : processPending(app, userId);
-  return { rule: rec.id, created: created, updated: updated, pending: pending };
+  var pending = clean.paused ? 0 : processPending(app, userId, report);
+  return { rule: rec.id, created: created, updated: updated, pending: pending, changes: report.changes.slice(0, 300) };
 }
 
 /** Lo que se propone para un correo de la bandeja, para llenar el formulario. */

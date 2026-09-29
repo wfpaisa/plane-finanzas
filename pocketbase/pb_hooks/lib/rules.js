@@ -258,10 +258,15 @@ function changesOf(before, after) {
  * @returns {number} cuántos movimientos cambiaron
  */
 function applyExisting(app, userId, ruleId, report) {
-  // Las que descartan son para los correos: no cambian movimientos.
+  // Las que descartan son para los correos: no cambian movimientos. Con
+  // `ruleId` se buscan todas igual: esa regla solo toca lo que gana hoy, no lo
+  // que otra más precisa reconoce.
   var rules = load(app, userId).filter(function (r) {
-    return (!ruleId || r.id === ruleId) && r.type !== "discard";
+    return r.type !== "discard";
   });
+  if (ruleId && !rules.some(function (r) {
+    return r.id === ruleId;
+  })) return 0;
   if (!rules.length) return 0;
   var withSender = rules.some(function (r) {
     return r.senders.length;
@@ -279,7 +284,7 @@ function applyExisting(app, userId, ruleId, report) {
     var ext = r.getString("external_id");
     var text = r.getString("description") + " " + r.getString("notes") + " " + r.getString("raw");
     var rule = find(text, rules, r.getFloat("amount"), senders[ext] || "");
-    if (!rule) continue;
+    if (!rule || (ruleId && rule.id !== ruleId)) continue;
     var before = {
       type: r.getString("type"),
       date: r.getString("date").slice(0, 10),

@@ -111,7 +111,8 @@ function runRecurring(app, userId) {
     if (start && date < start && freq !== "once") continue;
     if (end && date > end) continue;
     var who = { u: r.getString("owner"), k: key };
-    if (has(app, "transactions", "owner = {:u} && external_id = {:k}", who)) continue;
+    // Pagado: lo creó la app o se unió un movimiento que ya existía (ver plan.js).
+    if (has(app, "transactions", "owner = {:u} && (external_id = {:k} || recurring_key = {:k})", who)) continue;
     // Tampoco si la persona borró el de este mes (ver lib/ignored.js).
     if (has(app, "ignored_imports", "owner = {:u} && external_id = {:k}", who)) continue;
 
