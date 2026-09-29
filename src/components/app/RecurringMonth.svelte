@@ -1,31 +1,34 @@
 <!--
   Lo que toca pagar (y recibir) en un mes: los fijos que caen en él, con lo
-  ya pagado y lo que falta. Tocar uno pendiente abre su movimiento ya
-  llenado; al guardarlo queda pagado. El círculo lo marca de una vez, con
-  los datos del fijo. Uno pagado abre su movimiento para verlo o editarlo.
+  ya pagado y lo que falta. Tocar uno pendiente (la fila o su círculo) abre
+  su movimiento ya llenado; al guardarlo queda pagado. Uno pagado abre su
+  movimiento para verlo o editarlo. Los fijos se editan en el plan, abajo.
 
   El movimiento queda unido al fijo por su marca (`recurringKey`), la misma
   que usa el programador para los automáticos: así no se repiten. Lo marcado
   en el mes sale siempre, aunque su fijo ya no toque (pausado, terminado,
   cambiado o borrado).
+
+  Un fijo con provisión (el predial) trae además, cada mes, lo que toca
+  apartar para pagarlo: marcarlo abre el formulario del aporte a su ahorro,
+  sin mover plata. En el mes en curso avisa lo que quedó sin reservar. Al pagarlo, el servidor libera lo apartado (pb_hooks/lib/provisions.js).
 -->
 <script lang="ts">
-  import { dueDate, lastDayOf, monthRange, recurringKey, today } from "../../lib/finance";
+  import { dueDate, lastDayOf, monthRange, nextDueMonth, recurringKey, reserveMonths, today } from "../../lib/finance";
   import { dateShort, monthLabel } from "../../lib/format";
   import { notify } from "../../lib/notify.svelte";
   import { cachedList, offline } from "../../lib/offline.svelte";
   import { overlay, type Pending } from "../../lib/outbox";
-  import { pb, session } from "../../lib/pb.svelte";
+  import { pb } from "../../lib/pb.svelte";
   import { store } from "../../lib/store.svelte";
   import { recurringTags } from "../../lib/tags";
-  import type { Recurring, Transaction, TxDraft } from "../../lib/types";
+  import type { Recurring, Saving, SavingMovement, Transaction, TxDraft } from "../../lib/types";
   import Icon from "../Icon.svelte";
   import MonthNav from "../mobile/MonthNav.svelte";
   import CategoryPill from "./CategoryPill.svelte";
   import Money from "./Money.svelte";
+  import MovementForm from "./MovementForm.svelte";
   import TransactionForm from "./TransactionForm.svelte";
-
-  let { onEdit }: { onEdit?: (r: Recurring) => void } = $props();
 
   const now = today();
   let ym = $state(now.slice(0, 7));
@@ -105,7 +108,7 @@
       .filter((t) => !set.has(t.external_id))
       .map((t): Due => {
         const r = store.recurring.find((x) => x.id === t.external_id.split(":")[1]);
-        const fake = { id: "", name: t.description || "Recurrente borrado", kind: t.type, amount: t.amount, category: t.category } as Recurring;
+        const fake = { id: "", name: t.description || "Programación eliminada", kind: t.type, amount: t.amount, category: t.category } as Recurring;
         return { r: r ?? fake, date: t.date.slice(0, 10), key: t.external_id, orphan: !r };
       });
   });
@@ -117,12 +120,97 @@
   // Los gastos (con las transferencias, que también son pagos) y los ingresos, cada uno en su lista.
   const groups = $derived(
     [
-      { id: "out", title: "Gastos y pagos", items: rows.filter((d) => d.r.kind !== "income"), left: "por pagar" },
+      { id: "out", title: "Pagos y transferencias", items: rows.filter((d) => d.r.kind !== "income"), left: "por pagar" },
       { id: "in", title: "Ingresos", items: rows.filter((d) => d.r.kind === "income"), left: "por recibir" },
     ].filter((g) => g.items.length),
   );
 
-  const done = $derived(rows.filter((d) => paid.has(d.key)).length);
+  // ---- Lo que toca apartar este mes para las provisiones ----
+
+  interface Reserve {
+    r: Recurring;
+    saving: Saving;
+    key: string;
+    /** El aporte de este mes, si ya se marcó. */
+    mv?: SavingMovement;
+    /** Lo que toca apartar: lo que falta, repartido en los meses que quedan. */
+    quota: number;
+    /** El mes del pago. */
+    due: string;
+    /** En el mes en curso: los meses anteriores del ciclo sin reservar y lo que falta para ir al día. */
+    missed: number;
+    behind: number;
+  }
+
+  /** La provisión de un fijo, si tiene. */
+  const provisionOf = (r: Recurring) => {
+    const sv = r.saving ? store.saving(r.saving) : undefined;
+    return sv?.kind === "provision" ? sv : undefined;
+  };
+
+  const reserves = $derived(
+    store.recurring
+      .filter((r) => !r.paused && r.kind === "expense")
+      .flatMap((r): Reserve[] => {
+        const saving = provisionOf(r);
+        if (!saving) return [];
+        // Se aparta desde el "Desde" del fijo; sin él, desde que se creó la provisión.
+        const plan = reserveMonths(r, ym, (r.start_date || saving.created).slice(0, 7));
+        if (!plan) return [];
+        const prefix = `prov:${r.id}:`;
+        const marks = new Map(
+          store.movements.filter((m) => m.saving === saving.id && m.external_id?.startsWith(prefix)).map((m) => [m.external_id!.slice(prefix.length), m]),
+        );
+        const key = prefix + ym;
+        const mv = marks.get(ym);
+        // En el mes del pago, una vez pagado ya no hay nada que apartar.
+        if (!mv && ym === plan.due && paid.has(recurringKey(r, ym))) return [];
+        // Si el ciclo es solo el mes del pago, no hay meses antes para ir apartando.
+        if (!mv && plan.months.length < 2) return [];
+        // Cada mes, la parte pareja del ciclo; en el ciclo de hoy, nunca más de lo que falta.
+        const share = Math.ceil(r.amount / plan.months.length);
+        const thisMonth = now.slice(0, 7);
+        const live = plan.due === nextDueMonth(r, thisMonth);
+        const saved = store.savingCurrent(saving.id);
+        const quota = live ? Math.min(share, Math.max(0, r.amount - saved)) : share;
+        if (!mv && quota <= 0) return [];
+        const idx = plan.months.indexOf(ym);
+        // Un mes pasado del ciclo de hoy que ya quedó cubierto (por ejemplo, al reservar
+        // lo atrasado de una vez) no pide nada.
+        if (!mv && live && ym < thisMonth && saved >= Math.min(r.amount, share * (idx + 1))) return [];
+        // En el mes en curso, lo que quedó sin reservar en los meses anteriores.
+        let missed = 0;
+        let behind = 0;
+        if (!mv && live && ym === thisMonth) {
+          missed = plan.months.filter((m) => m < ym && !marks.has(m)).length;
+          behind = missed ? Math.max(0, Math.min(r.amount, share * idx) - saved) : 0;
+          if (!behind) missed = 0;
+        }
+        return [{ r, saving, key, mv, quota, due: plan.due, missed, behind }];
+      })
+      .toSorted((a, b) => a.due.localeCompare(b.due) || a.r.name.localeCompare(b.r.name)),
+  );
+
+  // Reservar siempre pasa por el formulario, ya llenado con la cuota del mes (o con
+  // todo lo atrasado); uno ya reservado se corrige (o se borra) en el mismo formulario.
+  let mvOpen = $state(false);
+  let mvSaving = $state<Saving | null>(null);
+  let mvEdit = $state<SavingMovement | null>(null);
+  let mvDraft = $state<{ amount: number; date: string; account: string; note: string; external_id: string } | null>(null);
+  let mvTitle = $state("");
+
+  function openReserve(x: Reserve, amount = x.quota) {
+    mvSaving = x.saving;
+    mvEdit = x.mv ?? null;
+    mvDraft = x.mv
+      ? null
+      : { amount, date: dateFor({ r: x.r, date: null, key: x.key }), account: x.r.account, note: "Dinero reservado", external_id: x.key };
+    mvTitle = `${x.mv ? "Dinero reservado para" : "Reservar dinero para"} ${x.r.name}`;
+    mvOpen = true;
+  }
+
+  const done = $derived(rows.filter((d) => paid.has(d.key)).length + reserves.filter((x) => x.mv).length);
+  const total = $derived(rows.length + reserves.length);
 
   /** Sin día fijo, la fecha es hoy si cae en el mes; si no, su primer o último día. */
   function dateFor(d: Due) {
@@ -161,65 +249,35 @@
     formOpen = true;
   }
 
-  let marking = $state("");
-
-  /** Marcarlo de una vez con lo del fijo. Sin cuenta (o sin destino), abre el formulario. */
-  async function mark(d: Due) {
-    const t = draftOf(d);
-    if (!t.account || (t.type === "transfer" && !t.to_account)) return open(d);
-    marking = d.key;
-    try {
-      await offline.create("transactions", {
-        owner: session.id,
-        type: t.type,
-        amount: t.amount,
-        date: `${t.date} 12:00:00.000Z`,
-        account: t.account,
-        to_account: t.to_account,
-        category: t.category,
-        description: t.description,
-        notes: "",
-        tags: t.tags,
-        source: "recurrente",
-        external_id: d.key,
-      });
-      notify.done(d.r.kind === "income" ? "Marcado como recibido" : "Marcado como pagado");
-    } catch (err) {
-      notify.fail(err);
-    } finally {
-      marking = "";
-    }
-  }
-
   const doneWord = (d: Due) => (d.r.kind === "income" ? "Recibido" : "Pagado");
 
   function status(d: Due): { text: string; tone?: "late" | "today" } {
     const income = d.r.kind === "income";
-    if (!d.date) return { text: "Este mes, sin día fijo" };
-    if (d.r.auto_create && d.date >= now) return { text: `${income ? "Se registra" : "Se paga"} solo el ${dateShort(d.date)}` };
-    if (d.date < now) return income ? { text: `Debió llegar el ${dateShort(d.date)}` } : { text: `Venció el ${dateShort(d.date)}`, tone: "late" };
+    if (!d.date) return { text: "Sin fecha definida para este mes" };
+    if (d.r.auto_create && d.date >= now) return { text: `Se registrará automáticamente el ${dateShort(d.date)}` };
+    if (d.date < now) return income ? { text: `Pendiente desde el ${dateShort(d.date)}` } : { text: `Pago vencido desde el ${dateShort(d.date)}`, tone: "late" };
     if (d.date === now) return { text: "Hoy", tone: "today" };
-    return { text: `${income ? "Llega" : "Vence"} el ${dateShort(d.date)}` };
+    return { text: `${income ? "Ingreso esperado" : "Pago previsto"} para el ${dateShort(d.date)}` };
   }
 </script>
 
 <div class="card rm">
   <div class="card-head rm-head">
     <div>
-      <h3 class="card-title">Pagos del mes</h3>
+      <h3 class="card-title">Movimientos programados</h3>
       <p class="card-sub">
-        {#if rows.length}
-          {done} de {rows.length} al día
+        {#if total}
+          {done} de {total} completados
         {:else}
-          Nada programado para {monthLabel(ym, true)}
+          No hay movimientos programados para {monthLabel(ym, true)}
         {/if}
       </p>
     </div>
     <MonthNav bind:ym />
   </div>
 
-  {#if rows.length}
-    <div class="rm-bar" aria-hidden="true"><span style:width="{(done / rows.length) * 100}%"></span></div>
+  {#if total}
+    <div class="rm-bar" aria-hidden="true"><span style:width="{(done / total) * 100}%"></span></div>
   {/if}
 
   {#each groups as g (g.id)}
@@ -238,10 +296,65 @@
     </section>
   {:else}
     {#if !store.recurring.length}
-      <p class="rm-empty">Agrega tus gastos, ingresos o transferencias recurrentes y aquí verás cuándo toca cada uno.</p>
+      <p class="rm-empty">Agrega un ingreso, pago o transferencia programada para organizar este mes.</p>
     {/if}
   {/each}
+
+  {#if reserves.length}
+    {@const rLeft = reserves.filter((x) => !x.mv).reduce((a, x) => a + x.quota, 0)}
+    <section class="rm-group" class:loading>
+      <h4 class="rm-group-head">
+        <span>Dinero por reservar</span>
+        <span class="rm-group-sum">{reserves.filter((x) => x.mv).length} de {reserves.length}{#if rLeft} · <Money value={rLeft} /> pendientes{/if}</span>
+      </h4>
+      <ul class="rm-list">
+        {#each reserves as x (x.key)}
+          {@render reserveItem(x)}
+        {/each}
+      </ul>
+    </section>
+  {/if}
 </div>
+
+{#snippet reserveItem(x: Reserve)}
+  {@const saved = store.savingCurrent(x.saving.id)}
+  <li class="rm-row" class:done={!!x.mv}>
+    <button
+      type="button"
+      class="rm-check"
+      class:on={!!x.mv}
+      aria-label={x.mv ? "Ver dinero reservado" : "Marcar dinero como reservado"}
+      data-tip={x.mv ? "Ver dinero reservado" : "Marcar dinero como reservado"}
+      onclick={() => openReserve(x)}
+    >
+      <Icon name={x.mv ? "checkmark-circle-02" : "circle"} size={22} />
+    </button>
+    <button type="button" class="rm-main" onclick={() => openReserve(x)}>
+      <span class="rm-text">
+        <span class="rm-name">Reservar para {x.r.name}</span>
+        <span class="rm-sub">
+          {#if x.mv}
+            Reservado el {dateShort(x.mv.date)}
+          {:else}
+            <Icon name="piggy-bank" /><Money value={saved} /> de <Money value={x.r.amount} /> reservados · pago en {monthLabel(x.due)}
+          {/if}
+        </span>
+      </span>
+      <span class="rm-amount"><Money value={x.mv?.amount ?? x.quota} /></span>
+    </button>
+  </li>
+  {#if x.behind}
+    <li class="rm-behind">
+      <Icon name="alert-circle" />
+      <span>
+        Llevas {x.missed} {x.missed === 1 ? "mes" : "meses"} sin reservar para {x.r.name}. Faltan <Money value={x.behind} /> para ir al día.
+      </span>
+      <button type="button" class="btn sm" onclick={() => openReserve(x, x.quota + x.behind)}>
+        Reservar <Money value={x.quota + x.behind} />
+      </button>
+    </li>
+  {/if}
+{/snippet}
 
 {#snippet item(d: Due)}
   {@const tx = paid.get(d.key)}
@@ -257,8 +370,7 @@
         class="rm-check"
         aria-label={d.r.kind === "income" ? "Marcar como recibido" : "Marcar como pagado"}
         data-tip={d.r.kind === "income" ? "Marcar como recibido" : "Marcar como pagado"}
-        disabled={marking === d.key}
-        onclick={() => mark(d)}
+        onclick={() => open(d)}
       >
         <Icon name="circle" size={22} />
       </button>
@@ -271,17 +383,15 @@
             {doneWord(d)} el {dateShort(tx.date)}{#if tx._pending} · sin enviar{/if}
           {:else}
             <span class={st.tone ? `rm-${st.tone}` : ""}>{st.text}</span>{#if d.r.auto_create}<Icon name="repeat" />{/if}
+            {#if provisionOf(d.r) && store.savingCurrent(d.r.saving!) > 0}
+              · <Icon name="piggy-bank" /><Money value={store.savingCurrent(d.r.saving!)} /> reservados
+            {/if}
           {/if}
         </span>
       </span>
       {#if d.r.kind !== "transfer" && (tx?.category ?? d.r.category)}<span class="rm-cat"><CategoryPill id={tx?.category ?? d.r.category} /></span>{/if}
       <span class="rm-amount"><Money value={tx?.amount ?? d.r.amount} tone={d.r.kind} /></span>
     </button>
-    {#if onEdit && !d.orphan}
-      <button type="button" class="btn-icon sm rm-edit" aria-label="Editar el recurrente" data-tip="Editar el recurrente" onclick={() => onEdit(d.r)}>
-        <Icon name="edit-02" />
-      </button>
-    {/if}
   </li>
 {/snippet}
 
@@ -293,6 +403,8 @@
   title={link ? (draft?.type === "income" ? "Marcar como recibido" : "Marcar como pagado") : undefined}
   onClose={() => (formOpen = false)}
 />
+
+<MovementForm open={mvOpen} saving={mvSaving} movement={mvEdit} draft={mvDraft} title={mvTitle} onClose={() => (mvOpen = false)} />
 
 <style>
   .rm-head {
@@ -439,9 +551,10 @@
   }
 
   .rm-sub {
-    display: inline-flex;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0 0.25rem;
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
@@ -456,12 +569,26 @@
   }
 
   .rm-amount {
+    flex: none;
     font-weight: 600;
   }
 
-  .rm-edit {
-    flex: none;
-    color: var(--text-muted);
+  .rm-behind {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-6) var(--sp-10);
+    margin: 0 var(--sp-8) var(--sp-8) 2.75rem;
+    padding: var(--sp-8) var(--sp-10);
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, var(--danger) 10%, transparent);
+    color: var(--danger);
+    font-size: var(--text-xs);
+
+    & > span {
+      flex: 1;
+      min-width: 12rem;
+    }
   }
 
   .rm-empty {

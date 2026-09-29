@@ -1,24 +1,22 @@
 <!--
   Proyección en el celular: lo que queda libre cada mes (ingresos menos
   fijos y ahorros), los ingresos y gastos frecuentes, cómo se reparten los
-  próximos meses y el simulador del dinero total.
+  próximos meses.
 -->
 <script lang="ts">
   import Chart from "../Chart.svelte";
   import Icon from "../Icon.svelte";
   import CategoryPill from "../app/CategoryPill.svelte";
   import Money from "../app/Money.svelte";
-  import MoneyInput from "../app/MoneyInput.svelte";
   import RecurringForm from "../app/RecurringForm.svelte";
   import RecurringMonth from "../app/RecurringMonth.svelte";
   import Segmented from "../app/Segmented.svelte";
-  import { Field } from "../ui";
   import SlideIn from "./SlideIn.svelte";
   import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
-  import { activeIn, monthlyEquivalent, simulate, today, whenTotalReaches, type Kind, type TxType } from "../../lib/finance";
-  import { monthLabel, monthName, monthsLabel } from "../../lib/format";
-  import { nextMonthsChart, simulationChart } from "../../lib/planCharts";
+  import { activeIn, monthlyEquivalent, today, type Kind, type TxType } from "../../lib/finance";
+  import { monthLabel, monthName } from "../../lib/format";
+  import { nextMonthsChart } from "../../lib/planCharts";
   import { store } from "../../lib/store.svelte";
   import type { Recurring } from "../../lib/types";
 
@@ -35,12 +33,6 @@
   let newKind = $state<TxType>("expense");
   let kind = $state<Kind>("expense");
 
-  let months = $state(24);
-  let spendPct = $state(100);
-  let extra = $state(0);
-  let baseRate = $state(0);
-  let goal = $state(0);
-
   const plan = $derived(store.plan);
   // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
   const items = $derived(store.recurring.filter((r) => (kind === "income" ? r.kind === "income" : r.kind !== "income")));
@@ -48,29 +40,7 @@
   const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
   const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
 
-  // Como en escritorio: en un ahorro compartido solo cuenta la parte propia.
-  const simSavings = $derived(
-    store.activeSavings
-      .map((s) => ({ ...s, share: store.savingShare(s), current: store.savingMine(s.id) }))
-      .filter((s) => s.share > 0 || s.current !== 0),
-  );
-  const simInput = $derived({
-    from: ym,
-    total: store.total,
-    recurring: store.recurring,
-    savings: simSavings,
-    spendRatio: spendPct / 100,
-    extraMonthly: extra,
-    baseRate,
-  });
-  const sim = $derived(simulate({ ...simInput, months: Math.max(months, 1) }));
-  const last = $derived(sim[sim.length - 1]);
-  const longSim = $derived(goal > store.total ? simulate({ ...simInput, months: 600 }) : []);
-  const reach = $derived(goal > store.total ? whenTotalReaches(longSim, goal) : null);
-  const reachIn = $derived(reach ? longSim.indexOf(reach) + 1 : 0);
-
   const nextConfig = () => nextMonthsChart(store.recurring, plan.savings, ym);
-  const simConfig = () => simulationChart(sim, simSavings, store.total);
 
   function edit(r: Recurring | null, k: TxType = kind) {
     editing = r;
@@ -97,8 +67,8 @@
 <TopBar>
   <BackButton label="Más" onclick={onBack} />
   {#snippet actions()}
-    <button type="button" class="btn-icon sm" aria-label="Agregar frecuente" onclick={() => edit(null)}>
-      <Icon name="add-01" size={18} />
+    <button type="button" class="btn sm" onclick={() => edit(null)}>
+      <Icon name="add-01" />Programar
     </button>
   {/snippet}
 </TopBar>
@@ -106,18 +76,25 @@
 <header class="page-head pl-head">
   <div>
     <h1>Proyección</h1>
-    <p>Cuánto puedes gastar al mes y cómo cambiaría tu dinero con el tiempo.</p>
+    <p>Organiza tus ingresos y pagos programados para saber cuánto dinero tendrás disponible.</p>
   </div>
 </header>
 
-<div class="pl-month"><RecurringMonth onEdit={(r) => edit(r)} /></div>
+<div class="pl-month"><RecurringMonth /></div>
+
+<header class="page-head pl-head pl-section">
+  <div>
+    <h2>Tu plan mensual</h2>
+    <p>Compara lo que esperas recibir con tus pagos y ahorros mensuales.</p>
+  </div>
+</header>
 
 <section class="card pl-top">
   <div class="pl-free" class:short={plan.free < 0}>
-    <span class="pl-label">Disponible para otros gastos</span>
+    <span class="pl-label">Disponible para gastar</span>
     <Money value={plan.free} />
     {#if plan.income > 0}
-      <span class="pl-sub">{plan.free < 0 ? "Te faltan cada mes" : `${Math.round(share(plan.free))}% de tus ingresos al mes`}</span>
+      <span class="pl-sub">{plan.free < 0 ? "Tus pagos y ahorros superan tus ingresos mensuales" : `${Math.round(share(plan.free))}% de tus ingresos mensuales`}</span>
     {/if}
   </div>
   <div class="pl-bar" aria-hidden="true">
@@ -127,13 +104,13 @@
   </div>
   <dl class="pl-sum">
     <div><dt>Ingresos</dt><dd><Money value={plan.income} tone="income" /></dd></div>
-    <div><dt><i class="seg-fixed"></i>Frecuentes</dt><dd><Money value={plan.fixed} tone="expense" /></dd></div>
+    <div><dt><i class="seg-fixed"></i>Pagos</dt><dd><Money value={plan.fixed} tone="expense" /></dd></div>
     <div><dt><i class="seg-save"></i>Ahorros</dt><dd><Money value={plan.savings} /></dd></div>
   </dl>
 </section>
 
 <section class="card pl-block">
-  <Segmented bind:value={kind} options={KINDS} tabs full label="Frecuentes" />
+  <Segmented bind:value={kind} options={KINDS} tabs full label="Movimientos programados" />
   <SlideIn key={kind} order={KINDS.map((k) => k.id)}>
     <ul class="pl-list">
       {#each items as r (r.id)}
@@ -143,7 +120,7 @@
             <span class="pl-main">
               <span class="pl-name">{r.name}</span>
               <span class="pl-sub">
-                {#if r.kind === "transfer"}Transferencia · {/if}{freqLabel(r)}{#if r.auto_create} · automático{/if}{#if r.paused} · pausado{/if}{#if out} · {out}{/if}
+                {#if r.kind === "transfer"}Transferencia · {/if}{freqLabel(r)}{#if r.auto_create} · registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
               </span>
               {#if r.category}<CategoryPill id={r.category} />{/if}
             </span>
@@ -154,68 +131,19 @@
           </button>
         </li>
       {:else}
-        <li class="pl-empty">{kind === "income" ? "Agrega tu sueldo u otros ingresos." : "Crédito, servicios, administración…"}</li>
+        <li class="pl-empty">{kind === "income" ? "Aún no hay ingresos programados. Agrega tu sueldo u otro ingreso habitual." : "Aún no hay pagos programados. Agrega servicios, cuotas u otros pagos habituales."}</li>
       {/each}
     </ul>
     <button type="button" class="pl-add" onclick={() => edit(null)}>
-      <Icon name="add-circle" />{kind === "income" ? "Ingreso recurrente" : "Gasto recurrente"}
+      <Icon name="add-circle" />{kind === "income" ? "Programar ingreso" : "Programar pago"}
     </button>
   </SlideIn>
 </section>
 
 <section class="card pl-block">
   <h3>Próximos 12 meses</h3>
-  <p class="pl-sub">En qué se va el ingreso de cada mes. Si una columna pasa la línea punteada, ese mes no alcanza.</p>
+  <p class="pl-sub">Compara los ingresos con los pagos y ahorros de cada mes. Si una columna supera la línea punteada, los ingresos no alcanzan.</p>
   <Chart config={nextConfig} height={220} square label="Plan de los próximos 12 meses" />
-</section>
-
-<section class="card pl-block">
-  <h3>Simulador</h3>
-  <p class="pl-sub">Hoy tienes <Money value={store.total} /> en total.</p>
-  <label class="pl-slider">
-    <span>Tiempo: <b>{monthsLabel(months)}</b></span>
-    <input type="range" class="field-control" min="1" max="120" bind:value={months} />
-  </label>
-  <label class="pl-slider">
-    <span>Gastarías el <b>{spendPct}%</b> de lo disponible</span>
-    <input type="range" class="field-control" min="0" max="100" step="5" bind:value={spendPct} />
-  </label>
-  <Field label="Cambio adicional cada mes"><MoneyInput bind:value={extra} allowNegative /></Field>
-  <Field label="Interés anual del dinero no reservado (%)">
-    <input type="number" class="field-control w-full" inputmode="decimal" min="0" max="50" step="0.5" bind:value={baseRate} />
-  </Field>
-
-  {#if last}
-    <div class="pl-answer">
-      <div class="pl-big">
-        <span class="pl-sub">Total estimado para {monthLabel(last.month, true)}</span>
-        <Money value={last.total} />
-      </div>
-      <div>
-        <span class="pl-sub">En ahorros</span>
-        <Money value={last.savingsTotal} />
-      </div>
-      <div>
-        <span class="pl-sub">Frente a hoy</span>
-        <Money value={last.total - store.total} tone="auto" />
-      </div>
-    </div>
-  {/if}
-
-  <Chart config={simConfig} height={240} label="Cálculo del saldo neto a futuro" />
-
-  <Field label="¿Para cuándo tendría…?"><MoneyInput bind:value={goal} placeholder="200.000.000" /></Field>
-  <p class="pl-goal">
-    {#if !goal}
-      <span class="pl-sub">Escribe una cifra y te digo la fecha.</span>
-    {:else if goal <= store.total}
-      ¡Ya la tienes! 🎉
-    {:else if reach}
-      Llegarías en <b>{monthLabel(reach.month, true)}</b> ({monthsLabel(reachIn)}).
-    {:else}
-      <span class="pl-sub">No se alcanzaría en 50 años con estos valores.</span>
-    {/if}
-  </p>
 </section>
 
 <RecurringForm open={formOpen} item={editing} kind={newKind} onClose={() => (formOpen = false)} />
@@ -223,6 +151,17 @@
 <style>
   .pl-month {
     margin: var(--sp-12);
+  }
+
+  .pl-head.pl-section {
+    padding-top: var(--sp-8);
+
+    & h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
   }
 
   .pl-head {
@@ -420,37 +359,6 @@
     cursor: pointer;
   }
 
-  .pl-slider {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-6);
-    font-size: var(--text-sm);
-  }
 
-  .pl-answer {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-8) var(--sp-12);
 
-    & div {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-
-    & .pl-big {
-      grid-column: 1 / -1;
-
-      & :global(.money) {
-        font-family: var(--font-num);
-        font-size: 1.375rem;
-        font-weight: 700;
-      }
-    }
-  }
-
-  .pl-goal {
-    margin: 0;
-    font-size: var(--text-sm);
-  }
 </style>

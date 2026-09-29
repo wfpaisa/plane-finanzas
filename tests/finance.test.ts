@@ -14,11 +14,14 @@ import {
   monthlyRate,
   monthsBetween,
   monthsToTarget,
+  nextDueMonth,
   occurrenceDate,
   occursIn,
   periodSpan,
   planSummary,
   recurringKey,
+  reserveMonths,
+  reserveQuota,
   simulate,
   splitByPercent,
   weekStart,
@@ -236,6 +239,34 @@ describe("plan", () => {
   test("simulación con interés en lo suelto y sin gastar nada", () => {
     const rows = simulate({ from: "2026-09", months: 12, total: 1000, recurring: [], savings: [], spendRatio: 0, baseRate: 12 });
     expect(rows[11].total).toBeCloseTo(1120, 6);
+  });
+});
+
+describe("provisiones", () => {
+  const predial = { kind: "expense" as const, amount: 1200000, frequency: "yearly" as const, month: 3, day_of_month: 15 };
+
+  test("el próximo pago", () => {
+    expect(nextDueMonth(predial, "2026-09")).toBe("2027-03");
+    expect(nextDueMonth(predial, "2027-03")).toBe("2027-03");
+    expect(nextDueMonth({ ...predial, end_date: "2026-12-31" }, "2026-09")).toBeNull();
+    expect(nextDueMonth({ ...predial, frequency: "once", start_date: "2026-12-10" }, "2026-09")).toBe("2026-12");
+    expect(nextDueMonth({ ...predial, frequency: "monthly" }, "2026-09")).toBeNull();
+  });
+
+  test("se aparta en los doce meses que llevan al pago, desde que se creó", () => {
+    const antes = reserveMonths(predial, "2026-09", "2025-01");
+    expect(antes?.due).toBe("2027-03");
+    expect(antes?.months).toEqual(["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02", "2027-03"]);
+    // Creada en septiembre: de septiembre a marzo, siete meses.
+    expect(reserveMonths(predial, "2026-09", "2026-09")?.months.length).toBe(7);
+    expect(reserveMonths(predial, "2026-08", "2026-09")).toBeNull();
+  });
+
+  test("la cuota reparte lo que falta en los meses que quedan", () => {
+    expect(reserveQuota(1200000, 0, 7)).toBe(171429);
+    expect(reserveQuota(1200000, 500000, 2)).toBe(350000);
+    expect(reserveQuota(1200000, 1300000, 2)).toBe(0);
+    expect(reserveQuota(1200000, 0, 0)).toBe(0);
   });
 });
 

@@ -105,6 +105,8 @@ export interface Saving extends RecordModel {
   auto: boolean;
   archived: boolean;
   notes: string;
+  /** "provision": lo apartado para un gasto recurrente (ver `Recurring.saving`); vacío, un ahorro con meta. */
+  kind?: "goal" | "provision" | "";
   expand?: { members?: User[]; owner?: User };
 }
 
@@ -115,6 +117,8 @@ export interface SavingMovement extends RecordModel {
   amount: number;
   date: string;
   note: string;
+  /** `prov:<recurrente>:<mes>` el apartado de una provisión; `pay:<marca del pago>` lo que se liberó al pagar. */
+  external_id?: string;
 }
 
 export interface Recurring extends RecordModel {
@@ -133,6 +137,8 @@ export interface Recurring extends RecordModel {
   /** El destino, si es una transferencia. */
   to_account: string;
   tags: string[] | null;
+  /** La provisión: dónde se aparta mes a mes para pagarlo (un ahorro de tipo "provision"). */
+  saving?: string;
   paused: boolean;
   auto_create: boolean;
 }

@@ -22,9 +22,9 @@ var VERSION = 1;
 var FIELDS = {
   categories: ["name", "kind", "icon", "color", "keywords", "budget", "tags"],
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "senders", "exclude_from_total", "archived", "sort", "notes"],
-  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "paused", "auto_create"],
+  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "saving", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "raw", "rule"],
-  savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes"],
+  savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes", "kind"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
   rules: ["name", "sender", "match", "amount", "type", "account", "to_account", "set_amount", "category", "tags", "description", "notes", "paused"],
   inbox: ["external_id", "source", "sender", "subject", "date", "text", "rich", "parsed", "status", "rule"],
@@ -184,7 +184,7 @@ function restoreData(app, userId, data, counts) {
     clean(tx, userId);
 
     // viejo id -> nuevo id, por colección.
-    var ids = { categories: {}, accounts: {}, savings: {}, rules: {}, transactions: {} };
+    var ids = { categories: {}, accounts: {}, recurring: {}, savings: {}, rules: {}, transactions: {} };
     function map(name, id) {
       return id ? ids[name][id] || "" : "";
     }
@@ -223,6 +223,8 @@ function restoreData(app, userId, data, counts) {
       r.set("category", map("categories", row.category));
       r.set("account", map("accounts", row.account));
       r.set("to_account", map("accounts", row.to_account));
+      // Su provisión todavía no existe: se une cuando ya estén los ahorros.
+      r.set("saving", "");
     });
     // Las reglas antes que los movimientos: cada uno dice qué regla lo ajustó.
     // Los respaldos de antes de las reglas no las traen.
@@ -278,6 +280,16 @@ function restoreData(app, userId, data, counts) {
       // existe aquí; su cuenta no viaja en el respaldo y queda vacía.
       r.set("created_by", userExists(tx, row.created_by) ? row.created_by : userId);
       r.set("account", map("accounts", row.account));
+    });
+
+    // Cada recurrente con su provisión, ya con los ids nuevos de los dos.
+    (data.recurring || []).forEach(function (row) {
+      var mine = map("recurring", row.id);
+      var saving = map("savings", row.saving);
+      if (!mine || !saving) return;
+      var r = tx.findRecordById("recurring", mine);
+      r.set("saving", saving);
+      tx.save(r);
     });
 
     // La bandeja; los respaldos de antes no la traen.

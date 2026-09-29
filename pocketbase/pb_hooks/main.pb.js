@@ -73,6 +73,44 @@ onRecordAfterCreateSuccess((e) => {
   e.next();
 }, "transactions");
 
+// ---------- Provisiones: al pagar se libera lo apartado (ver lib/provisions.js) ----------
+onRecordAfterCreateSuccess((e) => {
+  const dupes = require(`${__hooks}/lib/dupes.js`);
+  if (!dupes.restoring(e.app, e.record.getString("owner"))) {
+    try {
+      require(`${__hooks}/lib/provisions.js`).onPaid(e.app, e.record);
+    } catch (err) {
+      // Liberar lo apartado nunca debe impedir guardar el pago.
+      console.log("[finanzas] provisiones: " + err);
+    }
+  }
+  e.next();
+}, "transactions");
+
+onRecordAfterDeleteSuccess((e) => {
+  const dupes = require(`${__hooks}/lib/dupes.js`);
+  if (!dupes.restoring(e.app, e.record.getString("owner"))) {
+    try {
+      require(`${__hooks}/lib/provisions.js`).onUnpaid(e.app, e.record);
+    } catch (err) {
+      console.log("[finanzas] provisiones: " + err);
+    }
+  }
+  e.next();
+}, "transactions");
+
+// Sin su recurrente, la provisión no tiene para qué pagar: se va con lo apartado.
+onRecordAfterDeleteSuccess((e) => {
+  const id = e.record.getString("saving");
+  if (id) {
+    try {
+      const s = e.app.findRecordById("savings", id);
+      if (s.getString("kind") === "provision") e.app.delete(s);
+    } catch (_) {}
+  }
+  e.next();
+}, "recurring");
+
 // ---------- Remitentes nuevos en Gmail: la próxima lectura mira 90 días atrás ----------
 onRecordUpdate((e) => {
   if (e.record.getString("senders") !== e.record.original().getString("senders")) e.record.set("last_sync", "");

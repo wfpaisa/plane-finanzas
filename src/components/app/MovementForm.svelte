@@ -3,6 +3,8 @@
   marca como apartada dentro de la cuenta elegida.
 
   Con `movement`, corrige uno ya registrado: su valor, fecha, cuenta y nota.
+  Con `draft`, uno nuevo ya llenado (lo que se reserva para un pago
+  programado), con su marca `external_id`.
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -21,8 +23,17 @@
     open,
     saving,
     movement = null,
+    draft = null,
+    title,
     onClose,
-  }: { open: boolean; saving: Saving | null; movement?: SavingMovement | null; onClose: () => void } = $props();
+  }: {
+    open: boolean;
+    saving: Saving | null;
+    movement?: SavingMovement | null;
+    draft?: { amount: number; date: string; account: string; note: string; external_id: string } | null;
+    title?: string;
+    onClose: () => void;
+  } = $props();
 
   let dir = $state<"in" | "out">("in");
   let amount = $state(0);
@@ -40,6 +51,7 @@
     if (!open || !saving) return;
     void saving;
     void movement;
+    void draft;
     untrack(() => {
       if (movement) {
         dir = movement.amount < 0 ? "out" : "in";
@@ -51,6 +63,13 @@
         return;
       }
       dir = "in";
+      if (draft) {
+        amount = draft.amount;
+        account = draft.account || store.lastSavingAccount(saving.id) || store.activeAccounts[0]?.id || "";
+        date = draft.date;
+        note = draft.note;
+        return;
+      }
       // En un ahorro compartido, de partida lo que me toca a mí del aporte.
       const share = store.savingShare(saving);
       amount = Math.round((saving.monthly_amount || 0) * (share || 1));
@@ -85,9 +104,10 @@
         amount: sign * amount,
         date: `${date} 12:00:00.000Z`,
         note: note.trim() || (dir === "in" ? "Aporte" : "Retiro"),
+        ...(draft ? { external_id: draft.external_id } : {}),
       });
       await reload("savings");
-      notify.done(dir === "in" ? "Aporte registrado" : "Retiro registrado");
+      notify.done(draft ? "Dinero reservado" : dir === "in" ? "Aporte registrado" : "Retiro registrado");
       onClose();
     } catch (err) {
       notify.fail(err);
@@ -119,18 +139,24 @@
 <Modal
   {open}
   {onClose}
-  title={saving ? `${saving.name}` : "Ahorro"}
-  description={movement ? "Corrige este movimiento del ahorro." : "Registra el dinero reservado para este ahorro."}
+  title={title ?? (saving ? `${saving.name}` : "Ahorro")}
+  description={movement
+    ? "Corrige este movimiento del ahorro."
+    : draft
+      ? "El dinero no sale de la cuenta: queda reservado en ella hasta que registres el pago."
+      : "Registra el dinero reservado para este ahorro."}
 >
   <div class="stack">
-    <Segmented
-      bind:value={dir}
-      full
-      options={[
-        { id: "in", label: "Aportar", icon: "add-circle" },
-        { id: "out", label: "Retirar", icon: "remove-circle" },
-      ]}
-    />
+    {#if !draft}
+      <Segmented
+        bind:value={dir}
+        full
+        options={[
+          { id: "in", label: "Aportar", icon: "add-circle" },
+          { id: "out", label: "Retirar", icon: "remove-circle" },
+        ]}
+      />
+    {/if}
     <div class="form-grid">
       <Field label="Monto"><MoneyInput bind:value={amount} autofocus /></Field>
       <Field label="Fecha"><DateInput bind:value={date} /></Field>
@@ -138,7 +164,7 @@
     {#if foreignAccount}
       <p class="small muted">Este aporte pertenece a otra persona; su cuenta no se puede cambiar desde aquí.</p>
     {:else}
-      <Field label="Cuenta" tip="Dónde queda guardado este dinero. En Cuentas, la columna «Para ahorros» suma lo de cada una.">
+      <Field label="Cuenta" tip="Dónde queda guardado este dinero. En Cuentas, la columna «Apartado» suma lo de cada una.">
         <Select bind:value={account}>
           {#if movement && !movement.account}<option value="">Sin cuenta</option>{/if}
           {#each store.activeAccounts as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
@@ -155,7 +181,7 @@
       <span class="flex-1"></span>
     {/if}
     <Button onclick={onClose}>Cancelar</Button>
-    <Button variant="secondary" loading={busy} onclick={save}>Guardar</Button>
+    <Button variant="secondary" loading={busy} onclick={save}>{draft ? "Reservar dinero" : movement ? "Guardar cambios" : "Guardar"}</Button>
   {/snippet}
 </Modal>
 

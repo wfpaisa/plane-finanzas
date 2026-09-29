@@ -38,7 +38,11 @@ let txVersion = $state(0);
 // Lo que las pantallas leen a cada rato (a veces una vez por fila) se
 // calcula una sola vez por cambio.
 const activeAccounts = $derived(accounts.filter((a) => !a.archived));
-const activeSavings = $derived(savings.filter((s) => !s.archived));
+// Las provisiones son ahorros por dentro, pero no se muestran ni se suman
+// como tales: el plan ya cuenta su gasto (ver `Recurring.saving`).
+const goals = $derived(savings.filter((s) => s.kind !== "provision"));
+const provisions = $derived(savings.filter((s) => s.kind === "provision"));
+const activeSavings = $derived(goals.filter((s) => !s.archived));
 const accountIds = $derived(new Set(accounts.map((a) => a.id)));
 const total = $derived(
   accounts
@@ -291,8 +295,12 @@ export const store = {
   get categories() {
     return categories;
   },
+  /** Los ahorros con meta: sin las provisiones. */
   get savings() {
-    return savings;
+    return goals;
+  },
+  get provisions() {
+    return provisions;
   },
   get activeSavings() {
     return activeSavings;

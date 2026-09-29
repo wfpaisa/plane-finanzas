@@ -26,7 +26,7 @@
   let editing = $state<Account | null>(null);
   let formOpen = $state(false);
   let showArchived = $state(false);
-  // El desglose de "Para ahorros": una cuenta, o todas (`all`).
+  // El desglose de "Apartado": una cuenta, o todas (`all`).
   let earmarkOpen = $state(false);
   let earmarkAccount = $state<Account | null>(null);
 
@@ -120,9 +120,9 @@
         <div class="kpi-val"><Money value={store.total} /></div>
       </div>
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Reservado para ahorros</span></div>
+        <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Apartado</span></div>
         <div class="kpi-val"><Money value={earmarked} /></div>
-        {#if earmarked > 0}<button type="button" class="link small kpi-link" onclick={() => showEarmarked(null)}>Ver por ahorro →</button>{/if}
+        {#if earmarked > 0}<button type="button" class="link small kpi-link" onclick={() => showEarmarked(null)}>Ver para qué →</button>{/if}
       </div>
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="coins-01" /></span><span class="kpi-label">Sin reservar</span></div>
@@ -144,9 +144,9 @@
               <th>Cuenta</th>
               <th>Tipo</th>
               <th>Banco</th>
-              <th class="num">Para ahorros</th>
+              <th class="num"><span data-tip="Lo que ya tiene destino: tus ahorros y lo que juntas para pagos como el predial">Apartado</span></th>
               <th class="num">Saldo</th>
-              <th class="num"><span data-tip="El saldo menos lo apartado para ahorros: lo que puedes usar">Sin reservar</span></th>
+              <th class="num"><span data-tip="El saldo menos lo apartado: lo que puedes usar">Sin reservar</span></th>
               <th><span class="sr-only">Movimientos</span></th>
             </tr>
           </thead>
@@ -176,7 +176,7 @@
                     <button
                       type="button"
                       class="acc-saved"
-                      data-tip="Ver de qué ahorros es"
+                      data-tip="Ver para qué está apartado"
                       onclick={(e) => {
                         e.stopPropagation();
                         showEarmarked(a);
@@ -207,7 +207,7 @@
               <td colspan="3">{list.length} {list.length === 1 ? "cuenta" : "cuentas"}</td>
               <td class="num">
                 {#if earmarked > 0}
-                  <button type="button" class="acc-saved" data-tip="Ver de qué ahorros es" onclick={() => showEarmarked(null)}
+                  <button type="button" class="acc-saved" data-tip="Ver para qué está apartado" onclick={() => showEarmarked(null)}
                     ><Money value={earmarked} /></button
                   >
                 {:else}<Money value={earmarked} />{/if}
@@ -244,7 +244,7 @@
     >
       <span>Saldo <Money value={pickedBalance} tone={pickedBalance < 0 ? "expense" : undefined} /></span>
       {#if pickedSaved}
-        <span>Para ahorros <Money value={pickedSaved} /></span>
+        <span>Apartado <Money value={pickedSaved} /></span>
         <span>Sin reservar <Money value={pickedBalance - pickedSaved} /></span>
       {/if}
     </PickBar>
@@ -267,7 +267,7 @@
     align-self: flex-start;
   }
 
-  /* El total para ahorros se abre en su desglose: se ve como enlace. */
+  /* El total apartado se abre en su desglose: se ve como enlace. */
   .acc-saved {
     padding: 0;
     border: 0;

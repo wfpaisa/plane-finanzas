@@ -174,6 +174,53 @@ export function monthlyEquivalent(r: RecurringLike, ym?: string): number {
   return freq === "yearly" ? r.amount / 12 : r.amount;
 }
 
+// ---------------------------------------------------------------------------
+// Provisiones: un gasto anual (o de una vez) que se aparta mes a mes
+// ---------------------------------------------------------------------------
+
+/**
+ * El mes ("AAAA-MM") del pago que cae en `ym` o después, o `null` si ya no
+ * hay más pagos. Solo los anuales y los de una vez se provisionan.
+ */
+export function nextDueMonth(r: RecurringLike, ym: string): string | null {
+  const freq = r.frequency || "monthly";
+  let due: string;
+  if (freq === "once") {
+    due = dayOf(r.start_date ?? "").slice(0, 7);
+  } else if (freq === "yearly") {
+    const m = pad(r.month || 1);
+    due = `${ym.slice(0, 4)}-${m}`;
+    if (due < ym) due = `${Number(ym.slice(0, 4)) + 1}-${m}`;
+  } else {
+    return null;
+  }
+  if (!due || due < ym) return null;
+  return dueDate(r, due) ? due : null;
+}
+
+/**
+ * Los meses en que se aparta para el pago que cae en `ym` o después: los doce
+ * que terminan en él (en un anual) o desde `since`, el mes en que se creó la
+ * provisión, si es más tarde. El del pago cuenta: se puede apartar antes de
+ * pagar. `null` si en `ym` no toca apartar.
+ */
+export function reserveMonths(r: RecurringLike, ym: string, since: string): { due: string; months: string[] } | null {
+  const due = nextDueMonth(r, ym);
+  if (!due) return null;
+  let start = (r.frequency || "monthly") === "once" ? since : addMonths(due, -11);
+  if (since > start) start = since;
+  if (ym < start) return null;
+  const months: string[] = [];
+  for (let m = start; m <= due; m = addMonths(m, 1)) months.push(m);
+  return { due, months };
+}
+
+/** La cuota del mes: lo que falta, repartido en los meses que aún no se apartan, en pesos enteros hacia arriba. */
+export function reserveQuota(target: number, saved: number, pending: number): number {
+  const left = Math.max(0, target - saved);
+  return pending > 0 ? Math.ceil(left / pending) : 0;
+}
+
 /** Lo que aporta al mes un ahorro desde las cuentas propias. */
 export const savingMonthly = (s: SavingLike) => (s.monthly_amount || 0) * (s.share ?? 1);
 

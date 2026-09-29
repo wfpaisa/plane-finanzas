@@ -1,8 +1,12 @@
 <!--
-  Lo apartado para ahorros en una cuenta, ahorro por ahorro. Sin `account`,
-  el de todas las que suman en el total, cuenta por cuenta.
+  Lo apartado en una cuenta, ahorro por ahorro. Sin `account`, el de todas
+  las que suman en el total, cuenta por cuenta. Lo apartado son los ahorros
+  con meta y las provisiones (lo que se junta para un gasto, como el
+  predial): cada fila dice cuál es y lleva a donde se ve.
 -->
 <script lang="ts">
+  import { nextDueMonth, today } from "../../lib/finance";
+  import { monthLabel } from "../../lib/format";
   import { colorOf } from "../../lib/palettes";
   import { go } from "../../lib/router.svelte";
   import { store } from "../../lib/store.svelte";
@@ -35,15 +39,31 @@
   function savingName(id: string) {
     return store.saving(id)?.name ?? "Ahorro de otra persona";
   }
+
+  /** Qué es lo apartado y dónde verlo: un ahorro (en Ahorros) o una provisión (en Proyección). */
+  function whatIs(id: string): { label: string; path: string } {
+    const s = store.saving(id);
+    if (s?.kind !== "provision") return { label: "Ahorro", path: "/ahorros" };
+    const r = store.recurring.find((x) => x.saving === id);
+    const due = r && nextDueMonth(r, today().slice(0, 7));
+    return { label: due ? `Para pagar en ${monthLabel(due)}` : "Para un pago", path: "/proyeccion" };
+  }
+
+  const kinds = $derived(new Set(groups.flatMap((g) => g.items.map((it) => whatIs(it.saving).path))));
+
+  function goTo(path: string) {
+    onClose();
+    go(path);
+  }
 </script>
 
 <Modal
   {open}
   {onClose}
-  title={account ? `Para ahorros en ${account.name}` : "Reservado para ahorros"}
+  title={account ? `Apartado en ${account.name}` : "Dinero apartado"}
   description={account
-    ? "Lo que suman los aportes y retiros de cada ahorro hechos en esta cuenta."
-    : "Lo que suman los aportes y retiros de cada ahorro, cuenta por cuenta."}
+    ? "Plata que sigue en esta cuenta pero ya tiene destino: tus ahorros y lo que vas juntando para un pago, como el predial."
+    : "Plata que sigue en tus cuentas pero ya tiene destino: tus ahorros y lo que vas juntando para un pago, cuenta por cuenta."}
 >
   {#if groups.length}
     <div class="em">
@@ -56,8 +76,12 @@
             {#each g.items as it (it.saving)}
               {@const s = store.saving(it.saving)}
               {@const share = g.total > 0 ? Math.round((it.amount / g.total) * 100) : 0}
+              {@const what = whatIs(it.saving)}
               <li>
-                <span class="em-name"><ColorDot color={s?.palette} />{savingName(it.saving)}</span>
+                <button type="button" class="em-name" data-tip={what.path === "/ahorros" ? "Ver en Ahorros" : "Ver en Proyección"} onclick={() => goTo(what.path)}>
+                  <ColorDot color={s?.palette} />
+                  <span class="em-text"><span class="em-title">{savingName(it.saving)}</span><span class="em-kind">{what.label}</span></span>
+                </button>
                 <span class="em-bar"><span style:width="{Math.max(0, share)}%" style:background={colorOf(s?.palette)}></span></span>
                 <span class="em-pct">{share}%</span>
                 <Money value={it.amount} tone={it.amount < 0 ? "expense" : undefined} />
@@ -67,7 +91,7 @@
         </section>
       {/each}
       <div class="em-total">
-        <span>Total para ahorros</span><Money value={total} />
+        <span>Total apartado</span><Money value={total} />
       </div>
       {#if account}
         <div class="em-free">
@@ -77,16 +101,11 @@
       {/if}
     </div>
   {:else}
-    <p class="muted small">No hay dinero apartado para ahorros{account ? " en esta cuenta" : ""}.</p>
+    <p class="muted small">No hay dinero apartado{account ? " en esta cuenta" : ""}.</p>
   {/if}
   {#snippet footer()}
-    <Button
-      variant="ghost"
-      onclick={() => {
-        onClose();
-        go("/ahorros");
-      }}>Ir a Ahorros</Button
-    >
+    {#if kinds.has("/ahorros")}<Button variant="ghost" onclick={() => goTo("/ahorros")}>Ir a Ahorros</Button>{/if}
+    {#if kinds.has("/proyeccion")}<Button variant="ghost" onclick={() => goTo("/proyeccion")}>Ir a Proyección</Button>{/if}
     <span class="flex-1"></span>
     <Button variant="secondary" onclick={onClose}>Listo</Button>
   {/snippet}
@@ -148,11 +167,38 @@
   .em-name {
     display: flex;
     align-items: center;
-    gap: var(--sp-6);
+    gap: var(--sp-8);
     min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover .em-title {
+      text-decoration: underline;
+      text-underline-offset: 0.15em;
+    }
+  }
+
+  .em-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  .em-title,
+  .em-kind {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  .em-kind {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 
   .em-bar {

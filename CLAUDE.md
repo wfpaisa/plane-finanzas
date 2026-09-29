@@ -19,3 +19,9 @@ Usa datos ficticios: `Ana Perez`, `demo@ejemplo.com`, `*1234`, `@ana123`, `Banco
 Antes de hacer commit, revisa el diff buscando datos que parezcan reales. Si algo ya se subió, no basta con borrarlo en un commit nuevo: sigue en el historial y hay que reescribirlo.
 
 La única excepción es el correo de contacto en `public/privacidad.html` y el nombre en `LICENSE`, que son públicos a propósito.
+
+## Textos de la interfaz
+
+Todo texto que vea la persona (títulos, etiquetas, ayudas, botones, tooltips, estados vacíos, errores, confirmaciones y notificaciones) se escribe y se revisa con la guía de textos. Síguela siempre que crees o cambies textos, en escritorio y en móvil:
+
+@docs/guia-de-textos.md
