@@ -28,7 +28,6 @@
   import Icon from "../Icon.svelte";
   import { Button, Modal } from "../ui";
   import MonthNav from "../mobile/MonthNav.svelte";
-  import CategoryPill from "./CategoryPill.svelte";
   import Money from "./Money.svelte";
   import MovementForm from "./MovementForm.svelte";
   import TransactionForm from "./TransactionForm.svelte";
@@ -462,7 +461,6 @@
           {/if}
         </span>
       </span>
-      {#if d.r.kind !== "transfer" && (tx?.category ?? d.r.category)}<span class="rm-cat"><CategoryPill id={tx?.category ?? d.r.category} /></span>{/if}
       <span class="rm-amount"><Money value={tx?.amount ?? d.r.amount} tone={d.r.kind} /></span>
     </button>
     {#if tx?.recurring_key && !d.orphan}
@@ -737,12 +735,5 @@
     padding: 0 var(--sp-16) var(--sp-16);
     font-size: var(--text-sm);
     color: var(--text-muted);
-  }
-
-  /* En el teléfono la categoría no cabe junto al nombre y el monto. */
-  @media (max-width: 30rem) {
-    .rm-cat {
-      display: none;
-    }
   }
 </style>
