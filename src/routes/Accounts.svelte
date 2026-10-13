@@ -1,10 +1,10 @@
 <!--
-  Cuentas: cuánto hay en cada una, en una tabla, y el reparto del total en
-  una barra. Clic derecho en una fila la marca para sumarla (Mayús + clic
-  derecho marca el tramo desde la última tocada).
+  Cuentas: cuánto hay en cada una, en dos tablas (las cuentas y las tarjetas
+  de crédito, con su cupo y lo que se debe), y el reparto del total en un
+  flujo. Clic derecho en una fila la marca para sumarla (Mayús + clic derecho
+  marca el tramo desde la última tocada).
 -->
 <script lang="ts">
-  import type { ChartConfiguration } from "chart.js";
   import { SvelteSet } from "svelte/reactivity";
 
   import AccountForm from "../components/app/AccountForm.svelte";
@@ -12,21 +12,20 @@
   import EarmarkedModal from "../components/app/EarmarkedModal.svelte";
   import Money from "../components/app/Money.svelte";
   import PickBar from "../components/app/PickBar.svelte";
-  import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
-  import { Button, Switch } from "../components/ui";
-  import { colorsFor, token } from "../lib/colors";
-  import { money } from "../lib/format";
-  import { accountTypeIcon, accountTypeLabel } from "../lib/labels";
-  import { go } from "../lib/router.svelte";
+  import { Button, InfoTip, Switch } from "../components/ui";
+  import { band, flowLayout } from "../lib/analysis";
+  import { accountAvailability, cardCredit, isCard } from "../lib/cards";
+  import { accountTypeIcon, accountTypeLabel, BALANCE_TIPS } from "../lib/labels";
   import { colorOf } from "../lib/palettes";
+  import { go } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
   import type { Account } from "../lib/types";
 
   let editing = $state<Account | null>(null);
   let formOpen = $state(false);
   let showArchived = $state(false);
-  // El desglose de "Apartado": una cuenta, o todas (`all`).
+  // El desglose de lo reservado: una cuenta, o todas.
   let earmarkOpen = $state(false);
   let earmarkAccount = $state<Account | null>(null);
 
@@ -36,17 +35,22 @@
   }
 
   const list = $derived(store.accounts.filter((a) => showArchived || !a.archived));
+  const accounts = $derived(list.filter((a) => !isCard(a)));
+  const creditAccounts = $derived(list.filter(isCard));
+  const visibleOrder = $derived([...accounts, ...creditAccounts]);
   const counted = $derived(store.activeAccounts.filter((a) => !a.exclude_from_total));
   const positives = $derived(counted.filter((a) => store.balance(a.id) > 0));
   const debts = $derived(counted.filter((a) => store.balance(a.id) < 0).reduce((s, a) => s + store.balance(a.id), 0));
-  // Solo lo apartado en las cuentas que suman en el total: así el total es
+  // Solo lo reservado en las cuentas que suman en el total: así el total es
   // lo reservado más lo que queda sin reservar.
   const earmarked = $derived(counted.reduce((s, a) => s + store.earmarked(a.id), 0));
+  const availability = $derived(accountAvailability(store.activeAccounts, (id) => store.balance(id), earmarked));
+  const credit = (a: Account) => cardCredit(a, store.balance(a.id));
 
   // Lo marcado para sumar. Solo cuenta lo que está a la vista: si se
   // esconden las archivadas, salen de la suma sin perder la marca.
   const selected = new SvelteSet<string>();
-  const picked = $derived(list.filter((a) => selected.has(a.id)));
+  const picked = $derived(visibleOrder.filter((a) => selected.has(a.id)));
   const pickedBalance = $derived(picked.reduce((s, a) => s + store.balance(a.id), 0));
   const pickedSaved = $derived(picked.reduce((s, a) => s + store.earmarked(a.id), 0));
   let anchor: string | null = null;
@@ -55,9 +59,13 @@
     e.preventDefault();
     const on = !selected.has(a.id);
     if (e.shiftKey && anchor) {
-      const ids = list.map((x) => x.id);
+      const ids = visibleOrder.map((x) => x.id);
       const [i, j] = [ids.indexOf(anchor), ids.indexOf(a.id)].sort((x, y) => x - y);
-      if (i >= 0) for (const id of ids.slice(i, j + 1)) on ? selected.add(id) : selected.delete(id);
+      if (i >= 0)
+        for (const id of ids.slice(i, j + 1)) {
+          if (on) selected.add(id);
+          else selected.delete(id);
+        }
     } else if (on) selected.add(a.id);
     else selected.delete(a.id);
     anchor = a.id;
@@ -68,44 +76,130 @@
     formOpen = true;
   }
 
-  const chartConfig = (): ChartConfiguration => {
-    const sorted = [...positives].sort((a, b) => store.balance(b.id) - store.balance(a.id));
-    return {
-      type: "bar",
-      data: {
-        labels: sorted.map((a) => a.name),
-        datasets: [
-          {
-            label: "Saldo",
-            data: sorted.map((a) => store.balance(a.id)),
-            // Cada cuenta en su color.
-            backgroundColor: colorsFor(sorted.map((a) => colorOf(a.palette))),
-            borderRadius: 6,
-            borderSkipped: false,
-            barThickness: 18,
-          },
-        ],
-      },
-      options: {
-        indexAxis: "y",
-        scales: {
-          x: { ticks: { callback: (v) => money(Number(v)) }, border: { display: false } },
-          y: { grid: { display: false }, ticks: { color: token("--text-secondary") } },
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: (c) => ` ${money(Number(c.raw))}` } },
-        },
-      },
-    };
-  };
+  // Las cuentas a la izquierda, cada una del grueso de su saldo, y todas se
+  // juntan a la derecha en el total. Solo las que tienen saldo a favor: una
+  // deuda no aporta dinero, se resta aparte.
+  const FLOW_W = 1000;
+  const NODE = 12;
+  const sorted = $derived([...positives].sort((a, b) => store.balance(b.id) - store.balance(a.id)));
+  const FLOW_H = $derived(Math.max(240, sorted.length * 56));
+  const flow = $derived(
+    flowLayout(
+      [],
+      sorted.map((a) => ({ id: a.id, label: a.name, value: store.balance(a.id), tint: colorOf(a.palette) })),
+      FLOW_H,
+      6,
+      40,
+    ),
+  );
+  const positiveTotal = $derived(flow.total);
 </script>
+
+{#snippet accountTable(rows: Account[], title: string, cards = false)}
+  {@const balanceTotal = rows.reduce((sum, a) => sum + (cards ? credit(a).limit : store.balance(a.id)), 0)}
+  {@const savedTotal = rows.reduce((sum, a) => sum + store.earmarked(a.id), 0)}
+  {@const owedTotal = rows.reduce((sum, a) => sum + credit(a).owed, 0)}
+  {@const freeTotal = cards ? rows.reduce((sum, a) => sum + (credit(a).limit ? credit(a).available : 0), 0) : balanceTotal - savedTotal}
+  <section class="acc-table-wrap card">
+    <h2 class="acc-group-title">{title}</h2>
+    <table class="acc-table">
+      <thead>
+        <tr>
+          <th>Cuenta</th>
+          <th>Tipo</th>
+          <th>Banco</th>
+          {#if !cards}<th class="num"><span class="label-tip">Reservado<InfoTip text={BALANCE_TIPS.earmarked} /></span></th>{/if}
+          <th class="num"
+            ><span class="label-tip">{cards ? "Cupo" : "Saldo"}<InfoTip text={cards ? BALANCE_TIPS.limit : BALANCE_TIPS.balance} /></span></th
+          >
+          {#if cards}<th class="num"><span class="label-tip">Debes<InfoTip text={BALANCE_TIPS.owed} /></span></th>{/if}
+          <th class="num"
+            ><span class="label-tip">Disponible<InfoTip text={cards ? BALANCE_TIPS.cardFree : BALANCE_TIPS.free} /></span></th
+          >
+          <th><span class="sr-only">Movimientos</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each rows as a (a.id)}
+          {@const c = credit(a)}
+          {@const balance = store.balance(a.id)}
+          {@const saved = store.earmarked(a.id)}
+          {@const available = cards ? c.available : balance - saved}
+          <!-- La fila entera abre la cuenta; con teclado, el botón del
+               nombre (su clic sube hasta la fila). -->
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+          <tr
+            class:acc-selected={selected.has(a.id)}
+            class:acc-archived={a.archived}
+            onclick={() => open(a)}
+            oncontextmenu={(e) => toggle(a, e)}
+          >
+            <td class="acc-name">
+              <span class="acc-ico"><Icon name={a.icon || accountTypeIcon(a.type)} size={15} /></span>
+              <button type="button" aria-pressed={selected.has(a.id)}>{a.name}</button>
+              <ColorDot color={a.palette} />
+              {#if a.exclude_from_total}<span class="acc-note" data-tip="No suma en el saldo neto"
+                  ><Icon name="calculator-01" size={13} /></span
+                >{/if}
+            </td>
+            <td class="acc-cell">{accountTypeLabel(a.type)}</td>
+            <td class="acc-cell">{a.bank || "—"}</td>
+            {#if !cards}<td class="num acc-cell">
+                {#if saved > 0}
+                  <button
+                    type="button"
+                    class="acc-saved"
+                    data-tip="Ver para qué está reservado"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      showEarmarked(a);
+                    }}><Money value={saved} /></button
+                  >
+                {:else}—{/if}
+              </td>
+            {/if}
+            {#if cards}
+              <td class="num">{#if c.limit}<Money value={c.limit} />{:else}<span class="acc-cell" data-tip="Agrega el cupo al editar la tarjeta">—</span>{/if}</td>
+              <td class="num">{#if c.owed}<Money value={c.owed} tone="expense" />{:else}—{/if}</td>
+            {:else}
+              <td class="num"><Money value={balance} tone={balance < 0 ? "expense" : undefined} /></td>
+            {/if}
+            <!-- Sin reservas es el mismo saldo: se ve más suave para no repetirlo. -->
+            <td class="num acc-free" class:same={!cards && !saved}>
+              {#if cards && !c.limit}—{:else}<Money value={available} tone={available < 0 ? "expense" : undefined} />{/if}
+            </td>
+            <td class="acc-go">
+              <button
+                type="button"
+                class="link small"
+                onclick={(e) => {
+                  e.stopPropagation();
+                  go("/movimientos", { cuenta: a.id, mes: "todo" });
+                }}>Movimientos →</button
+              >
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">{rows.length} {rows.length === 1 ? (cards ? "tarjeta" : "cuenta") : cards ? "tarjetas" : "cuentas"}</td>
+          {#if !cards}<td class="num"><Money value={savedTotal} /></td>{/if}
+          <td class="num"><Money value={balanceTotal} tone={balanceTotal < 0 ? "expense" : undefined} /></td>
+          {#if cards}<td class="num"><Money value={owedTotal} tone="expense" /></td>{/if}
+          <td class="num"><Money value={freeTotal} tone={freeTotal < 0 ? "expense" : undefined} /></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>
+{/snippet}
 
 <div class="page">
   <header class="page-head">
     <div>
       <h1>Cuentas</h1>
-      <p>El saldo neto de tus cuentas es <b><Money value={store.total} /></b></p>
+      <p>Tu saldo neto, después de restar las deudas, es <b><Money value={store.total} /></b></p>
     </div>
     <div class="page-actions">
       <Switch bind:checked={showArchived} label="Ver archivadas" />
@@ -116,110 +210,55 @@
   <div class="stack">
     <div class="kpis-auto">
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
+        <div class="kpi-head">
+          <span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label"
+            ><span class="label-tip">Saldo neto<InfoTip text={BALANCE_TIPS.total} /></span></span
+          >
+        </div>
         <div class="kpi-val"><Money value={store.total} /></div>
       </div>
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Apartado</span></div>
+        <div class="kpi-head">
+          <span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label"
+            ><span class="label-tip">Reservado<InfoTip text={BALANCE_TIPS.earmarked} /></span></span
+          >
+        </div>
         <div class="kpi-val"><Money value={earmarked} /></div>
         {#if earmarked > 0}<button type="button" class="link small kpi-link" onclick={() => showEarmarked(null)}>Ver para qué →</button>{/if}
       </div>
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="coins-01" /></span><span class="kpi-label">Sin reservar</span></div>
-        <div class="kpi-val"><Money value={store.total - earmarked} /></div>
+        <div class="kpi-head">
+          <span class="kpi-ico tone-income"><Icon name="coins-01" /></span><span class="kpi-label"
+            ><span class="label-tip">Disponible<InfoTip text={BALANCE_TIPS.available} /></span></span
+          >
+        </div>
+        <div class="kpi-val"><Money value={availability.available} tone={availability.available < 0 ? "expense" : undefined} /></div>
+        {#if availability.debt > 0}
+          <p class="available-before-debts">Antes de deudas: <Money value={availability.beforeDebts} /></p>
+        {/if}
       </div>
-      {#if debts < 0}
+      {#if availability.debt > 0}
         <div class="card kpi">
-          <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="credit-card" /></span><span class="kpi-label">Deudas</span></div>
-          <div class="kpi-val"><Money value={debts} tone="expense" /></div>
+          <div class="kpi-head">
+            <span class="kpi-ico tone-expense"><Icon name="credit-card" /></span><span class="kpi-label"
+              ><span class="label-tip">Deudas<InfoTip text="Lo que debes en tarjetas de crédito y otras deudas: la suma de los saldos negativos." /></span></span
+            >
+          </div>
+          <div class="kpi-val"><Money value={availability.debt} tone="expense" /></div>
         </div>
       {/if}
     </div>
 
     {#if list.length}
-      <div class="acc-table-wrap card">
-        <table class="acc-table">
-          <thead>
-            <tr>
-              <th>Cuenta</th>
-              <th>Tipo</th>
-              <th>Banco</th>
-              <th class="num"><span data-tip="Lo que ya tiene destino: tus ahorros y lo que juntas para pagos como el predial">Apartado</span></th>
-              <th class="num">Saldo</th>
-              <th class="num"><span data-tip="El saldo menos lo apartado: lo que puedes usar">Sin reservar</span></th>
-              <th><span class="sr-only">Movimientos</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each list as a (a.id)}
-              {@const balance = store.balance(a.id)}
-              {@const saved = store.earmarked(a.id)}
-              <!-- La fila entera abre la cuenta; con teclado, el botón del
-                   nombre (su clic sube hasta la fila). -->
-              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-              <tr
-                class:acc-selected={selected.has(a.id)}
-                class:acc-archived={a.archived}
-                onclick={() => open(a)}
-                oncontextmenu={(e) => toggle(a, e)}
-              >
-                <td class="acc-name">
-                  <span class="acc-ico"><Icon name={a.icon || accountTypeIcon(a.type)} size={15} /></span>
-                  <button type="button" aria-pressed={selected.has(a.id)}>{a.name}</button>
-                  <ColorDot color={a.palette} />
-                  {#if a.exclude_from_total}<span class="acc-note" data-tip="No suma en el total"><Icon name="calculator-01" size={13} /></span>{/if}
-                </td>
-                <td class="acc-cell">{accountTypeLabel(a.type)}</td>
-                <td class="acc-cell">{a.bank || "—"}</td>
-                <td class="num acc-cell">
-                  {#if saved > 0}
-                    <button
-                      type="button"
-                      class="acc-saved"
-                      data-tip="Ver para qué está apartado"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        showEarmarked(a);
-                      }}><Money value={saved} /></button
-                    >
-                  {:else}—{/if}
-                </td>
-                <td class="num"><Money value={balance} tone={balance < 0 ? "expense" : undefined} /></td>
-                <!-- Sin ahorros es el mismo saldo: se ve más suave para no repetirlo. -->
-                <td class="num acc-free" class:same={!saved}>
-                  <Money value={balance - saved} tone={balance - saved < 0 ? "expense" : undefined} />
-                </td>
-                <td class="acc-go">
-                  <button
-                    type="button"
-                    class="link small"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      go("/movimientos", { cuenta: a.id, mes: "todo" });
-                    }}>Movimientos →</button
-                  >
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="3">{list.length} {list.length === 1 ? "cuenta" : "cuentas"}</td>
-              <td class="num">
-                {#if earmarked > 0}
-                  <button type="button" class="acc-saved" data-tip="Ver para qué está apartado" onclick={() => showEarmarked(null)}
-                    ><Money value={earmarked} /></button
-                  >
-                {:else}<Money value={earmarked} />{/if}
-              </td>
-              <td class="num"><Money value={store.total} /></td>
-              <td class="num"><Money value={store.total - earmarked} tone={store.total - earmarked < 0 ? "expense" : undefined} /></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <p class="acc-hint small"><Icon name="mouse-right-click-01" size={14} />Clic derecho en una cuenta para sumarla</p>
+      {#if accounts.length}
+        {@render accountTable(accounts, "Cuentas")}
+      {/if}
+      {#if creditAccounts.length}
+        {@render accountTable(creditAccounts, "Tarjetas de crédito", true)}
+      {/if}
+      <p class="acc-hint small">
+        <Icon name="mouse-right-click-01" size={14} />Haz clic derecho en una cuenta para seleccionarla y ver la suma de sus saldos
+      </p>
     {:else}
       <button type="button" class="add-account" onclick={() => open(null)}>
         <Icon name="add-circle" size={24} />Agregar cuenta
@@ -230,7 +269,33 @@
       <div class="card">
         <div class="card-head"><div><h3 class="card-title">Cuánto dinero hay en cada cuenta</h3></div></div>
         <div class="card-body">
-          <Chart config={chartConfig} height={Math.max(160, positives.length * 34)} label="Saldo por cuenta" />
+          <div class="aflow" style:height="{FLOW_H}px">
+            <div class="aflow-labels left">
+              {#each flow.right as n (n.id)}
+                <div class="aflow-label" style:--seg={n.tint} style:top="{((n.y + n.h / 2) / FLOW_H) * 100}%">
+                  <span class="aflow-name">{n.label} · {Math.round((n.value / positiveTotal) * 100)}%</span>
+                  <span class="aflow-amount"><Money value={n.value} /></span>
+                </div>
+              {/each}
+            </div>
+            <svg viewBox="0 0 {FLOW_W} {FLOW_H}" preserveAspectRatio="none" role="img" aria-label="Saldo de cada cuenta y su total">
+              {#each flow.right as n (n.id)}
+                <path class="aflow-band" style:--seg={n.tint} d={band(NODE, n.y, n.h, FLOW_W - NODE, n.my, n.mh)} />
+                <rect class="aflow-node" style:--seg={n.tint} x="0" y={n.y} width={NODE} height={n.h} rx="3" />
+              {/each}
+              <rect class="aflow-total" x={FLOW_W - NODE} y="0" width={NODE} height={FLOW_H} rx="3" />
+            </svg>
+            <div class="aflow-labels right">
+              <div class="aflow-label main" style="top: 50%">
+                <span class="aflow-name">Dinero en tus cuentas</span>
+                <span class="aflow-amount"><Money value={positiveTotal} /></span>
+                {#if debts < 0}
+                  <span class="aflow-sub">Deudas <Money value={debts} /></span>
+                  <span class="aflow-sub">Saldo neto <Money value={store.total} /></span>
+                {/if}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     {/if}
@@ -239,13 +304,13 @@
   {#if picked.length}
     <PickBar
       count={picked.length}
-      onAll={picked.length < list.length ? () => list.forEach((a) => selected.add(a.id)) : undefined}
+      onAll={picked.length < visibleOrder.length ? () => visibleOrder.forEach((a) => selected.add(a.id)) : undefined}
       onClear={() => selected.clear()}
     >
       <span>Saldo <Money value={pickedBalance} tone={pickedBalance < 0 ? "expense" : undefined} /></span>
       {#if pickedSaved}
-        <span>Apartado <Money value={pickedSaved} /></span>
-        <span>Sin reservar <Money value={pickedBalance - pickedSaved} /></span>
+        <span>Reservado <Money value={pickedSaved} /></span>
+        <span>Disponible <Money value={pickedBalance - pickedSaved} /></span>
       {/if}
     </PickBar>
   {/if}
@@ -255,6 +320,84 @@
 <EarmarkedModal open={earmarkOpen} account={earmarkAccount} accounts={counted} onClose={() => (earmarkOpen = false)} />
 
 <style>
+  .available-before-debts {
+    margin: var(--sp-4) 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  /* El flujo de las cuentas al total: el SVG se estira a lo ancho y las
+     etiquetas van encima en HTML, como en el plan de Gastos e ingresos. */
+  .aflow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 2.6fr) minmax(0, 1.4fr);
+    gap: var(--sp-12);
+
+    @media (max-width: 40rem) {
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1fr);
+      gap: var(--sp-6);
+    }
+
+    & svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .aflow-labels {
+    position: relative;
+
+    &.left .aflow-label {
+      right: 0;
+      align-items: flex-end;
+      text-align: right;
+    }
+
+    &.right .aflow-label {
+      left: 0;
+    }
+  }
+
+  .aflow-label {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    transform: translateY(-50%);
+
+    &.main .aflow-amount {
+      font-size: 1.625rem;
+      line-height: 1.15;
+    }
+  }
+
+  .aflow-name,
+  .aflow-sub {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .aflow-amount {
+    font-family: var(--font-num);
+    font-size: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .aflow-node {
+    fill: var(--seg);
+  }
+
+  .aflow-band {
+    fill: var(--seg);
+    opacity: 0.28;
+  }
+
+  .aflow-total {
+    fill: var(--text-muted);
+  }
+
   .acc-free :global(.money) {
     font-weight: 600;
   }
@@ -290,6 +433,13 @@
     position: relative;
     padding: 0;
     overflow-x: auto;
+  }
+
+  .acc-group-title {
+    margin: 0;
+    padding: var(--sp-12);
+    border-bottom: var(--border-width) solid var(--border);
+    font-size: var(--text-base);
   }
 
   .acc-table {

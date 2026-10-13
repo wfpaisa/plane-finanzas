@@ -1,13 +1,15 @@
 <!--
-  Las cuentas agrupadas por tipo, cada tipo en su tarjeta, con lo que se
-  tiene (capital), lo que se debe y el balance. Las tarjetas y créditos en negativo son deuda. Tocar
-  una cuenta abre sus movimientos.
+  Las cuentas agrupadas por tipo, cada tipo en su tarjeta, y al final las
+  tarjetas de crédito, con lo que se debe y lo que queda del cupo. Arriba, el
+  saldo neto, lo reservado, lo disponible y las deudas, como en escritorio.
+  Tocar una cuenta abre sus movimientos.
 -->
 <script lang="ts">
   import Icon from "../Icon.svelte";
   import Money from "../app/Money.svelte";
   import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
+  import { accountAvailability, cardCredit, isCard } from "../../lib/cards";
   import { ACCOUNT_TYPES, accountTypeIcon } from "../../lib/labels";
   import { colorOf } from "../../lib/palettes";
   import { store } from "../../lib/store.svelte";
@@ -15,11 +17,12 @@
   let { onPick, onBack }: { onPick: (accountId: string) => void; onBack?: () => void } = $props();
 
   const counted = $derived(store.activeAccounts.filter((a) => !a.exclude_from_total));
-  const capital = $derived(counted.reduce((s, a) => s + Math.max(0, store.balance(a.id)), 0));
-  const debt = $derived(counted.reduce((s, a) => s + Math.max(0, -store.balance(a.id)), 0));
+  const earmarked = $derived(counted.reduce((s, a) => s + store.earmarked(a.id), 0));
+  const availability = $derived(accountAvailability(store.activeAccounts, (id) => store.balance(id), earmarked));
 
+  // Las tarjetas de crédito van al final, después de las demás cuentas.
   const groups = $derived(
-    ACCOUNT_TYPES.map((t) => {
+    [...ACCOUNT_TYPES.filter((t) => t.id !== "tarjeta"), ...ACCOUNT_TYPES.filter((t) => t.id === "tarjeta")].map((t) => {
       const list = store.activeAccounts.filter((a) => (a.type || "otro") === t.id);
       const total = list.filter((a) => !a.exclude_from_total).reduce((s, a) => s + store.balance(a.id), 0);
       return { ...t, list, total };
@@ -45,19 +48,25 @@
     <a href="#/m?ver=administrar" class="btn sm">Administrar</a>
   </header>
 
-  <div class="card ac-sum">
+  <div class="card ac-sum" class:four={availability.debt > 0}>
     <div>
-      <span class="ac-sum-label"><span class="kpi-ico tone-income"><Icon name="arrow-up-right-01" size={14} /></span>Saldos positivos</span>
-      <Money value={capital} tone="income" />
+      <span class="ac-sum-label"><span class="kpi-ico"><Icon name="wallet-01" size={14} /></span>Saldo neto</span>
+      <Money value={store.total} />
     </div>
     <div>
-      <span class="ac-sum-label"><span class="kpi-ico tone-expense"><Icon name="credit-card" size={14} /></span>Deudas</span>
-      <Money value={debt} tone="expense" />
+      <span class="ac-sum-label"><span class="kpi-ico"><Icon name="piggy-bank" size={14} /></span>Reservado</span>
+      <Money value={earmarked} />
     </div>
     <div>
-      <span class="ac-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Saldo neto</span>
-      <Money value={capital - debt} />
+      <span class="ac-sum-label"><span class="kpi-ico tone-income"><Icon name="coins-01" size={14} /></span>Disponible</span>
+      <Money value={availability.available} tone={availability.available < 0 ? "expense" : "income"} />
     </div>
+    {#if availability.debt > 0}
+      <div>
+        <span class="ac-sum-label"><span class="kpi-ico tone-expense"><Icon name="credit-card" size={14} /></span>Deudas</span>
+        <Money value={availability.debt} tone="expense" />
+      </div>
+    {/if}
   </div>
 
   {#each groups as g (g.id)}
@@ -69,16 +78,19 @@
       <ul>
         {#each g.list as a (a.id)}
           {@const bal = store.balance(a.id)}
+          {@const c = isCard(a) ? cardCredit(a, bal) : null}
           <li>
             <button type="button" onclick={() => onPick(a.id)}>
               <span class="ac-ico" style:--c={colorOf(a.palette)}><Icon name={a.icon || accountTypeIcon(a.type)} size={16} /></span>
               <span class="ac-name">
                 <span>{a.name}</span>
                 <small>
-                  {#if a.exclude_from_total}No suma al total{:else}{a.bank || g.label}{/if}
+                  {#if c?.limit}Cupo disponible <Money value={c.available} />{:else if a.exclude_from_total}No suma en el saldo neto{:else}{a.bank || g.label}{/if}
                 </small>
               </span>
-              {#if bal < 0}
+              {#if c}
+                <span class="ac-owed"><small>Debes</small><Money value={c.owed} tone={c.owed ? "expense" : undefined} /></span>
+              {:else if bal < 0}
                 <Money value={bal} tone="expense" />
               {:else}
                 <Money value={bal} tone={bal > 0 ? "income" : undefined} />
@@ -106,6 +118,16 @@
   .ac-sum {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: var(--sp-12);
+
+    /* Con deudas, cuatro cifras: dos filas de dos. */
+    &.four {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+
+      & > div:nth-child(3) {
+        border-left: 0;
+      }
+    }
     margin-bottom: var(--sp-12);
     padding: var(--sp-12) var(--sp-4);
 
@@ -204,6 +226,22 @@
         color: var(--text-muted);
       }
     }
+  }
+
+  /* En una tarjeta de crédito, lo que se debe con su etiqueta encima. */
+  .ac-owed {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+
+    & small {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+  }
+
+  .ac-name small :global(.money) {
+    font-weight: 500;
   }
 
   .ac-type {

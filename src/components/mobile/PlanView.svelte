@@ -1,6 +1,7 @@
 <!--
-  Proyección en el celular: lo que queda libre cada mes (ingresos menos
-  fijos y ahorros), los ingresos y gastos frecuentes, cómo se reparten los
+  Gastos e ingresos en el celular: cuánto reservar y cuánto queda para gastar
+  en el mes (con lo que se debe en tarjetas de crédito), los programados del
+  mes para marcar, los ingresos y pagos programados y cómo se reparten los
   próximos meses.
 -->
 <script lang="ts">
@@ -8,12 +9,14 @@
   import Icon from "../Icon.svelte";
   import CategoryPill from "../app/CategoryPill.svelte";
   import Money from "../app/Money.svelte";
+  import PlanCards from "../app/PlanCards.svelte";
   import RecurringForm from "../app/RecurringForm.svelte";
   import RecurringMonth from "../app/RecurringMonth.svelte";
   import Segmented from "../app/Segmented.svelte";
   import SlideIn from "./SlideIn.svelte";
   import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
+  import { useCardPlan } from "../../lib/cardPlan.svelte";
   import { activeIn, monthlyEquivalent, today, type Kind, type TxType } from "../../lib/finance";
   import { monthLabel, monthName } from "../../lib/format";
   import { nextMonthsChart } from "../../lib/planCharts";
@@ -24,7 +27,10 @@
   /** Sin él es una pestaña: la marca arriba, sin botón de volver. */
   let { onBack }: { onBack?: () => void } = $props();
 
-  const ym = today().slice(0, 7);
+  const thisYm = today().slice(0, 7);
+  // Las tarjetas y el plan siguen al mes que se ve en la lista del mes.
+  let ym = $state(thisYm);
+  const cards = useCardPlan(() => ym);
   const KINDS = [
     { id: "income", label: "Ingresos" },
     { id: "expense", label: "Gastos" },
@@ -35,19 +41,20 @@
   let newKind = $state<TxType>("expense");
   let kind = $state<Kind>("expense");
 
-  const plan = $derived(store.plan);
+  const plan = $derived(store.planFor(ym));
+  const card = $derived(cards.current.total);
+  const free = $derived(plan.free - card);
   // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
   const items = $derived(store.recurring.filter((r) => (kind === "income" ? r.kind === "income" : r.kind !== "income")));
-  const barBase = $derived(Math.max(plan.income, plan.fixed + plan.savings));
-  const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
+  const barBase = $derived(Math.max(plan.income, plan.fixed + card + plan.savings));
   const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
 
-  // El botón de atrás del teléfono cierra el formulario en vez de salir de Proyección.
+  // El botón de atrás del teléfono cierra el formulario en vez de salir de la pantalla.
   $effect(() => {
     if (formOpen) return closeOnBack(() => (formOpen = false));
   });
 
-  const nextConfig = () => nextMonthsChart(store.recurring, plan.savings, ym);
+  const nextConfig = () => nextMonthsChart(store.recurring, store.plan.savings, thisYm);
 
   function edit(r: Recurring | null, k: TxType = kind) {
     editing = r;
@@ -65,9 +72,9 @@
           : "Sin día fijo";
 
   const outOfPlan = (r: Recurring) => {
-    if (r.paused || r.frequency === "once" || activeIn(r, ym)) return "";
+    if (r.paused || r.frequency === "once" || activeIn(r, thisYm)) return "";
     const end = r.end_date?.slice(0, 7);
-    return end && end < ym ? `terminó en ${monthLabel(end)}` : `empieza en ${monthLabel(r.start_date.slice(0, 7))}`;
+    return end && end < thisYm ? `terminó en ${monthLabel(end)}` : `empieza en ${monthLabel(r.start_date.slice(0, 7))}`;
   };
 </script>
 
@@ -82,10 +89,12 @@
 
 <header class="page-head pl-head">
   <div>
-    <h1>Proyección</h1>
-    <p>Organiza tus ingresos y pagos programados para saber cuánto dinero tendrás disponible.</p>
+    <h1>Gastos e ingresos</h1>
+    <p>Marca los pagos e ingresos programados de cada mes y mira cuánto dinero debes reservar y cuánto te queda para gastar.</p>
   </div>
 </header>
+
+<div class="pl-cards"><PlanCards {ym} cards={cards.current} /></div>
 
 <header class="section-head pl-section">
   <div>
@@ -94,31 +103,26 @@
   </div>
 </header>
 
-<div class="pl-month"><RecurringMonth mobile /></div>
+<div class="pl-month"><RecurringMonth mobile bind:ym /></div>
 
 <header class="section-head pl-section">
   <div>
-    <h2>Tu plan mensual</h2>
-    <p>Compara lo que esperas recibir con tus pagos y ahorros mensuales.</p>
+    <h2>Tu plan del mes</h2>
+    <p>Compara lo que esperas recibir con tus pagos, tarjetas y ahorros del mes.</p>
   </div>
 </header>
 
 <section class="card pl-top">
-  <div class="pl-free" class:short={plan.free < 0}>
-    <span class="pl-label">Disponible para gastar</span>
-    <Money value={plan.free} />
-    {#if plan.income > 0}
-      <span class="pl-sub">{plan.free < 0 ? "Tus pagos y ahorros superan tus ingresos mensuales" : `${Math.round(share(plan.free))}% de tus ingresos mensuales`}</span>
-    {/if}
-  </div>
   <div class="pl-bar" aria-hidden="true">
     <span class="seg-fixed" style:width="{width(plan.fixed)}%"></span>
+    {#if card > 0}<span class="seg-card" style:width="{width(card)}%"></span>{/if}
     <span class="seg-save" style:width="{width(plan.savings)}%"></span>
-    <span class="seg-free" style:width="{width(plan.free)}%"></span>
+    <span class="seg-free" style:width="{width(free)}%"></span>
   </div>
-  <dl class="pl-sum">
+  <dl class="pl-sum" style:--cols={card > 0 ? 2 : 3}>
     <div><dt>Ingresos</dt><dd><Money value={plan.income} tone="income" /></dd></div>
     <div><dt><i class="seg-fixed"></i>Pagos</dt><dd><Money value={plan.fixed} tone="expense" /></dd></div>
+    {#if card > 0}<div><dt><i class="seg-card"></i>Tarjetas</dt><dd><Money value={card} tone="expense" /></dd></div>{/if}
     <div><dt><i class="seg-save"></i>Ahorros</dt><dd><Money value={plan.savings} /></dd></div>
   </dl>
 </section>
@@ -172,6 +176,10 @@
     margin: var(--sp-12);
   }
 
+  .pl-cards {
+    margin: var(--sp-12);
+  }
+
   /* Los títulos de sección van fuera de las tarjetas, alineados con su borde. */
   .pl-section {
     margin: var(--sp-20) var(--sp-12) 0;
@@ -195,33 +203,6 @@
     padding: var(--sp-16);
   }
 
-  .pl-free {
-    --tone: var(--viz-free);
-
-    display: flex;
-    flex-direction: column;
-    padding: var(--sp-12) var(--sp-16);
-    border: 1px solid oklch(from var(--tone) l c h / 0.4);
-    border-radius: var(--radius-lg);
-    background:
-      radial-gradient(120% 140% at 100% 0%, oklch(from var(--tone) l c h / 0.28), transparent 60%),
-      oklch(from var(--tone) l c h / 0.1);
-
-    &.short {
-      --tone: var(--viz-expense);
-    }
-
-    & .pl-label {
-      font-size: var(--text-xs);
-      color: light-dark(oklch(from var(--tone) calc(l - 0.14) c h), var(--tone));
-    }
-
-    & > :global(.money) {
-      font-family: var(--font-num);
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-  }
 
   .pl-bar {
     display: flex;
@@ -240,13 +221,18 @@
     background: var(--viz-saving);
   }
 
+  .seg-card {
+    background: var(--viz-card);
+  }
+
   .seg-free {
     background: var(--viz-free);
   }
 
   .pl-sum {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    row-gap: var(--sp-10);
     margin: 0;
     text-align: center;
 

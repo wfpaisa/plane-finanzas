@@ -26,7 +26,7 @@
 }
 
 /* El título de una sección dentro de una página del celular (Resumen,
-   Análisis, Proyección): va fuera de la tarjeta, que lleva solo el contenido. */
+   Análisis, Gastos e ingresos): va fuera de la tarjeta, que lleva solo el contenido. */
 .section-head {
   display: flex;
   align-items: flex-end;

@@ -20,7 +20,7 @@ var VERSION = 1;
 // Los campos que se guardan de cada colección, sin id, dueño ni fechas de registro.
 var FIELDS = {
   categories: ["name", "kind", "icon", "color", "budget", "tags"],
-  accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "exclude_from_total", "archived", "sort", "notes"],
+  accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "credit_limit", "exclude_from_total", "archived", "sort", "notes"],
   recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "saving", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "recurring_key"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes", "kind"],

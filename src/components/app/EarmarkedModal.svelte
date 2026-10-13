@@ -40,7 +40,7 @@
     return store.saving(id)?.name ?? "Ahorro de otra persona";
   }
 
-  /** Qué es lo apartado y dónde verlo: un ahorro (en Ahorros) o una provisión (en Proyección). */
+  /** Qué es lo apartado y dónde verlo: un ahorro (en Ahorros) o una provisión (en Gastos e ingresos). */
   function whatIs(id: string): { label: string; path: string } {
     const s = store.saving(id);
     if (s?.kind !== "provision") return { label: "Ahorro", path: "/ahorros" };
@@ -78,7 +78,7 @@
               {@const share = g.total > 0 ? Math.round((it.amount / g.total) * 100) : 0}
               {@const what = whatIs(it.saving)}
               <li>
-                <button type="button" class="em-name" data-tip={what.path === "/ahorros" ? "Ver en Ahorros" : "Ver en Proyección"} onclick={() => goTo(what.path)}>
+                <button type="button" class="em-name" data-tip={what.path === "/ahorros" ? "Ver en Ahorros" : "Ver en Gastos e ingresos"} onclick={() => goTo(what.path)}>
                   <ColorDot color={s?.palette} />
                   <span class="em-text"><span class="em-title">{savingName(it.saving)}</span><span class="em-kind">{what.label}</span></span>
                 </button>
@@ -105,7 +105,7 @@
   {/if}
   {#snippet footer()}
     {#if kinds.has("/ahorros")}<Button variant="ghost" onclick={() => goTo("/ahorros")}>Ir a Ahorros</Button>{/if}
-    {#if kinds.has("/proyeccion")}<Button variant="ghost" onclick={() => goTo("/proyeccion")}>Ir a Proyección</Button>{/if}
+    {#if kinds.has("/proyeccion")}<Button variant="ghost" onclick={() => goTo("/proyeccion")}>Ir a Gastos e ingresos</Button>{/if}
     <span class="flex-1"></span>
     <Button variant="secondary" onclick={onClose}>Listo</Button>
   {/snippet}

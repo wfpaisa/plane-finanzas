@@ -15,7 +15,7 @@
   apartar para pagarlo: marcarlo abre el formulario del aporte a su ahorro,
   sin mover plata. En el mes en curso avisa lo que quedó sin reservar. Al pagarlo, el servidor libera lo apartado (pb_hooks/lib/provisions.js).
 
-  Con `mobile` (Proyección en el celular) el título lo pone la página, el
+  Con `mobile` (Gastos e ingresos en el celular) el título lo pone la página, el
   movimiento se abre en la pantalla del celular (mobile/TxScreen) y el botón
   de atrás del teléfono cierra lo que esté abierto.
 -->
@@ -38,10 +38,10 @@
   import MovementForm from "./MovementForm.svelte";
   import TransactionForm from "./TransactionForm.svelte";
 
-  let { mobile = false }: { mobile?: boolean } = $props();
-
   const now = today();
-  let ym = $state(now.slice(0, 7));
+
+  /** `ym`: el mes que se ve ("AAAA-MM"); quien lo enlaza sigue al mes elegido aquí. */
+  let { mobile = false, ym = $bindable(now.slice(0, 7)) }: { mobile?: boolean; ym?: string } = $props();
 
   interface Due {
     r: Recurring;
@@ -328,7 +328,7 @@
     }
   }
 
-  // En el celular, el botón de atrás cierra la ventana abierta en vez de salir de Proyección.
+  // En el celular, el botón de atrás cierra la ventana abierta en vez de salir de la pantalla.
   $effect(() => {
     if (mobile && pickFor) return closeOnBack(() => (pickFor = null));
   });

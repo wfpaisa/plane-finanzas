@@ -8,7 +8,7 @@
   importe → descripción. "Continuar" guarda y deja la pantalla lista para otro con
   la misma fecha y cuenta.
 
-  Con `draft` llega ya llenado (un pago programado de Proyección) y, con
+  Con `draft` llega ya llenado (un pago programado de Gastos e ingresos) y, con
   `link`, queda unido a su programación: se guarda como pagado.
 -->
 <script lang="ts">
@@ -72,7 +72,6 @@
   let panel = $state<Panel>(null);
   let busy = $state(false);
   let confirmDelete = $state(false);
-  let showRaw = $state(false);
   let noteEl = $state<HTMLInputElement | null>(null);
 
   $effect(() => {
@@ -91,7 +90,6 @@
       notes = tx?.notes ?? draft?.notes ?? "";
       tags = [...(tx?.tags ?? draft?.tags ?? [])];
       files = [];
-      showRaw = false;
       // Al anotar se empieza por la cuenta, ya elegida: un toque la confirma.
       // Uno ya llenado solo se revisa y se guarda.
       panel = tx || draft ? null : "account";
@@ -406,14 +404,8 @@
             {/each}
           </div>
         {/if}
-        {#if editing && editing.source && editing.source !== "manual"}
-          <p class="ts-origin">
-            Llegó por {SOURCE_LABEL[editing.source] ?? editing.source}
-            {#if editing.raw}
-              · <button type="button" class="link" onclick={() => (showRaw = !showRaw)}>{showRaw ? "Ocultar" : "Ver"} el texto</button>
-            {/if}
-          </p>
-          {#if showRaw}<pre class="ts-raw">{editing.raw}</pre>{/if}
+        {#if editing?.source && SOURCE_LABEL[editing.source]}
+          <p class="ts-origin">Origen: <b>{SOURCE_LABEL[editing.source]}</b></p>
         {/if}
       </div>
 
@@ -764,15 +756,6 @@
     color: var(--text-muted);
   }
 
-  .ts-raw {
-    margin: var(--sp-6) 0 0;
-    padding: var(--sp-10);
-    border-radius: var(--radius-sm);
-    background: var(--bg-field);
-    font-size: var(--text-xs);
-    white-space: pre-wrap;
-    color: var(--text-secondary);
-  }
 
   /* --- Botones --- */
   .ts-actions {

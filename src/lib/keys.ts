@@ -14,10 +14,14 @@ export const SHORTCUTS: { where: string; items: [string, string][] }[] = [
     where: "En cualquier pantalla",
     items: [
       ["N", "Agregar un movimiento"],
-      ["1 … 6", "Ir a Resumen, Proyección, Ahorros, Movimientos, Cuentas o Ajustes"],
+      ["1 … 6", "Ir a Resumen, Gastos e ingresos, Ahorros, Movimientos, Cuentas o Ajustes"],
       ["?", "Ver estos atajos"],
       ["Esc", "Cerrar la ventana abierta"],
     ],
+  },
+  {
+    where: "Gastos e ingresos",
+    items: [["← →", "Mes anterior / siguiente"]],
   },
   {
     where: "Movimientos",

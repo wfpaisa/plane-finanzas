@@ -14,6 +14,8 @@
     label: string;
     icon: string;
     href?: string;
+    /** Un nombre más corto para la barra, si el de la sección no cabe; el completo queda para los lectores de pantalla. */
+    short?: string;
     /** Un aviso en el icono: cuántos correos esperan, por ejemplo. */
     count?: number;
   }
@@ -39,12 +41,18 @@
         <Icon name={it.icon} size={20} />
         {#if it.count}<span class="tb-count" aria-label="{it.count} pendientes">{it.count > 99 ? "99+" : it.count}</span>{/if}
       </span>
-      <span class="tb-label">{it.label}</span>
+      <span class="tb-label">{it.short ?? it.label}</span>
     {/snippet}
     {#if it.href}
-      <a href={it.href} class:active={on} aria-current={on ? "page" : undefined}>{@render inner()}</a>
+      <a href={it.href} class:active={on} aria-current={on ? "page" : undefined} aria-label={it.short ? it.label : undefined}>{@render inner()}</a>
     {:else}
-      <button type="button" class:active={on} aria-current={on ? "page" : undefined} onclick={() => onPick?.(it.id)}>
+      <button
+        type="button"
+        class:active={on}
+        aria-current={on ? "page" : undefined}
+        aria-label={it.short ? it.label : undefined}
+        onclick={() => onPick?.(it.id)}
+      >
         {@render inner()}
       </button>
     {/if}

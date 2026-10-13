@@ -53,17 +53,22 @@ Crea ahorros con **meta, aporte mensual y rentabilidad**. La app calcula para cu
 
 ![Ahorros](docs/capturas/ahorros.png)
 
-### Planear el futuro
-En **Proyección** pones tus ingresos fijos (sueldo) y tus gastos fijos (arriendo, servicios, seguros), y la app hace la cuenta:
+### Gastos e ingresos
+En **Gastos e ingresos** programas tus ingresos (sueldo) y tus pagos de cada mes (arriendo, servicios, seguros), y los marcas a medida que ocurren. Arriba, dos tarjetas responden lo importante del mes:
 
-> **Ingresos − gastos fijos − ahorros = lo que puedes gastar**
+- **Dinero por reservar**: tus pagos programados, tus ahorros y lo que debes en tarjetas de crédito (lo gastado este mes y lo que viene de meses anteriores).
+- **Disponible para gastar**: lo que te queda de tus ingresos después de reservar todo eso.
+
+> **Ingresos − pagos programados − ahorros − tarjetas de crédito = lo que puedes gastar**
+
+En **Cuentas**, las tarjetas de crédito van aparte, con su cupo, lo que debes y lo que te queda disponible.
 
 Además proyecta los próximos 12 meses, tiene un **simulador** y responde preguntas como "¿para cuándo tendría $10.000.000?". Los fijos que marques se crean solos cada mes. Al marcar un pago como hecho, si ya está registrado, la app te propone usar ese movimiento en vez de crear otro.
 
-![Proyección](docs/capturas/plan-futuro.png)
+![Gastos e ingresos](docs/capturas/plan-futuro.png)
 
 ### En el celular
-La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Ahorros, Proyección y Ajustes). En Movimientos:
+La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Ahorros, Gastos e ingresos y Ajustes). En Movimientos:
 
 - **Diario**: tus movimientos día por día, con lo que entró y salió cada día.
 - **Calendario**: el mes completo, con el gasto de cada día a la vista.
@@ -201,7 +206,7 @@ pocketbase/
   pb_migrations/   esquema (colecciones + reglas por usuario)
   pb_hooks/        proyección, respaldo, tokens de API, tareas automáticas
 src/
-  routes/          Resumen (con el análisis), Movimientos, Cuentas, Ahorros, Proyección, Ajustes, vista móvil
+  routes/          Resumen (con el análisis), Movimientos, Cuentas, Ahorros, Gastos e ingresos, Ajustes, vista móvil
   components/app/  piezas de la app (formularios, tarjetas, listas)
   components/ui/   componentes base
   lib/finance.ts   cálculos: plan, ahorros, simulación, estados

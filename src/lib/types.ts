@@ -31,6 +31,8 @@ export interface Account extends RecordModel {
   palette: string;
   icon: string;
   initial_balance: number;
+  /** En una tarjeta de crédito, su cupo. */
+  credit_limit?: number;
   exclude_from_total: boolean;
   archived: boolean;
   sort: number;

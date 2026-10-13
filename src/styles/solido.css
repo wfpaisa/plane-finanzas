@@ -98,6 +98,7 @@
   --viz-income: oklch(0.696 0.17 163);
   --viz-expense: oklch(0.645 0.246 16);
   --viz-saving: oklch(0.623 0.214 260);
+  --viz-card: oklch(0.55 0.2 300);
   --viz-free: oklch(0.696 0.17 163);
 
   --glass-0: oklch(1 0 0 / 0.66);
@@ -157,6 +158,7 @@
   --viz-income: oklch(0.765 0.177 163);
   --viz-expense: oklch(0.68 0.215 15);
   --viz-saving: oklch(0.707 0.165 255);
+  --viz-card: oklch(0.76 0.15 300);
   --viz-free: oklch(0.765 0.177 163);
 
   --glass-0: oklch(0.3 calc(0.01 * var(--s-k)) var(--s-h) / 0.3);

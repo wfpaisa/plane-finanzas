@@ -247,8 +247,8 @@
       </label>
     </div>
 
-    {#if tx?.source && tx.source !== "manual"}
-      <p class="tx-origin">Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b></p>
+    {#if tx?.source && SOURCE_LABEL[tx.source]}
+      <p class="tx-origin">Origen: <b>{SOURCE_LABEL[tx.source]}</b></p>
     {/if}
   </div>
 

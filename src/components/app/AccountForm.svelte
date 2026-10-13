@@ -37,6 +37,7 @@
   let icon = $state("");
   let color = $state("");
   let initial = $state(0);
+  let creditLimit = $state(0);
   let exclude = $state(false);
   let archived = $state(false);
   let notes = $state("");
@@ -62,6 +63,7 @@
       icon = account?.icon ?? "";
       color = account?.palette ? colorOf(account.palette) : nextColor(store.accounts.map((a) => a.palette));
       initial = account ? (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) : 0;
+      creditLimit = account?.credit_limit ?? 0;
       exclude = account?.exclude_from_total ?? false;
       archived = account?.archived ?? false;
       notes = account?.notes ?? "";
@@ -81,6 +83,7 @@
         icon: icon || accountTypeIcon(type),
         palette: color,
         initial_balance: initial,
+        credit_limit: type === "tarjeta" ? creditLimit : 0,
         exclude_from_total: exclude,
         archived,
         notes,
@@ -149,6 +152,11 @@
       >
         <MoneyInput bind:value={initial} allowNegative />
       </Field>
+      {#if type === "tarjeta"}
+        <Field label="Cupo (opcional)" tip="Límite de crédito aprobado para esta tarjeta. Lo que debes reduce el disponible para gastar con ella.">
+          <MoneyInput bind:value={creditLimit} />
+        </Field>
+      {/if}
     </div>
 
     <div>

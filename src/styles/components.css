@@ -3628,3 +3628,10 @@ input[type="range"].field-control {
   letter-spacing: 0.05em;
   color: var(--text-muted);
 }
+
+/* Una etiqueta con su ⓘ al lado (ver ui/InfoTip). */
+.label-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}

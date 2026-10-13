@@ -31,7 +31,8 @@
     { path: "/", label: "Resumen", icon: "dashboard-square-01", mobile: true },
     {
       path: "/proyeccion",
-      label: "Proyección",
+      label: "Gastos e ingresos",
+      short: "Gastos",
       icon: "chart-line-data-01",
       mobile: true,
     },
@@ -207,7 +208,7 @@
 
     <TabBar
       items={[
-        ...NAV.filter((n) => n.mobile).map((n) => ({ id: n.path, label: n.label, icon: n.icon, href: `#${n.path}` })),
+        ...NAV.filter((n) => n.mobile).map((n) => ({ id: n.path, label: n.label, short: n.short, icon: n.icon, href: `#${n.path}` })),
         { id: "mas", label: "Más", icon: "menu-01" },
       ]}
       active={moreOpen || !NAV.find((n) => n.path === route.path)?.mobile ? "mas" : route.path}

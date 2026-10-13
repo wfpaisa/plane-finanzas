@@ -1,6 +1,6 @@
 <!--
   La app del celular (`#/m`). Tiene las mismas secciones que la versión
-  completa y en el mismo orden: abajo Resumen, Proyección, Ahorros,
+  completa y en el mismo orden: abajo Resumen, Gastos e ingresos, Ahorros,
   Movimientos y Más (Cuentas, Análisis y Ajustes). En Movimientos el
   mes se ve de cuatro maneras: diario, calendario, mensual (el año mes a mes)
   y total (presupuesto y cuentas). Lo que no tiene una versión propia del
@@ -54,9 +54,9 @@
   type View = "diario" | "calendario" | "mensual" | "total";
 
   // Los mismos nombres e iconos que el menú de escritorio (ver App.svelte).
-  const TABS = $derived<{ id: Tab; label: string; icon: string; count?: number }[]>([
+  const TABS = $derived<{ id: Tab; label: string; short?: string; icon: string; count?: number }[]>([
     { id: "resumen", label: "Resumen", icon: "dashboard-square-01" },
-    { id: "plan", label: "Proyección", icon: "chart-line-data-01" },
+    { id: "plan", label: "Gastos e ingresos", short: "Gastos", icon: "chart-line-data-01" },
     { id: "ahorros", label: "Ahorros", icon: "piggy-bank" },
     { id: "movimientos", label: "Movimientos", icon: "exchange-01" },
     { id: "mas", label: "Más", icon: "menu-01" },

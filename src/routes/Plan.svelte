@@ -1,53 +1,128 @@
 <!--
-  Proyección: el plan del mes (ingresos, fijos, ahorros y lo que se puede
-  gastar), lo que toca pagar cada mes y los recurrentes.
+  Gastos e ingresos: cuánto reservar y cuánto queda para gastar en el mes
+  (con lo que se debe en tarjetas de crédito), los programados del mes para
+  marcar, el resumen del mes o del año y la lista de cada programado.
 -->
 <script lang="ts">
   import CategoryPill from "../components/app/CategoryPill.svelte";
   import Money from "../components/app/Money.svelte";
+  import PlanCards from "../components/app/PlanCards.svelte";
   import RecurringForm from "../components/app/RecurringForm.svelte";
   import RecurringMonth from "../components/app/RecurringMonth.svelte";
+  import Segmented from "../components/app/Segmented.svelte";
   import Icon from "../components/Icon.svelte";
   import { band, flowLayout } from "../lib/analysis";
-  import { activeIn, monthlyEquivalent, today, type TxType } from "../lib/finance";
+  import { useCardPlan } from "../lib/cardPlan.svelte";
+  import { isCard } from "../lib/cards";
+  import { activeIn, addMonths, monthlyEquivalent, today, type TxType } from "../lib/finance";
   import { monthLabel, monthName } from "../lib/format";
+  import { keys } from "../lib/keys";
+  import { notify } from "../lib/notify.svelte";
+  import { cachedList } from "../lib/offline.svelte";
+  import { pb } from "../lib/pb.svelte";
   import { store } from "../lib/store.svelte";
-  import type { Recurring } from "../lib/types";
+  import type { Recurring, Transaction } from "../lib/types";
 
-  const ym = today().slice(0, 7);
+  const thisYm = today().slice(0, 7);
+  // Todo sigue al mes que se ve en la lista del mes.
+  let ym = $state(thisYm);
 
   let formOpen = $state(false);
   let editing = $state<Recurring | null>(null);
   let newKind = $state<TxType>("expense");
 
-  const plan = $derived(store.plan);
+  const cards = useCardPlan(() => ym);
+
+  // Por mes, o el año de ese mes: lo registrado de enero a hoy.
+  let span = $state<"month" | "year">("month");
+  const yearly = $derived(span === "year");
+  const year = $derived(ym.slice(0, 4));
+  const toDate = $derived(year === thisYm.slice(0, 4) && thisYm.slice(5) !== "12");
+
+  type Row = Pick<Transaction, "type" | "amount" | "account" | "external_id" | "recurring_key">;
+  let yearTxs = $state<Row[]>([]);
+  $effect(() => {
+    if (!yearly) return;
+    void store.txVersion;
+    const y = year;
+    let alive = true;
+    const filter = pb.filter('type != "transfer" && date >= {:from} && date < {:to}', { from: `${y}-01-01`, to: `${Number(y) + 1}-01-01` });
+    cachedList<Row>(
+      `year:${y}`,
+      () => pb.collection("transactions").getFullList<Row>({ filter, fields: "type,amount,account,external_id,recurring_key", batch: 1000 }),
+      (rows) => alive && (yearTxs = rows),
+    ).catch(notify.fail);
+    return () => (alive = false);
+  });
+
+  /** Lo registrado en el año: ingresos y gastos (programados, con tarjeta y otros) y lo puesto en los ahorros. */
+  const recorded = $derived.by(() => {
+    const programmed = (t: Row) => !!t.recurring_key || (t.external_id ?? "").startsWith("rec:");
+    const cardIds = new Set(store.accounts.filter(isCard).map((a) => a.id));
+    const sum = { income: 0, incomeOther: 0, fixed: 0, card: 0, other: 0, savings: 0 };
+    for (const t of yearTxs) {
+      if (t.type === "income") {
+        sum.income += t.amount;
+        if (!programmed(t)) sum.incomeOther += t.amount;
+      } else if (programmed(t)) sum.fixed += t.amount;
+      else if (cardIds.has(t.account)) sum.card += t.amount;
+      else sum.other += t.amount;
+    }
+    const goals = new Set(store.savings.map((s) => s.id));
+    const own = new Set(store.accounts.map((a) => a.id));
+    sum.savings = Math.max(
+      0,
+      store.movements
+        .filter((m) => goals.has(m.saving) && m.date.startsWith(year) && (!m.account || own.has(m.account)))
+        .reduce((a, m) => a + m.amount, 0),
+    );
+    return sum;
+  });
+
+  const plan = $derived(store.planFor(ym));
+  const income = $derived(yearly ? recorded.income : plan.income);
+  /** Lo que queda: en el mes, después de reservar todo; en el año, lo que sobró de lo registrado. */
+  const free = $derived(
+    yearly ? recorded.income - recorded.fixed - recorded.card - recorded.other - recorded.savings : plan.free - cards.current.total,
+  );
+  const period = $derived(
+    !yearly ? monthLabel(ym) : !toDate ? year : thisYm.endsWith("-01") ? monthLabel(thisYm) : `ene – ${monthLabel(thisYm)}`,
+  );
+  const title = $derived(
+    !yearly
+      ? `Resumen de ${monthLabel(ym, true)}`
+      : toDate
+        ? `Consolidado de ${year}, de enero a ${monthLabel(thisYm, true).split(" ")[0]}`
+        : `Consolidado de ${year}`,
+  );
+
   const incomes = $derived(store.recurring.filter((r) => r.kind === "income"));
   // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
   const expenses = $derived(store.recurring.filter((r) => r.kind !== "income"));
 
-  const share = (n: number) => (plan.income > 0 ? Math.max(0, (n / plan.income) * 100) : 0);
+  const share = (n: number) => (income > 0 ? Math.max(0, (n / income) * 100) : 0);
   // El flujo del ingreso: a la derecha, a dónde va cada peso. Si lo
   // planeado se pasa del ingreso, la última banda es lo que falta, y la
   // barra del ingreso cubre solo la parte que alcanza a pagar.
   const FLOW_W = 1000;
-  const FLOW_H = 220;
   const NODE = 12;
-  const flow = $derived(
-    flowLayout(
-      [],
-      [
-        { id: "fixed", label: "Pagos programados", value: plan.fixed, tint: "seg-fixed" },
-        { id: "save", label: "Ahorros", value: plan.savings, tint: "seg-save" },
-        plan.free < 0
-          ? { id: "short", label: "Te falta cada mes", value: -plan.free, tint: "seg-short" }
-          : { id: "free", label: "Disponible para gastar", value: plan.free, tint: "seg-free" },
-      ].filter((p) => p.value > 0),
-      FLOW_H,
-      8,
-      60,
-    ),
+  const parts = $derived(
+    [
+      { id: "fixed", label: "Pagos programados", value: yearly ? recorded.fixed : plan.fixed, tint: "seg-fixed" },
+      { id: "card", label: yearly ? "Gastos con tarjeta" : "Tarjetas de crédito", value: yearly ? recorded.card : cards.current.total, tint: "seg-card" },
+      { id: "other", label: "Otros gastos", value: yearly ? recorded.other : 0, tint: "seg-other" },
+      { id: "save", label: "Ahorros", value: yearly ? recorded.savings : plan.savings, tint: "seg-save" },
+      free < 0
+        ? { id: "short", label: yearly ? "Gastaste de más" : "Te falta este mes", value: -free, tint: "seg-short" }
+        : { id: "free", label: yearly ? "Te quedó" : "Disponible para gastar", value: free, tint: "seg-free" },
+    ].filter((p) => p.value > 0),
   );
-  const inH = $derived(flow.total ? (FLOW_H * Math.min(plan.income, flow.total)) / flow.total : 0);
+  // Más alto con más partes, para que cada etiqueta quepa junto a su nodo.
+  const FLOW_H = $derived(Math.max(240, parts.length * 66));
+  const flow = $derived(flowLayout([], parts, FLOW_H, 8, 46));
+  const inH = $derived(flow.total ? (FLOW_H * Math.min(income, flow.total)) / flow.total : 0);
+  /** La barra del ingreso, partida: arriba los programados, abajo los demás registrados. */
+  const inOtherH = $derived(yearly && income ? (inH * recorded.incomeOther) / income : 0);
 
   function edit(r: Recurring | null, kind: TxType = "expense") {
     editing = r;
@@ -66,42 +141,50 @@
 
   /** Por qué un fijo no suma en el plan de este mes: ya terminó o aún no empieza. */
   const outOfPlan = (r: Recurring) => {
-    if (r.paused || r.frequency === "once" || activeIn(r, ym)) return "";
+    if (r.paused || r.frequency === "once" || activeIn(r, thisYm)) return "";
     const end = r.end_date?.slice(0, 7);
-    return end && end < ym ? `terminó en ${monthLabel(end)}` : `empieza en ${monthLabel(r.start_date.slice(0, 7))}`;
+    return end && end < thisYm ? `terminó en ${monthLabel(end)}` : `empieza en ${monthLabel(r.start_date.slice(0, 7))}`;
   };
-
 </script>
 
 <div class="page">
   <header class="page-head">
     <div>
-      <h1>Proyección</h1>
-      <p>Organiza tus ingresos y pagos programados para saber cuánto dinero tendrás disponible.</p>
+      <h1>Gastos e ingresos</h1>
+      <p>Marca los pagos e ingresos programados de cada mes y mira cuánto dinero debes reservar y cuánto te queda para gastar.</p>
     </div>
   </header>
 
   <div class="stack">
-    <RecurringMonth />
+    <PlanCards {ym} cards={cards.current} />
 
-    <!-- De aquí en adelante, el plan: en qué se va el ingreso y los recurrentes que lo forman. -->
-    <header class="page-head plan-section">
-      <div>
-        <h2 id="plan-title">Tu plan mensual</h2>
-        <p>Compara lo que esperas recibir con tus pagos y ahorros mensuales.</p>
-      </div>
-    </header>
+    <RecurringMonth bind:ym />
 
     <!-- El ingreso a la izquierda se abre en bandas hacia lo que se lleva
          cada parte, cada una del grueso de su monto. Lo que queda para
          gastar es la respuesta, y va más grande. -->
     <div class="card plan-card">
-      {#if plan.income > 0}
+      <div class="plan-head">
+        <h3 class="card-title">{title}</h3>
+        <Segmented
+          bind:value={span}
+          label="Ver el resumen"
+          options={[
+            { id: "month", label: "Mes" },
+            { id: "year", label: "Año" },
+          ]}
+        />
+      </div>
+      {#if income > 0}
         <div class="pflow" style:height="{FLOW_H}px">
           <div class="pflow-labels left">
             <div class="pflow-label" style:top="{(Math.min(inH, FLOW_H) / 2 / FLOW_H) * 100}%">
-              <span class="pflow-name">Ingresos mensuales</span>
-              <span class="pflow-amount"><Money value={plan.income} /></span>
+              <span class="pflow-name">{yearly ? `Ingresos de ${period}` : `Ingresos programados de ${period}`}</span>
+              <span class="pflow-amount"><Money value={income} /></span>
+              {#if yearly && recorded.incomeOther > 0}
+                <span class="pflow-split"><i class="pflow-dot"></i>Programados <Money value={income - recorded.incomeOther} /></span>
+                <span class="pflow-split"><i class="pflow-dot once"></i>Otros <Money value={recorded.incomeOther} /></span>
+              {/if}
             </div>
           </div>
           <svg viewBox="0 0 {FLOW_W} {FLOW_H}" preserveAspectRatio="none" aria-hidden="true">
@@ -110,28 +193,48 @@
               <rect class="pflow-node {n.tint}" x={FLOW_W - NODE} y={n.y} width={NODE} height={n.h} rx="3" />
             {/each}
             <rect class="pflow-income" x="0" y="0" width={NODE} height={inH} rx="3" />
+            {#if inOtherH}<rect class="pflow-income once" x="0" y={inH - inOtherH} width={NODE} height={inOtherH} rx="3" />{/if}
           </svg>
           <div class="pflow-labels right">
             {#each flow.right as n (n.id)}
               {@const main = n.id === "free" || n.id === "short"}
               <div class="pflow-label {n.tint}" class:main style:top="{((n.y + n.h / 2) / FLOW_H) * 100}%">
-                <span class="pflow-name">{n.label} · {Math.round(share(n.value))}%</span>
+                <span class="pflow-name">{n.label}{#if free >= 0} · {Math.round(share(n.value))}%{/if}</span>
                 <span class="pflow-amount"><Money value={n.value} /></span>
-                {#if n.id === "short"}<span class="pflow-sub">Tus pagos y ahorros superan tus ingresos.</span>{/if}
+                {#if n.id === "short"}<span class="pflow-sub"
+                    >{yearly ? "Tus gastos y ahorros superan tus ingresos del año." : "Tus pagos, ahorros y tarjetas superan tus ingresos."}</span
+                  >{/if}
               </div>
             {/each}
           </div>
         </div>
       {:else}
-        <p class="muted small">Agrega al menos un ingreso programado para calcular cuánto puedes destinar a pagos, ahorros y otros gastos.</p>
+        <p class="muted small">
+          {yearly
+            ? `No hay ingresos registrados en ${period}. Registra un ingreso para ver en qué se fue tu dinero.`
+            : `No hay ingresos programados en ${monthLabel(ym, true)}. Programa un ingreso para calcular cuánto puedes destinar a pagos, ahorros y otros gastos.`}
+        </p>
       {/if}
     </div>
+
+    <!-- De aquí en adelante, lo que se repite: los programados que forman el plan. -->
+    <header class="section-head plan-section">
+      <div>
+        <h2 class="card-title-icon"><Icon name="repeat" />Programación de ingresos y pagos</h2>
+        <p>Los ingresos y pagos que se repiten. Con ellos se calcula el plan de cada mes.</p>
+      </div>
+    </header>
 
     <div class="split-even">
       <div class="card">
         <div class="card-head">
-          <div><h3 class="card-title">Ingresos programados</h3><p class="card-sub">Total mensual estimado: <Money value={plan.income} /></p></div>
-          <div class="card-head-actions"><button type="button" class="btn sm" onclick={() => edit(null, "income")}><Icon name="add-01" />Agregar ingreso</button></div>
+          <div>
+            <h3 class="card-title">Ingresos programados</h3>
+            <p class="card-sub">Total mensual estimado: <Money value={store.plan.income} /></p>
+          </div>
+          <div class="card-head-actions">
+            <button type="button" class="btn sm" onclick={() => edit(null, "income")}><Icon name="add-01" />Programar ingreso</button>
+          </div>
         </div>
         <div class="card-body">
           {#each incomes as r (r.id)}
@@ -143,8 +246,13 @@
       </div>
       <div class="card">
         <div class="card-head">
-          <div><h3 class="card-title">Pagos programados</h3><p class="card-sub">Total mensual estimado: <Money value={plan.fixed} /></p></div>
-          <div class="card-head-actions"><button type="button" class="btn sm" onclick={() => edit(null, "expense")}><Icon name="add-01" />Agregar gasto</button></div>
+          <div>
+            <h3 class="card-title">Pagos programados</h3>
+            <p class="card-sub">Total mensual estimado: <Money value={store.plan.fixed} /></p>
+          </div>
+          <div class="card-head-actions">
+            <button type="button" class="btn sm" onclick={() => edit(null, "expense")}><Icon name="add-01" />Programar pago</button>
+          </div>
         </div>
         <div class="card-body">
           {#each expenses as r (r.id)}
@@ -155,7 +263,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -176,11 +283,25 @@
   </button>
 {/snippet}
 
+<!-- Las flechas del teclado pasan de mes (ver `lib/keys.ts`). -->
+<svelte:window
+  onkeydown={keys({
+    ArrowLeft: () => (ym = addMonths(ym, -1)),
+    ArrowRight: () => (ym = addMonths(ym, 1)),
+  })}
+/>
+
 <RecurringForm open={formOpen} item={editing} kind={newKind} onClose={() => (formOpen = false)} />
 
 <style>
   .plan-section {
     margin: var(--sp-16) 0 0;
+
+    & p {
+      margin: var(--sp-4) 0 0;
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+    }
 
     & h2 {
       margin: 0;
@@ -192,6 +313,21 @@
 
   .plan-card {
     padding: var(--sp-20);
+  }
+
+  .plan-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-8);
+    margin-bottom: var(--sp-16);
+  }
+
+  .card-title-icon {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-6);
   }
 
   /* Las bandas son un SVG que se estira a lo ancho; las etiquetas, HTML
@@ -263,8 +399,41 @@
     font-size: var(--text-xs);
   }
 
+  /* Los ingresos: verde los programados y otro tono los demás registrados. */
   .pflow-income {
-    fill: var(--text-muted);
+    fill: var(--viz-income);
+
+    &.once {
+      fill: var(--viz-free);
+      opacity: 0.6;
+    }
+  }
+
+  /* Bajo el total de ingresos: cuánto es programado y cuánto no. */
+  .pflow-split {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-4);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+
+    & :global(.money) {
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+  }
+
+  .pflow-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 2px;
+    background: var(--viz-income);
+
+    &.once {
+      background: var(--viz-free);
+      opacity: 0.6;
+    }
   }
 
   .pflow-node {
@@ -282,6 +451,14 @@
 
   .seg-save {
     --seg: var(--viz-saving);
+  }
+
+  .seg-card {
+    --seg: var(--viz-card);
+  }
+
+  .seg-other {
+    --seg: var(--text-muted);
   }
 
   .seg-free {
