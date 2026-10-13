@@ -230,7 +230,7 @@
         <div class="card-head">
           <div>
             <h3 class="card-title">Ingresos programados</h3>
-            <p class="card-sub">Total mensual estimado: <Money value={store.plan.income} /></p>
+            <p class="card-sub">Total de este mes: <Money value={store.plan.income} /></p>
           </div>
           <div class="card-head-actions">
             <button type="button" class="btn sm" onclick={() => edit(null, "income")}><Icon name="add-01" />Programar ingreso</button>

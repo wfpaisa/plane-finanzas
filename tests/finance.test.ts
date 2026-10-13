@@ -59,6 +59,21 @@ describe("fechas", () => {
   });
 });
 
+describe("ingresos del mes", () => {
+  const prima = { kind: "income" as const, amount: 8_900_000, frequency: "yearly" as const, month: 12, day_of_month: 15 };
+  const quincena = { kind: "income" as const, amount: 4_000_000, frequency: "monthly" as const, day_of_month: 14 };
+  const seguro = { kind: "expense" as const, amount: 1_200_000, frequency: "yearly" as const, month: 3, day_of_month: 1 };
+
+  test("un ingreso anual cuenta completo en su mes y en los demás no suma", () => {
+    expect(planSummary([prima, quincena], [], "2026-10").income).toBe(4_000_000);
+    expect(planSummary([prima, quincena], [], "2026-12").income).toBe(12_900_000);
+  });
+
+  test("un gasto anual se sigue repartiendo en doce", () => {
+    expect(planSummary([seguro], [], "2026-10").fixed).toBe(100_000);
+  });
+});
+
 describe("plan", () => {
   // El plan real de la hoja: sueldo 8M, fijos 3.702.121, ahorros 2.700.000.
   const recurring = [

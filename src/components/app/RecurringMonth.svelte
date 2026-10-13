@@ -1,8 +1,10 @@
 <!--
   Lo que toca pagar (y recibir) en un mes: los fijos que caen en él, con lo
-  ya pagado y lo que falta. Tocar uno pendiente (la fila o su círculo) abre
-  su movimiento ya llenado; al guardarlo queda pagado. Uno pagado abre su
-  movimiento para verlo o editarlo. Los fijos se editan en el plan, abajo.
+  ya pagado y lo que falta. Su círculo lo marca de una vez: registra el
+  movimiento con los datos del fijo, y al desmarcarlo lo elimina (o, si era
+  uno que ya existía, solo lo suelta). Tocar la fila de uno pendiente abre su
+  movimiento ya llenado, para cambiarlo antes de guardarlo; la de uno pagado
+  lo abre para verlo o editarlo. Los fijos se editan en el plan, abajo.
 
   El movimiento queda unido al fijo por su marca (`recurringKey`), la misma
   que usa el programador para los automáticos: así no se repiten. Si el pago
@@ -25,7 +27,7 @@
   import { notify } from "../../lib/notify.svelte";
   import { cachedList, offline } from "../../lib/offline.svelte";
   import { overlay, type Pending } from "../../lib/outbox";
-  import { pb } from "../../lib/pb.svelte";
+  import { pb, session } from "../../lib/pb.svelte";
   import { closeOnBack } from "../../lib/router.svelte";
   import { store, touchTransactions } from "../../lib/store.svelte";
   import { recurringTags } from "../../lib/tags";
@@ -262,6 +264,60 @@
     formOpen = true;
   }
 
+  // ---- El check: registrar o quitar el movimiento, sin formulario ----
+
+  let busy = $state(new Set<string>());
+
+  /**
+   * Marcar registra el movimiento de una vez, con los datos del programado.
+   * Desmarcar lo elimina; si era un movimiento que ya existía y se unió, solo
+   * se le quita la marca y se conserva.
+   */
+  async function toggle(d: Due) {
+    if (busy.has(d.key)) return;
+    busy = new Set(busy).add(d.key);
+    const tx = paid.get(d.key);
+    const income = d.r.kind === "income";
+    try {
+      if (!tx) {
+        const x = draftOf(d);
+        await offline.create("transactions", {
+          owner: session.id,
+          type: x.type,
+          amount: x.amount,
+          date: `${x.date} 12:00:00.000Z`,
+          account: x.account,
+          to_account: x.to_account,
+          category: x.category,
+          description: x.description,
+          notes: x.notes,
+          tags: x.tags,
+          source: "recurrente",
+          external_id: d.key,
+        });
+        notify.done(
+          !offline.online
+            ? `${d.r.name} quedó ${income ? "recibido" : "pagado"} sin conexión. El movimiento se enviará al reconectar.`
+            : `${d.r.name} quedó ${income ? "recibido" : "pagado"}. Se registró el movimiento del ${dateShort(x.date)}.`,
+        );
+      } else if (tx.recurring_key) {
+        if (d.orphan) return open(d);
+        await pb.send("/api/finanzas/recurring/mark", { method: "POST", body: { recurring: d.r.id, ym, unlink: true } });
+        notify.done(`${d.r.name} volvió a quedar pendiente. El movimiento que ya tenías se conserva.`);
+        touchTransactions();
+      } else {
+        await offline.remove("transactions", tx.id, tx);
+        notify.done(`${d.r.name} volvió a quedar pendiente. Se eliminó su movimiento.`);
+      }
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      const next = new Set(busy);
+      next.delete(d.key);
+      busy = next;
+    }
+  }
+
   // ---- Un pago que ya está registrado ----
 
   interface Candidate {
@@ -315,17 +371,6 @@
     const d = pickFor;
     pickFor = null;
     if (d) open(d);
-  }
-
-  /** Quitar la marca a un movimiento que se unió: el movimiento se conserva. */
-  async function unlink(d: Due) {
-    try {
-      await pb.send("/api/finanzas/recurring/mark", { method: "POST", body: { recurring: d.r.id, ym, unlink: true } });
-      notify.done(`${d.r.name} volvió a quedar pendiente. El movimiento se conserva.`);
-      touchTransactions();
-    } catch (err) {
-      notify.fail(err);
-    }
   }
 
   // En el celular, el botón de atrás cierra la ventana abierta en vez de salir de la pantalla.
@@ -471,23 +516,26 @@
 {#snippet item(d: Due)}
   {@const tx = paid.get(d.key)}
   {@const st = status(d)}
+  {@const label = tx
+    ? tx.recurring_key
+      ? "Desmarcar sin borrar el movimiento"
+      : "Desmarcar y eliminar el movimiento"
+    : d.r.kind === "income"
+      ? "Marcar como recibido"
+      : "Marcar como pagado"}
   <li class="rm-row" class:done={!!tx}>
-    {#if tx}
-      <button type="button" class="rm-check on" aria-label="Ver el movimiento" data-tip="Ver el movimiento" onclick={() => open(d)}>
-        <Icon name="checkmark-circle-02" size={22} />
-      </button>
-    {:else}
-      <button
-        type="button"
-        class="rm-check"
-        aria-label={d.r.kind === "income" ? "Marcar como recibido" : "Marcar como pagado"}
-        data-tip={d.r.kind === "income" ? "Marcar como recibido" : "Marcar como pagado"}
-        onclick={() => mark(d)}
-      >
-        <Icon name="circle" size={22} />
-      </button>
-    {/if}
-    <button type="button" class="rm-main" onclick={() => (tx ? open(d) : mark(d))}>
+    <button
+      type="button"
+      class="rm-check"
+      class:on={!!tx}
+      aria-label={label}
+      data-tip={label}
+      disabled={busy.has(d.key)}
+      onclick={() => toggle(d)}
+    >
+      <Icon name={tx ? "checkmark-circle-02" : "circle"} size={22} />
+    </button>
+    <button type="button" class="rm-main" disabled={busy.has(d.key)} onclick={() => (tx ? open(d) : mark(d))}>
       <span class="rm-text">
         <span class="rm-name">{d.r.name}</span>
         <span class="rm-sub">
@@ -503,17 +551,6 @@
       </span>
       <span class="rm-amount"><Money value={tx?.amount ?? d.r.amount} tone={d.r.kind} /></span>
     </button>
-    {#if tx?.recurring_key && !d.orphan}
-      <button
-        type="button"
-        class="rm-check"
-        aria-label="Desmarcar sin borrar el movimiento"
-        data-tip="Desmarcar sin borrar el movimiento"
-        onclick={() => unlink(d)}
-      >
-        <Icon name="unlink-01" size={18} />
-      </button>
-    {/if}
   </li>
 {/snippet}
 

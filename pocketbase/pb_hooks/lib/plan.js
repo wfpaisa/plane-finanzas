@@ -125,14 +125,19 @@ function reserveMonths(r, ym, since) {
   return { due: due, months: months };
 }
 
+/** Lo que entra de un ingreso en el mes: completo si cae en él. Ver `incomeIn` en finance.ts. */
+function incomeIn(r, ym) {
+  if (r.paused || r.kind !== "income") return 0;
+  return dueDate(r, ym) ? r.amount : 0;
+}
+
 /** Ingresos, pagos programados, ahorros y lo libre de un mes. Ver `planSummary`. */
 function summary(recurring, savings, ym) {
   var income = 0;
   var fixed = 0;
   for (var i = 0; i < recurring.length; i++) {
-    var v = monthlyEquivalent(recurring[i], ym);
-    if (recurring[i].kind === "income") income += v;
-    else if (recurring[i].kind === "expense") fixed += v;
+    if (recurring[i].kind === "income") income += incomeIn(recurring[i], ym);
+    else if (recurring[i].kind === "expense") fixed += monthlyEquivalent(recurring[i], ym);
   }
   var sav = 0;
   for (var j = 0; j < savings.length; j++) if (!savings[j].archived) sav += (savings[j].monthly_amount || 0) * (savings[j].share === undefined ? 1 : savings[j].share);

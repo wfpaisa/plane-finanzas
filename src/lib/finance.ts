@@ -232,14 +232,26 @@ export interface PlanSummary {
   free: number;
 }
 
-/** El plan del mes `ym` (por defecto, el actual). */
+/**
+ * Lo que entra de un ingreso programado en el mes: completo si cae en él, si
+ * no, nada. Un ingreso anual (una prima) cuenta solo en su mes, para no
+ * planear con dinero que aún no llega.
+ */
+export function incomeIn(r: RecurringLike, ym: string): number {
+  if (r.paused || r.kind !== "income") return 0;
+  return dueDate(r, ym) ? r.amount : 0;
+}
+
+/**
+ * El plan del mes `ym` (por defecto, el actual). Los ingresos, los que caen en
+ * el mes; los pagos, promediados (el anual en doce): se reservan mes a mes.
+ */
 export function planSummary(recurring: RecurringLike[], savings: SavingLike[], ym = today().slice(0, 7)): PlanSummary {
   let income = 0;
   let fixed = 0;
   for (const r of recurring) {
-    const v = monthlyEquivalent(r, ym);
-    if (r.kind === "income") income += v;
-    else if (r.kind === "expense") fixed += v;
+    if (r.kind === "income") income += incomeIn(r, ym);
+    else if (r.kind === "expense") fixed += monthlyEquivalent(r, ym);
   }
   const sav = savings.filter((s) => !s.archived).reduce((a, s) => a + savingMonthly(s), 0);
   return { income, fixed, savings: sav, free: income - fixed - sav };
