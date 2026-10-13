@@ -321,7 +321,7 @@
         </div>
         <a class="card kpi kpi-link" href="#/ahorros">
           <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Ahorros</span></div>
-          <div class="kpi-val"><Money value={savedTotal} /></div>
+          <div class="kpi-val"><Money value={savedTotal} copy={false} /></div>
           <div class="kpi-foot"><Money value={plan.savings} /> al mes · {store.activeSavings.length} {store.activeSavings.length === 1 ? "ahorro" : "ahorros"}</div>
         </a>
       </div>

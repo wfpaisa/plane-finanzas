@@ -356,34 +356,34 @@
   {/if}
 {/snippet}
 
-<div class="card rm" class:mobile>
+<div class="rm" class:mobile>
   {#if mobile}
     <div class="rm-head rm-head-m">
       <MonthNav bind:ym />
       <p class="card-sub">{@render progress()}</p>
     </div>
   {:else}
-    <div class="card-head rm-head">
-      <div>
-        <h3 class="card-title">Movimientos programados</h3>
+    <header class="rm-header">
+      <div class="rm-heading">
+        <h2>Movimientos programados del mes</h2>
+        <p class="card-sub">Marca cada uno cuando lo pagues o lo recibas.</p>
+      </div>
+      <div class="rm-head">
+        <MonthNav bind:ym />
         <p class="card-sub">{@render progress()}</p>
       </div>
-      <MonthNav bind:ym />
-    </div>
-  {/if}
-
-  {#if total}
-    <div class="rm-bar" aria-hidden="true"><span style:width="{(done / total) * 100}%"></span></div>
+    </header>
   {/if}
 
   {#each groups as g (g.id)}
     {@const gDone = g.items.filter((d) => paid.has(d.key)).length}
     {@const gLeft = g.items.filter((d) => !paid.has(d.key)).reduce((a, d) => a + d.r.amount, 0)}
-    <section class="rm-group" class:loading>
-      <h4 class="rm-group-head">
-        <span>{g.title}</span>
-        <span class="rm-group-sum">{gDone} de {g.items.length}{#if gLeft} · <Money value={gLeft} /> {g.left}{/if}</span>
-      </h4>
+    <section class="card rm-group" class:loading>
+      <div class="rm-group-head">
+        <h3 class="rm-group-title">{g.title}</h3>
+        <span class="rm-group-sum">{gDone} de {g.items.length} completados{#if gLeft} · <Money value={gLeft} /> {g.left}{/if}</span>
+      </div>
+      {@render groupProgress(gDone, g.items.length, g.title)}
       <ul class="rm-list">
         {#each g.items as d (d.key)}
           {@render item(d)}
@@ -392,17 +392,19 @@
     </section>
   {:else}
     {#if !store.recurring.length}
-      <p class="rm-empty">Agrega un ingreso, pago o transferencia programada para organizar este mes.</p>
+      <p class="card rm-empty">Agrega un ingreso, pago o transferencia programada para organizar este mes.</p>
     {/if}
   {/each}
 
   {#if reserves.length}
+    {@const rDone = reserves.filter((x) => x.mv).length}
     {@const rLeft = reserves.filter((x) => !x.mv).reduce((a, x) => a + x.quota, 0)}
-    <section class="rm-group" class:loading>
-      <h4 class="rm-group-head">
-        <span>Dinero por reservar</span>
-        <span class="rm-group-sum">{reserves.filter((x) => x.mv).length} de {reserves.length}{#if rLeft} · <Money value={rLeft} /> pendientes{/if}</span>
-      </h4>
+    <section class="card rm-group" class:loading>
+      <div class="rm-group-head">
+        <h3 class="rm-group-title">Dinero por reservar</h3>
+        <span class="rm-group-sum">{rDone} de {reserves.length} reservados{#if rLeft} · <Money value={rLeft} /> pendientes{/if}</span>
+      </div>
+      {@render groupProgress(rDone, reserves.length, "Dinero por reservar")}
       <ul class="rm-list">
         {#each reserves as x (x.key)}
           {@render reserveItem(x)}
@@ -411,6 +413,20 @@
     </section>
   {/if}
 </div>
+
+{#snippet groupProgress(count: number, of: number, title: string)}
+  <div
+    class="rm-bar"
+    role="progressbar"
+    aria-label="Progreso de {title.toLowerCase()}"
+    aria-valuemin={0}
+    aria-valuemax={of || 1}
+    aria-valuenow={count}
+    aria-valuetext="{count} de {of}"
+  >
+    <span style:width="{of ? (count / of) * 100 : 0}%"></span>
+  </div>
+{/snippet}
 
 {#snippet reserveItem(x: Reserve)}
   {@const saved = store.savingCurrent(x.saving.id)}
@@ -446,7 +462,7 @@
         Llevas {x.missed} {x.missed === 1 ? "mes" : "meses"} sin reservar para {x.r.name}. Faltan <Money value={x.behind} /> para ir al día.
       </span>
       <button type="button" class="btn sm" onclick={() => openReserve(x, x.quota + x.behind)}>
-        Reservar <Money value={x.quota + x.behind} />
+        Reservar <Money value={x.quota + x.behind} copy={false} />
       </button>
     </li>
   {/if}
@@ -597,9 +613,43 @@
     }
   }
 
-  .rm-head-m {
+  .rm {
+    display: grid;
+    gap: var(--sp-12);
+  }
+
+  /* El título y el mes van fuera de las tarjetas; cada grupo, en la suya. */
+  .rm-header {
     display: flex;
-    padding: var(--sp-12) var(--sp-12) 0 var(--sp-8);
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-12);
+    margin-top: var(--sp-16);
+  }
+
+  .rm-heading {
+    flex: 1 1 15rem;
+    min-width: 0;
+
+    & h2 {
+      margin: 0 0 var(--sp-4);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    & .card-sub {
+      margin: 0;
+    }
+  }
+
+  .rm-head {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--sp-4);
+    margin-left: auto;
 
     & .card-sub {
       margin: 0;
@@ -607,16 +657,17 @@
     }
   }
 
-  .rm-head {
+  .rm-head-m {
+    flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--sp-8);
+    width: 100%;
+    padding: 0 var(--sp-4);
   }
 
   .rm-bar {
     height: 4px;
-    margin: var(--sp-4) var(--sp-16) var(--sp-8);
+    margin: var(--sp-4) var(--sp-8) var(--sp-8);
     border-radius: 999px;
     background: var(--bg-field);
     overflow: hidden;
@@ -631,28 +682,30 @@
   }
 
   .rm-group {
-    padding: 0 var(--sp-8) var(--sp-8);
+    min-width: 0;
+    padding: var(--sp-8);
     transition: opacity 0.2s;
 
     &.loading {
       opacity: 0.7;
     }
-
-    & + .rm-group {
-      padding-top: var(--sp-8);
-      border-top: var(--border-width) solid var(--border);
-    }
   }
 
+  /* El título del grupo a la izquierda; cuántos van y lo que falta, a la derecha. */
   .rm-group-head {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
     gap: var(--sp-4) var(--sp-12);
-    margin: 0;
     padding: var(--sp-6) var(--sp-8);
     font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .rm-group-title {
+    margin: 0;
+    font-size: inherit;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -660,10 +713,7 @@
   }
 
   .rm-group-sum {
-    font-weight: 400;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--text-muted);
+    margin-left: auto;
   }
 
   .rm-list {
@@ -793,7 +843,7 @@
 
   .rm-empty {
     margin: 0;
-    padding: 0 var(--sp-16) var(--sp-16);
+    padding: var(--sp-16);
     font-size: var(--text-sm);
     color: var(--text-muted);
   }

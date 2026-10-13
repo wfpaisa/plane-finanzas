@@ -9,6 +9,7 @@
   import { ErrorNote, Loading, Modal, SuccessNote } from "./components/ui";
   import ModeToggle from "./components/ui/ModeToggle.svelte";
   import TabBar from "./components/app/TabBar.svelte";
+  import { copyText } from "./lib/copy";
   import { notify } from "./lib/notify.svelte";
   import { logout, session } from "./lib/pb.svelte";
   import { mobileHash } from "./lib/mobile";
@@ -81,6 +82,100 @@
   rewriteRoutes((r) =>
     r.path !== "/m" && inPhoneApp() ? mobileHash(r.path, r.query) : undefined,
   );
+
+  // Copiar un monto, solo los dígitos, listo para pegar en la app del banco
+  // (salvo `<Money copy={false}>`). Con el mouse, un clic. Con el dedo, dejarlo
+  // presionado hasta que el teléfono vibra (el navegador avisa con el evento
+  // del menú); un toque normal sigue abriendo la fila que lo contiene. Todo va
+  // en captura para ganarle a esa fila cuando sí se copia.
+  $effect(() => {
+    // Por si el navegador no avisa (Safari en iPhone): pasado este tiempo, copia igual.
+    const HOLD = 700;
+    let timer = 0;
+    let held: HTMLElement | null = null;
+    let start = { x: 0, y: 0 };
+    let byTouch = false;
+    // Al soltar después de copiar llega un clic: ese no debe abrir la fila.
+    let swallow = false;
+
+    function copy(el: Element) {
+      swallow = true;
+      release();
+      const shown = el.textContent?.trim() ?? "";
+      const digits = shown.replace(/\D/g, "");
+      if (!digits) return;
+      void copyText(digits).then((ok) =>
+        ok ? notify.done(`Se copió ${shown}.`) : notify.fail(new Error("No se pudo copiar el monto. Inténtalo de nuevo.")),
+      );
+    }
+
+    function release() {
+      clearTimeout(timer);
+      held?.removeAttribute("data-holding");
+      held = null;
+    }
+
+    function onDown(e: PointerEvent) {
+      byTouch = e.pointerType !== "mouse";
+      swallow = false;
+      release();
+      if (!byTouch) return;
+      const el = (e.target as Element | null)?.closest?.<HTMLElement>(".money-copy");
+      if (!el) return;
+      held = el;
+      start = { x: e.clientX, y: e.clientY };
+      el.setAttribute("data-holding", "");
+      timer = window.setTimeout(() => copy(el), HOLD);
+    }
+
+    // Si el dedo se mueve, está desplazando la pantalla: no copia.
+    function onMove(e: PointerEvent) {
+      if (held && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) release();
+    }
+
+    function onClick(e: MouseEvent) {
+      if (swallow) {
+        swallow = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (byTouch) return;
+      const el = (e.target as Element | null)?.closest?.(".money-copy");
+      // Si arrastró para seleccionar texto, no se mete.
+      if (!el || !getSelection()?.isCollapsed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      copy(el);
+    }
+
+    // Dejar presionado: el teléfono vibra y el navegador abriría su menú. En
+    // vez del menú, copia.
+    function onMenu(e: Event) {
+      if (!byTouch) return;
+      const el = (e.target as Element | null)?.closest?.(".money-copy");
+      if (!el) return;
+      e.preventDefault();
+      if (!swallow) copy(el);
+    }
+
+    const opts = { capture: true };
+    addEventListener("pointerdown", onDown, opts);
+    addEventListener("pointermove", onMove, opts);
+    addEventListener("pointerup", release, opts);
+    addEventListener("pointercancel", release, opts);
+    addEventListener("click", onClick, opts);
+    addEventListener("contextmenu", onMenu, opts);
+    return () => {
+      release();
+      removeEventListener("pointerdown", onDown, opts);
+      removeEventListener("pointermove", onMove, opts);
+      removeEventListener("pointerup", release, opts);
+      removeEventListener("pointercancel", release, opts);
+      removeEventListener("click", onClick, opts);
+      removeEventListener("contextmenu", onMenu, opts);
+    };
+  });
 
   // Entrar carga todo; salir lo suelta. Solo cuenta el id (refrescar la
   // sesión trae un objeto de usuario nuevo, y eso no es entrar de nuevo), y lo

@@ -153,7 +153,7 @@
                     onclick={(e) => {
                       e.stopPropagation();
                       showEarmarked(a);
-                    }}><Money value={saved} /></button
+                    }}><Money value={saved} copy={false} /></button
                   >
                 {:else}—{/if}
               </td>
