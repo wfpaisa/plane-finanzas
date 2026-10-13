@@ -13,7 +13,6 @@
 
   import Money from "../components/app/Money.svelte";
   import PickBar from "../components/app/PickBar.svelte";
-  import DupeCard from "../components/app/DupeCard.svelte";
   import TransactionList from "../components/app/TransactionList.svelte";
   import CalendarView from "../components/mobile/CalendarView.svelte";
   import MonthlyView from "../components/mobile/MonthlyView.svelte";
@@ -128,7 +127,6 @@
         filter: pb.filter(parts.join(" && "), params),
         sort: "-date,-created",
         batch: 500,
-        expand: "rule,dup_of",
       })
       .then((r) => alive && (items = r))
       .catch(notify.fail)
@@ -482,11 +480,6 @@
     </div>
     {/if}
   </div>
-
-  <!-- Posibles repetidos (ver pb_hooks/lib/dupes.js): la persona decide. -->
-  {#each items.filter((t) => t.dup_of && t.expand?.dup_of) as t (t.id)}
-    <DupeCard tx={t} twin={t.expand!.dup_of!} />
-  {/each}
 
   {#if loading && !items.length}
     <Loading />

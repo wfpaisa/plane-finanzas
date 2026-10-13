@@ -186,8 +186,6 @@ export function mobileHash(path: string, query: URLSearchParams): string | undef
       return with_("cuentas");
     case "/estados":
       return with_("analisis");
-    case "/correos":
-      return with_("correos");
     case "/ahorros":
       return tab("ahorros");
     case "/proyeccion":

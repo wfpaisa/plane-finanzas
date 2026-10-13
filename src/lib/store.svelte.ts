@@ -16,7 +16,6 @@ import type {
   Account,
   Balance,
   Category,
-  GmailConnection,
   Recurring,
   Saving,
   SavingMovement,
@@ -28,9 +27,6 @@ let categories = $state<Category[]>([]);
 let savings = $state<Saving[]>([]);
 let movements = $state<SavingMovement[]>([]);
 let recurring = $state<Recurring[]>([]);
-let gmail = $state<GmailConnection | null>(null);
-/** Cuántos correos esperan una decisión en la bandeja. */
-let inboxPending = $state(0);
 let loaded = $state(false);
 /** Sube con cada cambio en transacciones: las pantallas lo leen para recargar. */
 let txVersion = $state(0);
@@ -133,21 +129,11 @@ async function loadRecurring() {
   recurring = await pb.collection("recurring").getFullList<Recurring>({ sort: "kind,-amount" });
 }
 
-async function loadGmail() {
-  const [list, pending] = await Promise.all([
-    pb.collection("gmail_connections").getFullList<GmailConnection>(),
-    pb.collection("inbox").getList(1, 1, { filter: 'status = "pendiente"', fields: "id", skipTotal: false }),
-  ]);
-  gmail = list[0] ?? null;
-  inboxPending = pending.totalItems;
-}
-
 const loaders = {
   accounts: loadAccounts,
   categories: loadCategories,
   savings: loadSavings,
   recurring: loadRecurring,
-  gmail: loadGmail,
 };
 
 export type Part = keyof typeof loaders;
@@ -181,8 +167,8 @@ function refresh(...parts: Part[]) {
   });
 }
 
-// Varios avisos seguidos (una sincronización de Gmail crea decenas) se juntan
-// en una sola recarga.
+// Varios avisos seguidos (un registro automático crea varios) se juntan en
+// una sola recarga.
 const pending = new Set<Part>();
 let timer: number | undefined;
 function soon(part: Part) {
@@ -216,8 +202,6 @@ async function subscribe() {
     watch("savings", () => soon("savings")),
     watch("saving_movements", () => soon("savings")),
     watch("recurring", () => soon("recurring")),
-    watch("gmail_connections", () => soon("gmail")),
-    watch("inbox", () => soon("gmail")),
   ]);
 }
 
@@ -269,8 +253,6 @@ export async function stop() {
   savings = [];
   movements = [];
   recurring = [];
-  gmail = null;
-  inboxPending = 0;
 }
 
 /** Avisar a las pantallas de que las transacciones cambiaron. */
@@ -310,12 +292,6 @@ export const store = {
   },
   get recurring() {
     return recurring;
-  },
-  get gmail() {
-    return gmail;
-  },
-  get inboxPending() {
-    return inboxPending;
   },
   /** El saldo del servidor más lo que falta por enviar. */
   balance(id: string) {

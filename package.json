@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "chart.js": "^4.5.1",
-    "dompurify": "^3.4.16",
     "fflate": "^0.8.3",
     "pocketbase": "^0.28.1",
     "vanilla-calendar-pro": "^3.4.0"

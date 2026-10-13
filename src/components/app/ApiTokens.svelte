@@ -53,11 +53,11 @@
       `URL base: ${origin}`,
       `Token: ${token}`,
       "Envía el token en cada petición con la cabecera: Authorization: Bearer <token>",
-      `Primero lee la guía completa: GET ${origin}/api/finanzas/guia. Explica las colecciones, las rutas, las reglas y los pasos para cada tarea.`,
+      `Primero lee la guía completa: GET ${origin}/api/finanzas/guia. Explica las colecciones, las rutas y los pasos para cada tarea.`,
       s === "write"
         ? "Antes de crear, cambiar o borrar datos, muéstrame lo que vas a hacer y espera mi confirmación."
         : "El token es de solo lectura: consulta y propón cambios, pero no intentes hacerlos.",
-      "Tarea: revisa los correos pendientes de la bandeja, agrúpalos por remitente y comercio, y propón las reglas para que se registren solos.",
+      "Tarea: ayúdame a registrar mis movimientos y a poner al día los pagos programados de este mes.",
     ].join("\n");
   }
 
@@ -178,10 +178,10 @@
     </div>
     <div class="card-body">
       <ol class="token-steps">
-        <li>Crea un token. Elige <b>Solo consultar</b> si solo quieres que revise y proponga, o <b>Consultar y cambiar</b> si quieres que cree reglas, categorías o movimientos.</li>
+        <li>Crea un token. Elige <b>Solo consultar</b> si solo quieres que revise y proponga, o <b>Consultar y cambiar</b> si quieres que registre movimientos o cree categorías.</li>
         <li>Copia las instrucciones que aparecen al crearlo y pégalas en el asistente. Incluyen el token y la dirección de la guía.</li>
         <li>El asistente lee la guía en <code>{origin}/api/finanzas/guia</code>, donde están los datos que puede usar y los pasos de cada tarea.</li>
-        <li>Revisa lo que propone antes de aceptar cambios. Ningún token puede cambiar tu clave, conectar Gmail, cargar un respaldo ni eliminar todos tus datos.</li>
+        <li>Revisa lo que propone antes de aceptar cambios. Ningún token puede cambiar tu clave, cargar un respaldo ni eliminar todos tus datos.</li>
       </ol>
     </div>
   </div>
@@ -219,7 +219,7 @@
         />
         <span class="field-hint">
           {scope === "write"
-            ? "Podrá crear, editar y eliminar cuentas, categorías, reglas y movimientos."
+            ? "Podrá crear, editar y eliminar cuentas, categorías, movimientos y movimientos programados."
             : "Podrá ver tus datos y proponer cambios, pero no hacerlos."}
         </span>
       </div>

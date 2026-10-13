@@ -20,7 +20,6 @@
   import { txModal } from "./lib/ui.svelte";
   import Accounts from "./routes/Accounts.svelte";
   import Dashboard from "./routes/Dashboard.svelte";
-  import Inbox from "./routes/Inbox.svelte";
   import Login from "./routes/Login.svelte";
   import Mobile from "./routes/Mobile.svelte";
   import Plan from "./routes/Plan.svelte";
@@ -44,7 +43,6 @@
       mobile: true,
     },
     { path: "/cuentas", label: "Cuentas", icon: "wallet-01", mobile: false },
-    { path: "/correos", label: "Correos", icon: "mail-01", mobile: false },
     { path: "/ajustes", label: "Ajustes", icon: "settings-01", mobile: false },
   ];
 
@@ -52,7 +50,6 @@
     "/": Dashboard,
     "/movimientos": Transactions,
     "/cuentas": Accounts,
-    "/correos": Inbox,
     "/ahorros": Savings,
     "/proyeccion": Plan,
     "/ajustes": Settings,
@@ -60,18 +57,10 @@
 
   const Page = $derived(PAGES[route.path] ?? Dashboard);
 
-  // Importar ahora es la pestaña Gmail de Ajustes; los enlaces viejos y la
-  // vuelta de Google (`?gmail=…`) llegan allá.
   $effect(() => {
-    // La bandeja ahora se llama Correos: los enlaces viejos siguen sirviendo.
-    if (route.path === "/bandeja") go("/correos", Object.fromEntries(route.query));
-    // Análisis ahora va dentro del Resumen.
-    if (route.path === "/estados") go("/");
-    if (route.path === "/importar")
-      go("/ajustes", {
-        seccion: "gmail",
-        gmail: route.query.get("gmail") ?? undefined,
-      });
+    // Análisis ahora va dentro del Resumen, y los correos ya no existen: los
+    // enlaces viejos llevan al Resumen.
+    if (["/estados", "/correos", "/bandeja", "/importar"].includes(route.path)) go("/");
   });
 
   // Quien usa la app del teléfono (`#/m`) se queda en ella: un enlace a una
@@ -110,7 +99,7 @@
   const onKey = keys({
     n: () => session.user && route.path !== "/m" && txModal.new(),
     "?": () => session.user && (helpOpen = true),
-    // 1 … 7: las pantallas en el orden del menú.
+    // 1 … 6: las pantallas en el orden del menú.
     ...Object.fromEntries(
       NAV.map((item, i) => [
         String(i + 1),
@@ -154,9 +143,6 @@
             class:active={route.path === item.path}
           >
             <Icon name={item.icon} size={18} />{item.label}
-            {#if item.path === "/correos" && store.inboxPending}<span
-                class="nav-count">{store.inboxPending}</span
-              >{/if}
           </a>
         {/each}
       </nav>
@@ -222,7 +208,7 @@
     <TabBar
       items={[
         ...NAV.filter((n) => n.mobile).map((n) => ({ id: n.path, label: n.label, icon: n.icon, href: `#${n.path}` })),
-        { id: "mas", label: "Más", icon: "menu-01", count: store.inboxPending },
+        { id: "mas", label: "Más", icon: "menu-01" },
       ]}
       active={moreOpen || !NAV.find((n) => n.path === route.path)?.mobile ? "mas" : route.path}
       onPick={() => (moreOpen = !moreOpen)}
@@ -231,8 +217,7 @@
         <div class="more-sheet plane-card">
           {#each NAV.filter((n) => !n.mobile) as item (item.path)}
             <a href="#{item.path}" onclick={() => (moreOpen = false)}
-              ><Icon name={item.icon} size={18} />{item.label}
-              {#if item.path === "/correos" && store.inboxPending}<span class="nav-count">{store.inboxPending}</span>{/if}</a
+              ><Icon name={item.icon} size={18} />{item.label}</a
             >
           {/each}
           <a href="#/m" onclick={() => (moreOpen = false)}
@@ -436,19 +421,6 @@
       color: var(--text-primary);
       font-weight: 600;
     }
-  }
-
-  .nav-count {
-    margin-left: auto;
-    min-width: 1.25rem;
-    padding: 0 0.375rem;
-    border-radius: var(--radius-pill);
-    background: var(--accent);
-    color: var(--accent-text);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
   }
 
   .sidebar-foot {

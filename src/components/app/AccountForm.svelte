@@ -1,6 +1,5 @@
 <!--
-  Crear o editar una cuenta: nombre, tipo, color, icono, dinero inicial y los
-  remitentes de correo con los que la bandeja la reconoce.
+  Crear o editar una cuenta: nombre, tipo, color, icono y dinero inicial.
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -18,19 +17,15 @@
   import ColorDot from "./ColorDot.svelte";
   import MoneyInput from "./MoneyInput.svelte";
   import ColorPicker from "./ColorPicker.svelte";
-  import TagInput from "./TagInput.svelte";
 
   let {
     open,
     account = null,
-    senders: startSenders = [],
     onClose,
     onCreated,
   }: {
     open: boolean;
     account?: Account | null;
-    /** Remitentes de partida para una cuenta nueva (los del correo desde el que se crea). */
-    senders?: string[];
     onClose: () => void;
     /** Al crear una: la cuenta ya guardada, para elegirla donde se pidió. */
     onCreated?: (a: Account) => void;
@@ -42,8 +37,6 @@
   let icon = $state("");
   let color = $state("");
   let initial = $state(0);
-  let senders = $state<string[]>([]);
-  let refs = $state<string[]>([]);
   let exclude = $state(false);
   let archived = $state(false);
   let notes = $state("");
@@ -69,16 +62,11 @@
       icon = account?.icon ?? "";
       color = account?.palette ? colorOf(account.palette) : nextColor(store.accounts.map((a) => a.palette));
       initial = account ? (store.account(account.id)?.initial_balance ?? account.initial_balance ?? 0) : 0;
-      senders = [...(account?.senders ?? startSenders)];
-      refs = [...(account?.refs ?? [])];
       exclude = account?.exclude_from_total ?? false;
       archived = account?.archived ?? false;
       notes = account?.notes ?? "";
     });
   });
-
-  /** Los remitentes que Gmail lee, para elegir con un clic. */
-  const knownSenders = $derived([...(store.gmail?.senders ?? [])].sort());
 
   async function save() {
     if (!name.trim()) return notify.fail(new Error("Ponle un nombre a la cuenta."));
@@ -93,8 +81,6 @@
         icon: icon || accountTypeIcon(type),
         palette: color,
         initial_balance: initial,
-        senders,
-        refs,
         exclude_from_total: exclude,
         archived,
         notes,
@@ -164,20 +150,6 @@
         <MoneyInput bind:value={initial} allowNegative />
       </Field>
     </div>
-
-    <Field
-      label="Remitentes de correo"
-      hint="Los correos de estos remitentes se leen y se asignan a esta cuenta. Basta con una parte del remitente: «nu@» o «nu.com» reconocen a nu@nu.com.co. Pulsa Enter para agregarla. Si varias cuentas coinciden, se propone la primera; una regla puede elegir otra."
-    >
-      <TagInput bind:value={senders} prefix="" placeholder="alertas@banco.com, banco.com…" suggestions={knownSenders} limit={30} />
-    </Field>
-
-    <Field
-      label="Terminaciones y llaves"
-      hint="Cómo nombran los avisos a esta cuenta: los últimos dígitos de la tarjeta o la cuenta (*1234) o una llave (@ana123). Con ellas, un aviso de compra se registra en esta cuenta, y uno que menciona otra de tus cuentas se registra como transferencia entre las dos. Pulsa Enter para agregar cada una."
-    >
-      <TagInput bind:value={refs} prefix="" placeholder="*1234, @ana123…" limit={20} />
-    </Field>
 
     <div>
       <p class="eyebrow">Color</p>

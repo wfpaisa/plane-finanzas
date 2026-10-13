@@ -22,25 +22,24 @@ describe("denied", () => {
   const ok = (scope: string, method: string, path: string) => t.denied(scope, method, path) === "";
 
   test("lectura: consulta colecciones y rutas propias", () => {
-    expect(ok("read", "GET", "/api/collections/inbox/records")).toBe(true);
-    expect(ok("read", "GET", "/api/collections/rules/records/abc")).toBe(true);
+    expect(ok("read", "GET", "/api/collections/transactions/records")).toBe(true);
+    expect(ok("read", "GET", "/api/collections/recurring/records/abc")).toBe(true);
     expect(ok("read", "GET", "/api/finanzas/guia")).toBe(true);
-    expect(ok("read", "POST", "/api/finanzas/inbox/suggest")).toBe(true);
-    expect(ok("read", "POST", "/api/finanzas/rules/check")).toBe(true);
-    expect(ok("read", "GET", "/api/finanzas/gmail/messages")).toBe(true);
+    expect(ok("read", "GET", "/api/finanzas/plan")).toBe(true);
   });
 
   test("lectura: no cambia nada", () => {
     expect(ok("read", "POST", "/api/collections/categories/records")).toBe(false);
     expect(ok("read", "PATCH", "/api/collections/categories/records/abc")).toBe(false);
-    expect(ok("read", "DELETE", "/api/collections/inbox/records/abc")).toBe(false);
-    expect(ok("read", "POST", "/api/finanzas/inbox/rule")).toBe(false);
+    expect(ok("read", "DELETE", "/api/collections/transactions/records/abc")).toBe(false);
+    expect(ok("read", "POST", "/api/finanzas/recurring/mark")).toBe(false);
   });
 
-  test("escritura: crea reglas y edita colecciones", () => {
-    expect(ok("write", "POST", "/api/finanzas/inbox/rule")).toBe(true);
+  test("escritura: registra movimientos y edita colecciones", () => {
+    expect(ok("write", "POST", "/api/collections/transactions/records")).toBe(true);
+    expect(ok("write", "POST", "/api/finanzas/recurring/mark")).toBe(true);
     expect(ok("write", "PATCH", "/api/collections/categories/records/abc")).toBe(true);
-    expect(ok("write", "DELETE", "/api/collections/inbox/records/abc")).toBe(true);
+    expect(ok("write", "DELETE", "/api/collections/transactions/records/abc")).toBe(true);
     expect(ok("write", "GET", "/api/finanzas/backup")).toBe(true);
   });
 
@@ -52,7 +51,8 @@ describe("denied", () => {
       ["POST", "/api/finanzas/tokens"],
       ["POST", "/api/finanzas/clean"],
       ["POST", "/api/finanzas/backup"],
-      ["POST", "/api/finanzas/gmail/connect"],
+      ["GET", "/api/collections/inbox/records"],
+      ["GET", "/api/collections/gmail_connections/records"],
       ["GET", "/api/finanzas/users/lookup"],
       ["GET", "/api/realtime"],
       ["POST", "/api/batch"],

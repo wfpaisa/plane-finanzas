@@ -92,8 +92,6 @@
                 <span class="d-flag bad"><Icon name="alert-02" size={11} />No se pudo guardar</span>
               {:else if t._pending}
                 <span class="d-flag"><Icon name="clock-01" size={11} />Por enviar</span>
-              {:else if t.dup_of}
-                <span class="d-flag warn"><Icon name="copy-01" size={11} />¿Repetido?</span>
               {:else if t.tags?.includes("revisar")}
                 <span class="d-flag warn"><Icon name="alert-02" size={11} />Por revisar</span>
               {/if}

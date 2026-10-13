@@ -11,7 +11,7 @@
 
 <p align="center"><b>Tu dinero, claro y en un solo lugar.</b></p>
 
-Finanzas es una app web para llevar las cuentas de la casa: cuánto entra, cuánto sale, en qué se va y cuánto te queda para gastar este mes. Está pensada para Colombia (pesos colombianos y notificaciones de los bancos de aquí), la puedes instalar en tu propio servidor y la pueden usar varias personas, cada una con sus datos.
+Finanzas es una app web para llevar las cuentas de la casa: cuánto entra, cuánto sale, en qué se va y cuánto te queda para gastar este mes. Está pensada para Colombia (pesos colombianos), la puedes instalar en tu propio servidor y la pueden usar varias personas, cada una con sus datos.
 
 ![Resumen del mes](docs/capturas/resumen.png)
 
@@ -40,16 +40,8 @@ Banco, tarjeta de crédito, efectivo, billeteras digitales, inversiones… Cada 
 
 ![Cuentas](docs/capturas/cuentas.png)
 
-### Que los movimientos lleguen solos
-No tienes que escribir cada compra:
-
-- **Conecta tu Gmail** y la app lee cada 30 minutos los correos de los remitentes que le indiques (tu banco, Nequi, Bold…). Llegan a **Correos**: abres cada correo y decides si crear el movimiento (ya viene llenado), crear una **regla** para que los que se parezcan se creen solos, o descartarlo.
-- **Pega un SMS o un correo** del banco y la app lo convierte en movimientos (antes te muestra una vista previa).
-- **Sube un CSV** exportado de otra app de gastos.
-
-Nunca se duplica nada. Si anotaste un gasto a mano y luego llega el mismo desde el banco, la app te pregunta si es el mismo. Nada se crea a ciegas: sin una regla tuya, el correo espera en Correos.
-
-![Importar](docs/capturas/importar.png)
+### Registrar con un asistente
+Además de anotarlos a mano, puedes pedirle a un asistente (Claude, ChatGPT…) que registre tus movimientos por ti: le cuentas «ayer gasté $45.900 en el mercado con la tarjeta» y lo anota. Se conecta con un token de *Ajustes → Acceso por API* (ver «Y además…»). La app no lee tu correo ni se conecta a tu banco: todo lo que está en ella lo registraste tú o tu asistente.
 
 ### Entender en qué se va tu plata
 Debajo del **Resumen**, en el análisis, comparas ingresos y gastos por semana, mes o año, y ves el reparto por categoría con un presupuesto para cada una.
@@ -66,12 +58,12 @@ En **Proyección** pones tus ingresos fijos (sueldo) y tus gastos fijos (arriend
 
 > **Ingresos − gastos fijos − ahorros = lo que puedes gastar**
 
-Además proyecta los próximos 12 meses, tiene un **simulador** y responde preguntas como "¿para cuándo tendría $10.000.000?". Los fijos que marques se crean solos cada mes. Al marcar un pago como hecho, si ya está registrado (por ejemplo, llegó por Gmail), la app te propone usar ese movimiento en vez de crear otro.
+Además proyecta los próximos 12 meses, tiene un **simulador** y responde preguntas como "¿para cuándo tendría $10.000.000?". Los fijos que marques se crean solos cada mes. Al marcar un pago como hecho, si ya está registrado, la app te propone usar ese movimiento en vez de crear otro.
 
 ![Proyección](docs/capturas/plan-futuro.png)
 
 ### En el celular
-La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Correos, Ahorros, Proyección y Ajustes). En Movimientos:
+La app **se instala en el celular** como una aplicación más (desde el navegador: *Agregar a pantalla de inicio*) y tiene una versión hecha para el teléfono, con las mismas secciones y el mismo aspecto que la del computador: abajo **Resumen, Movimientos, Cuentas, Análisis y Más** (Ahorros, Proyección y Ajustes). En Movimientos:
 
 - **Diario**: tus movimientos día por día, con lo que entró y salió cada día.
 - **Calendario**: el mes completo, con el gasto de cada día a la vista.
@@ -90,13 +82,10 @@ Además **funciona sin internet**: lo que anotes sin señal se guarda en el tel�
 | <img src="docs/capturas/movil-estadisticas.png" alt="Estadísticas" width="200"> | <img src="docs/capturas/movil-cuentas.png" alt="Cuentas" width="200"> | <img src="docs/capturas/movil-anotar.png" alt="Anotar un gasto" width="200"> | <img src="docs/capturas/movil-diario-oscuro.png" alt="Modo oscuro en el celular" width="200"> |
 
 ### Y además…
-- **Reglas automáticas**: "si el movimiento dice *Netflix*, es Entretenimiento". Las categorías también aprenden con palabras clave (por ejemplo `exito, carulla, d1` → Mercado).
-- **Nombres de comercios**: «IKEA ENVIGADO» se registra como «Ikea», con su categoría si quieres. Se nombran desde un correo en Correos o en *Ajustes → Gmail → Comercios*. En la descripción de una regla, `{comercio}` pone ese nombre, y los filtros limpian el de los comercios sin nombre: `{comercio|sin_ciudad|capitalizar}`. También sirven para la cuenta o la llave de otra persona: las transferencias a esa cuenta se registran como «Arriendo». Si el comercio tiene categoría, gana a la de la regla.
-- **Cuentas por terminación y llave**: a cada cuenta le pones cómo la nombran los avisos (*1234, @ana123). Una compra «con tu T.Cred *5678» se registra en esa tarjeta, y «pagaste la tarjeta *5678 desde la cuenta *1234» es una transferencia entre las dos. Los retiros en cajero van a la cuenta de efectivo y los avisos de operaciones rechazadas se descartan solos. Así basta una regla general por banco.
 - **Modo claro y oscuro**, y un estilo sólido (sin degradados) para quien prefiere colores planos.
 - **Respaldo**: exporta todos tus datos a un archivo y vuelve a cargarlos cuando quieras, incluso en otro servidor.
 - **Varios usuarios**: cada persona se registra con su correo y solo ve sus datos. La clave se cambia en *Ajustes → Cuenta y datos*.
-- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas un token (solo consultar, o consultar y cambiar, con vencimiento) y copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, revisar tus correos pendientes y proponerte las reglas. También puede listar tus correos de Gmail tal como están (incluidos la papelera y el spam) y validar las reglas contra ellos sin guardar nada: qué regla gana en cada correo, qué movimiento crearía y qué está mal (cuentas o categorías borradas, remitentes que Gmail no lee, reglas que nunca coinciden o que empatan). También conoce la proyección: qué pagos programados tocan cada mes, cuáles están vencidos y cuáles ya se pagaron, y puede marcarlos. Antes de cambiar algo, el asistente puede simularlo (`dry_run`) y mostrarte qué movimientos cambiarían. Ningún token puede cambiar tu clave, conectar Gmail, cargar un respaldo ni borrar todos tus datos.
+- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas un token (solo consultar, o consultar y cambiar, con vencimiento) y copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, registrar los movimientos que le cuentes. También conoce la proyección: qué pagos programados tocan cada mes, cuáles están vencidos y cuáles ya se pagaron, y puede marcarlos. Antes de marcar un pago, el asistente puede simularlo (`dry_run`) y mostrarte qué cambiaría. Ningún token puede cambiar tu clave, cargar un respaldo ni borrar todos tus datos.
 
 ![Modo oscuro](docs/capturas/resumen-oscuro.png)
 
@@ -112,8 +101,7 @@ Es la forma recomendada. Todo corre en **un solo contenedor**: la base de datos,
 
 - Un servidor o computador con **Linux de 64 bits (x86_64/amd64)** y **Docker** con Docker Compose.
 - Pocos recursos: es un solo programa liviano. El disco crece con tus movimientos y adjuntos.
-- Opcional: un **dominio con HTTPS** (por ejemplo detrás de Nginx Proxy Manager, Caddy o Traefik). Es necesario para instalarla en el celular y para conectar Gmail desde fuera de tu red.
-- Opcional: una **cuenta de Google Cloud** si quieres la lectura automática de Gmail (ver más abajo).
+- Opcional: un **dominio con HTTPS** (por ejemplo detrás de Nginx Proxy Manager, Caddy o Traefik). Es necesario para instalarla en el celular.
 
 ### Paso a paso
 
@@ -133,21 +121,7 @@ Es la forma recomendada. Todo corre en **un solo contenedor**: la base de datos,
    mkdir -p /opt/finanzas/pb_data && cp deploy/docker-compose.yml /opt/finanzas/
    ```
 
-3. **Crea el archivo `/opt/finanzas/.env`** con la dirección donde vas a abrir la app:
-
-   ```ini
-   # La dirección pública de la app (la que escribes en el navegador)
-   APP_URL=https://finanzas.midominio.com
-   WEB_URL=https://finanzas.midominio.com
-
-   # Solo si vas a conectar Gmail
-   GOOGLE_CLIENT_ID=
-   GOOGLE_CLIENT_SECRET=
-   ```
-
-   Si solo la vas a usar en tu red local, pon la IP y el puerto, por ejemplo `http://192.168.1.50:3434`.
-
-4. **Arranca**
+3. **Arranca**
 
    ```bash
    cd /opt/finanzas && docker compose up -d
@@ -155,7 +129,7 @@ Es la forma recomendada. Todo corre en **un solo contenedor**: la base de datos,
 
    La app queda en el puerto **3434**. Ábrela en el navegador, toca **Crear cuenta** y listo.
 
-5. **(Opcional) Crea el administrador** del panel de la base de datos (`/_/`):
+4. **(Opcional) Crea el administrador** del panel de la base de datos (`/_/`):
 
    ```bash
    docker exec plane-finanzas /pb/pocketbase superuser upsert admin@correo.com una-clave-larga --dir /pb/pb_data
@@ -163,7 +137,7 @@ Es la forma recomendada. Todo corre en **un solo contenedor**: la base de datos,
 
 ### Actualizar
 
-Descarga los cambios, vuelve a construir la imagen y reinicia. Tus datos (`pb_data`) y tu `.env` no se tocan.
+Descarga los cambios, vuelve a construir la imagen y reinicia. Tus datos (`pb_data`) no se tocan.
 
 ```bash
 git pull && docker build -t plane-finanzas:latest .
@@ -179,21 +153,6 @@ cd /opt/finanzas && docker compose up -d
 ### Copias de seguridad
 
 Todo lo importante está en la carpeta `/opt/finanzas/pb_data`. Cópiala de vez en cuando. Cada usuario también puede exportar sus datos desde **Ajustes → Cuenta y datos → Exportar**.
-
----
-
-## Conectar Gmail (opcional)
-
-Se hace **una sola vez en el servidor** y sirve para todos los usuarios. Google solo le da permiso de **lectura** a la app.
-
-1. Entra a [Google Cloud Console](https://console.cloud.google.com/), crea un proyecto y activa la **Gmail API**.
-2. En **Pantalla de consentimiento OAuth** elige "Externo" y agrega como *usuarios de prueba* los correos que se van a conectar.
-3. En **Credenciales** crea un **ID de cliente OAuth** de tipo *Aplicación web*, con este URI de redirección:
-   `https://finanzas.midominio.com/api/finanzas/gmail/callback` (tu `APP_URL` + `/api/finanzas/gmail/callback`).
-4. Copia el ID y el secreto en `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del `.env` y reinicia (`docker compose up -d`).
-5. En la app: **Ajustes → Gmail → Conectar Gmail**, y di qué **remitentes** son transaccionales.
-6. En **Cuentas**, ponle a cada cuenta sus **remitentes de correo** para que se proponga la cuenta de cada correo. Si dos cuentas comparten remitente, se propone la primera; una regla puede elegir otra. Agrega también sus **terminaciones y llaves** para que cada tarjeta y cada transferencia entre tus cuentas se reconozcan sin reglas.
-7. Revisa **Correos**: la primera lectura deja todos los correos ahí para que decidas. Con cada regla que crees, los siguientes se hacen solos.
 
 ---
 
@@ -216,7 +175,7 @@ bun install
 bun run dev
 ```
 
-Eso levanta la API en `:8093` y la web en http://localhost:3434 (descarga PocketBase si falta). Para Gmail en local copia `.env.example` a `.env`.
+Eso levanta la API en `:8093` y la web en http://localhost:3434 (descarga PocketBase si falta).
 
 Datos de ejemplo desde un CSV del registro contable (se puede correr varias veces sin duplicar):
 
@@ -231,7 +190,7 @@ bun run seed -- --email yo@correo.com --password "clave-larga" --name "Yo" --fil
 | `bun run dev` | PocketBase + Vite en una sola terminal |
 | `bun run pb` / `bun run web` | Solo la API / solo la web |
 | `bun run pb:admin correo clave` | Crea el administrador del panel `/_/` |
-| `bun run test` | Tests del lector de notificaciones y de los cálculos |
+| `bun run test` | Tests de los cálculos, la proyección y los tokens |
 | `bun run check` | Revisión de tipos (svelte-check) |
 | `bun run build` | Compila la web a `pocketbase/pb_public` (PocketBase la sirve) |
 
@@ -240,10 +199,9 @@ bun run seed -- --email yo@correo.com --password "clave-larga" --name "Yo" --fil
 ```
 pocketbase/
   pb_migrations/   esquema (colecciones + reglas por usuario)
-  pb_hooks/        Gmail, bandeja, reglas, respaldo, tareas automáticas
-    lib/parsers.js lector de notificaciones bancarias (probado en tests/)
+  pb_hooks/        proyección, respaldo, tokens de API, tareas automáticas
 src/
-  routes/          Resumen (con el análisis), Movimientos, Cuentas, Ahorros, Proyección, Importar, Ajustes, vista móvil
+  routes/          Resumen (con el análisis), Movimientos, Cuentas, Ahorros, Proyección, Ajustes, vista móvil
   components/app/  piezas de la app (formularios, tarjetas, listas)
   components/ui/   componentes base
   lib/finance.ts   cálculos: plan, ahorros, simulación, estados

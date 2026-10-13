@@ -250,7 +250,7 @@
     {/if}
     {#if auto}
       <p class="small muted">
-        La aplicación creará este movimiento según la frecuencia y la fecha indicadas. No hará operaciones en tu banco. Desactiva esta opción si el movimiento ya se registra desde Gmail para evitar duplicados.
+        La aplicación creará este movimiento según la frecuencia y la fecha indicadas. No hará operaciones en tu banco.
       </p>
     {/if}
   </div>

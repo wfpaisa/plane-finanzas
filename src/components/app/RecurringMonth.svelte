@@ -6,8 +6,8 @@
 
   El movimiento queda unido al fijo por su marca (`recurringKey`), la misma
   que usa el programador para los automáticos: así no se repiten. Si el pago
-  ya está registrado (llegó por Gmail), se propone usar ese movimiento: queda
-  unido por `recurring_key` y conserva su correo (ver pb_hooks/lib/plan.js). Lo marcado
+  ya está registrado, se propone usar ese movimiento: queda unido por
+  `recurring_key` (ver pb_hooks/lib/plan.js). Lo marcado
   en el mes sale siempre, aunque su fijo ya no toque (pausado, terminado,
   cambiado o borrado).
 
@@ -245,7 +245,6 @@
       description: r.name,
       notes: "",
       tags: recurringTags(r.tags),
-      rule: "",
     };
   }
 
@@ -263,7 +262,7 @@
     formOpen = true;
   }
 
-  // ---- Un pago que ya está registrado (por ejemplo, llegó por Gmail) ----
+  // ---- Un pago que ya está registrado ----
 
   interface Candidate {
     id: string;
@@ -516,7 +515,7 @@
       <li>
         <span class="rm-text">
           <span class="rm-name">{c.description || "Sin descripción"}</span>
-          <span class="rm-sub">{dateShort(c.date)}{#if c.account_name} · {c.account_name}{/if}{#if c.source === "gmail"} · de Gmail{/if}</span>
+          <span class="rm-sub">{dateShort(c.date)}{#if c.account_name} · {c.account_name}{/if}</span>
         </span>
         <span class="rm-amount"><Money value={c.amount} /></span>
         <Button size="sm" loading={picking} onclick={() => useExisting(c)}>Usar este movimiento</Button>

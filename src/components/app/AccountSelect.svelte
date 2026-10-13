@@ -13,15 +13,12 @@
     value = $bindable(""),
     placeholder = "",
     exclude = "",
-    senders = [],
   }: {
     value?: string;
     /** El texto de la opción vacía; sin él, no hay opción vacía. */
     placeholder?: string;
     /** Una cuenta que no se ofrece (el origen de una transferencia). */
     exclude?: string;
-    /** Remitentes con que se propone la cuenta nueva (los del correo). */
-    senders?: string[];
   } = $props();
 
   const NEW = "__nueva__";
@@ -52,7 +49,6 @@
 
 <AccountForm
   open={creating}
-  {senders}
   onClose={() => (creating = false)}
   onCreated={(a: Account) => (value = a.id)}
 />

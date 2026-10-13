@@ -1,15 +1,14 @@
 <!--
   La app del celular (`#/m`). Tiene las mismas secciones que la versión
   completa y en el mismo orden: abajo Resumen, Proyección, Ahorros,
-  Movimientos y Más (Cuentas, Correos, Análisis y Ajustes). En Movimientos el
+  Movimientos y Más (Cuentas, Análisis y Ajustes). En Movimientos el
   mes se ve de cuatro maneras: diario, calendario, mensual (el año mes a mes)
   y total (presupuesto y cuentas). Lo que no tiene una versión propia del
-  teléfono (Resumen, Correos, Ajustes, administrar cuentas) es la misma
+  teléfono (Resumen, Ajustes, administrar cuentas) es la misma
   pantalla de escritorio, dentro de esta app.
 
   Funciona sin internet: lo anotado se guarda en el teléfono y se envía solo
-  al volver la conexión (ver lib/offline.svelte.ts). Y si lo que anotaste a
-  mano llega también desde el banco, pregunta si es el mismo movimiento.
+  al volver la conexión (ver lib/offline.svelte.ts).
 -->
 <script lang="ts">
   import { untrack } from "svelte";
@@ -35,18 +34,16 @@
   import ModeToggle from "../components/ui/ModeToggle.svelte";
   import Accounts from "./Accounts.svelte";
   import Dashboard from "./Dashboard.svelte";
-  import Inbox from "./Inbox.svelte";
   import Settings from "./Settings.svelte";
   import { estilo } from "../lib/estilo.svelte";
   import { monthRange, today, weekStart, ymd } from "../lib/finance";
-  import { dateLong, dateShort, monthLabel } from "../lib/format";
-  import { dupeSide } from "../lib/labels";
+  import { dateLong, monthLabel } from "../lib/format";
   import { emptyFilters, filterCount, filtersFrom, sumOf, type Tab } from "../lib/mobile";
   import { notify } from "../lib/notify.svelte";
   import { cachedList, offline } from "../lib/offline.svelte";
   import { overlay, type OutboxItem, type Pending } from "../lib/outbox";
   import { logout, pb, reauth, session } from "../lib/pb.svelte";
-  import { store, touchTransactions } from "../lib/store.svelte";
+  import { store } from "../lib/store.svelte";
   import { theme } from "../lib/theme.svelte";
   import type { Transaction } from "../lib/types";
   import { closeOnBack, goBack, nextDirection, route } from "../lib/router.svelte";
@@ -62,7 +59,7 @@
     { id: "plan", label: "Proyección", icon: "chart-line-data-01" },
     { id: "ahorros", label: "Ahorros", icon: "piggy-bank" },
     { id: "movimientos", label: "Movimientos", icon: "exchange-01" },
-    { id: "mas", label: "Más", icon: "menu-01", count: store.inboxPending },
+    { id: "mas", label: "Más", icon: "menu-01" },
   ]);
   const VIEWS: { id: View; label: string }[] = [
     { id: "diario", label: "Diario" },
@@ -106,7 +103,6 @@
         pb.collection("transactions").getFullList<Transaction>({
           filter: pb.filter("date >= {:from} && date < {:to}", { from, to }),
           sort: "-date,-created",
-          expand: "dup_of",
           batch: 1000,
         }),
       (list) => alive && (serverTxs = list),
@@ -198,51 +194,6 @@
     };
   }
 
-  // --- Posibles repetidos: lo anotado a mano contra lo del banco --------
-  const dupes = $derived(monthTxs.filter((t) => t.dup_of));
-  let merging = $state("");
-
-  const twinOf = (t: Tx): Transaction | undefined =>
-    t.expand?.dup_of ?? txs.find((x) => x.id === t.dup_of);
-
-  /** El par ordenado: lo que anotó la persona y lo que trajo el banco. */
-  function pairOf(t: Tx) {
-    const twin = twinOf(t);
-    if (!twin) return null;
-    return t.source === "manual" || !t.source
-      ? { mine: t, bank: twin }
-      : { mine: twin, bank: t };
-  }
-
-  async function merge(t: Tx) {
-    if (!offline.online)
-      return notify.fail(new Error("Para unirlos hace falta conexión."));
-    merging = t.id;
-    try {
-      // Si alguno tiene cambios sin enviar, primero esos.
-      await offline.sync();
-      if (offline.items.some((i) => i.id === t.id || i.id === t.dup_of)) {
-        throw new Error(
-          "Aún hay cambios de este movimiento sin enviar. Intenta en un momento.",
-        );
-      }
-      await pb.send("/api/finanzas/tx/merge", {
-        method: "POST",
-        body: { id: t.id },
-      });
-      touchTransactions();
-      notify.done("Listo: quedó uno solo");
-    } catch (err) {
-      notify.fail(err);
-    } finally {
-      merging = "";
-    }
-  }
-
-  function distinct(t: Tx) {
-    void offline.update("transactions", t.id, { dup_of: "" }, t);
-  }
-
   // --- Qué vista abre la app --------------------------------------------
   function leave() {
     try {
@@ -266,18 +217,16 @@
   // Lo de "Más", como en el menú de escritorio.
   const MORE = $derived([
     { href: "#/m?ver=cuentas", label: "Cuentas", icon: "wallet-01", hint: "Saldos, deudas y balance de cada cuenta" },
-    { href: "#/m?ver=correos", label: "Correos", icon: "mail-01", hint: "Avisos del banco por revisar", count: store.inboxPending },
     { href: "#/m?ver=analisis", label: "Análisis", icon: "pie-chart", hint: "En qué gastas y de dónde recibes dinero" },
-    { href: "#/m?ver=ajustes", label: "Ajustes", icon: "settings-01", hint: "Categorías, Gmail y tu cuenta" },
+    { href: "#/m?ver=ajustes", label: "Ajustes", icon: "settings-01", hint: "Categorías, acceso por API y tu cuenta" },
   ]);
 
   // Las subpantallas se abren encima de su pestaña, en la misma ruta
-  // (`#/m?ver=correos`): así el botón de atrás del teléfono vuelve a ella.
+  // (`#/m?ver=ajustes`): así el botón de atrás del teléfono vuelve a ella.
   const SUBS: Record<string, Tab> = {
     buscar: "movimientos",
     cuentas: "mas",
     administrar: "mas",
-    correos: "mas",
     analisis: "mas",
     ajustes: "mas",
   };
@@ -343,12 +292,12 @@
     <StatsView onOpen={(t) => txModal.edit(t)} onBack={closeSub} />
   {:else if sub === "buscar"}
     <SearchScreen bind:filters onBack={closeSub} />
-  {:else if sub === "correos" || sub === "ajustes" || sub === "administrar"}
+  {:else if sub === "ajustes" || sub === "administrar"}
     <TopBar>
       <BackButton label={backLabel} onclick={closeSub} />
     </TopBar>
     <div class="m-page">
-      {#if sub === "correos"}<Inbox />{:else if sub === "ajustes"}<Settings />{:else}<Accounts />{/if}
+      {#if sub === "ajustes"}<Settings />{:else}<Accounts />{/if}
     </div>
   {:else if tab === "resumen"}
     <TopBar brand />
@@ -391,59 +340,6 @@
 
       <SlideIn key={view} order={VIEWS.map((v) => v.id)}>
         {#if view === "diario"}
-          {#each dupes as t (t.id)}
-            {@const pair = pairOf(t)}
-            {#if pair}
-              <section class="card m-dupe" aria-label="Posible movimiento repetido">
-                <div class="m-dupe-head">
-                  <Icon name="copy-01" size={16} />
-                  <strong>¿Es el mismo movimiento?</strong>
-                  <Money value={t.amount} tone={t.type} />
-                </div>
-                <div class="m-dupe-pair">
-                  <div>
-                    <span class="m-label">{dupeSide(pair.mine)}</span>
-                    <span class="m-desc"
-                      >{pair.mine.description ||
-                        store.category(pair.mine.category)?.name ||
-                        "Sin descripción"}</span
-                    >
-                    <span class="m-sub"
-                      >{dateShort(pair.mine.date.slice(0, 10))} · {store.account(
-                        pair.mine.account,
-                      )?.name ?? ""}</span
-                    >
-                  </div>
-                  <div>
-                    <span class="m-label">{dupeSide(pair.bank)}</span>
-                    <span class="m-desc"
-                      >{pair.bank.description || "Sin descripción"}</span
-                    >
-                    <span class="m-sub"
-                      >{dateShort(pair.bank.date.slice(0, 10))} · {store.account(
-                        pair.bank.account,
-                      )?.name ?? ""}</span
-                    >
-                  </div>
-                </div>
-                <div class="m-dupe-foot">
-                  <button type="button" class="btn sm" onclick={() => distinct(t)}
-                    >Son distintos</button
-                  >
-                  <button
-                    type="button"
-                    class="btn sm btn-primary"
-                    disabled={merging === t.id}
-                    onclick={() => merge(t)}
-                  >
-                    <Icon name="git-merge" />{merging === t.id
-                      ? "Uniendo…"
-                      : "Es el mismo: unir"}
-                  </button>
-                </div>
-              </section>
-            {/if}
-          {/each}
           <DayList
             txs={monthTxs}
             onOpen={(t) => txModal.edit(t)}
@@ -500,7 +396,6 @@
                 <span class="m-desc">{item.label}</span>
                 <span class="m-sub">{item.hint}</span>
               </span>
-              {#if item.count}<span class="m-count">{item.count}</span>{/if}
               <Icon name="arrow-right-01" size={14} />
             </a>
           </li>
@@ -791,50 +686,6 @@
     }
   }
 
-  .m-dupe {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-10);
-    margin: 0 var(--sp-12) var(--sp-12);
-    padding: var(--sp-14, 0.875rem) var(--sp-16);
-    border-color: color-mix(in oklch, var(--warning, var(--accent)) 45%, var(--glass-rim));
-  }
-
-  .m-dupe-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-8);
-    font-size: var(--text-sm);
-
-    & :global(.money) {
-      margin-left: auto;
-    }
-  }
-
-  .m-dupe-pair {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-10);
-
-    & > div {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-  }
-
-  .m-dupe-foot {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--sp-8);
-  }
-
-  .m-label {
-    display: block;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-
   .m-note {
     margin: 0;
     font-size: var(--text-sm);
@@ -974,24 +825,6 @@
     background: var(--bg-field);
     box-shadow: var(--pillow);
     color: var(--text-secondary);
-  }
-
-  .m-count {
-    min-width: 1.375rem;
-    margin-left: auto;
-    padding: 0 0.375rem;
-    border-radius: var(--radius-pill);
-    background: var(--accent);
-    color: var(--accent-text);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    line-height: 1.375rem;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-
-    & + :global(i) {
-      margin-left: 0 !important;
-    }
   }
 
   .m-logout {

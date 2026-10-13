@@ -14,7 +14,7 @@ export const SHORTCUTS: { where: string; items: [string, string][] }[] = [
     where: "En cualquier pantalla",
     items: [
       ["N", "Agregar un movimiento"],
-      ["1 … 7", "Ir a Resumen, Proyección, Ahorros, Movimientos, Cuentas, Correos o Ajustes"],
+      ["1 … 6", "Ir a Resumen, Proyección, Ahorros, Movimientos, Cuentas o Ajustes"],
       ["?", "Ver estos atajos"],
       ["Esc", "Cerrar la ventana abierta"],
     ],

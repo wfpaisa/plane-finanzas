@@ -1,10 +1,8 @@
 <!--
-  Ajustes, en cuatro secciones para no bajar por una página larga:
-  - Categorías: icono, color, presupuesto y las palabras clave con que se
-    categoriza lo que llega de Gmail. Gasto e ingreso en la misma lista.
-  - Reglas: "si el movimiento dice X, es tal cosa".
-  - Apariencia: el tinte del fondo de la app.
+  Ajustes, en tres secciones para no bajar por una página larga:
   - Cuenta y datos: el perfil, la clave, lo automático y el respaldo.
+  - Categorías: icono, color, etiquetas y presupuesto. Gasto e ingreso en la
+    misma lista.
   - Acceso por API: los tokens para asistentes y programas.
   La sección va en la URL (`?seccion=`), así se puede enlazar.
 -->
@@ -18,8 +16,7 @@
   import TagInput from "../components/app/TagInput.svelte";
   import TintPicker from "../components/app/TintPicker.svelte";
   import Icon from "../components/Icon.svelte";
-  import Import from "./Import.svelte";
-  import { Button, ConfirmDialog, Field, Input, Modal, Textarea } from "../components/ui";
+  import { Button, ConfirmDialog, Field, Input, Modal } from "../components/ui";
   import Tag, { type Tone } from "../components/ui/Tag.svelte";
   import type { Backup, BackupFiles } from "../lib/backupZip";
   import type { Kind } from "../lib/finance";
@@ -35,17 +32,13 @@
   const SECTIONS = [
     { id: "cuenta", label: "Cuenta y datos", icon: "user-circle" },
     { id: "categorias", label: "Categorías", icon: "tag-01" },
-    { id: "gmail", label: "Gmail", icon: "mail-01" },
     { id: "api", label: "Acceso por API", icon: "key-01" },
   ] as const;
   type Section = (typeof SECTIONS)[number]["id"];
 
   const section = $derived.by<Section>(() => {
     const s = route.query.get("seccion");
-    if (SECTIONS.some((x) => x.id === s)) return s as Section;
-    // Reglas e Importar eran pestañas; ahora van en Gmail.
-    if (s === "reglas" || s === "importar" || route.query.get("regla")) return "gmail";
-    return "cuenta";
+    return SECTIONS.some((x) => x.id === s) ? (s as Section) : "cuenta";
   });
 
   let catKind = $state<Kind>("expense");
@@ -57,7 +50,7 @@
       (c) =>
         c.kind === catKind &&
         (!catTag || c.tags?.includes(catTag)) &&
-        (!q || [c.name, c.keywords, ...(c.tags ?? [])].some((x) => x?.toLowerCase().includes(q))),
+        (!q || [c.name, ...(c.tags ?? [])].some((x) => x?.toLowerCase().includes(q))),
     );
   });
   /** Las etiquetas de las categorías de este tipo, para filtrar la lista. */
@@ -76,7 +69,6 @@
   let cColor = $state("");
   const autoColor = $derived(nextCategoryTint(store.categories.filter((c) => c.id !== editing?.id), cKind));
   const shownColor = $derived(cColor || autoColor);
-  let cKeywords = $state("");
   let cBudget = $state(0);
   let cTags = $state<string[]>([]);
   let busy = $state(false);
@@ -96,7 +88,6 @@
     cKind = c?.kind ?? kind;
     cIcon = c?.icon || "tag-01";
     cColor = c?.color ?? "";
-    cKeywords = c?.keywords ?? "";
     cBudget = c?.budget ?? 0;
     cTags = [...(c?.tags ?? [])];
     open = true;
@@ -112,7 +103,6 @@
         kind: cKind,
         icon: cIcon,
         color: shownColor,
-        keywords: cKeywords,
         budget: cKind === "expense" ? cBudget : 0,
         tags: cTags,
       };
@@ -272,7 +262,7 @@
       <div class="card-head">
         <div>
           <h3 class="card-title">Categorías</h3>
-          <p class="card-sub">Las palabras clave permiten clasificar automáticamente los movimientos importados de Gmail.</p>
+          <p class="card-sub">Agrupan tus ingresos y gastos para ver en qué se va tu dinero y de dónde llega.</p>
         </div>
         <div class="card-head-actions">
           <Button size="sm" variant="secondary" onclick={() => edit(null, catKind)}><Icon name="add-01" />Nueva categoría</Button>
@@ -304,7 +294,6 @@
                 <span class="cat-ico {c.color || 'tint-10'}"><Icon name={c.icon || "tag-01"} size={16} /></span>
                 <span class="cat-main">
                   <span class="cat-name">{c.name}</span>
-                  <span class="cat-keys">{c.keywords || "Sin palabras clave"}</span>
                   {#if c.tags?.length}
                     <span class="cat-tags">
                       {#each c.tags as t (t)}<Tag tone={tintFor(t) as Tone}>#{t}</Tag>{/each}
@@ -320,8 +309,6 @@
         {/if}
       </div>
     </div>
-  {:else if section === "gmail"}
-    <Import />
   {:else if section === "api"}
     <ApiTokens />
   {:else}
@@ -386,7 +373,7 @@
         <div class="card-head">
           <div>
             <h3 class="card-title">Datos</h3>
-            <p class="card-sub">Descarga un zip con todo: cuentas, categorías, movimientos, reglas, ahorros y los adjuntos (facturas, fotos). También puedes importar respaldos .json de antes.</p>
+            <p class="card-sub">Descarga un zip con todo: cuentas, categorías, movimientos, movimientos programados, ahorros y los adjuntos (facturas, fotos). También puedes importar respaldos .json de antes.</p>
           </div>
         </div>
         <div class="card-body data-actions">
@@ -437,9 +424,6 @@
       <TagInput bind:value={cTags} suggestions={categoryTags()} />
       <p class="small muted cat-tag-hint">Los movimientos de esta categoría las heredan: sirven para filtrar y sumar en Movimientos, Resumen y el móvil. Con <b>#fijo</b>, el móvil la cuenta en los gastos fijos.</p>
     </div>
-    <Field label="Palabras clave" hint="Escribe términos separados por comas, como exito, carulla, d1. No importa si usas mayúsculas o tildes.">
-      <Textarea bind:value={cKeywords} rows={3} />
-    </Field>
     {#if cKind === "expense"}
       <Field label="Límite de gasto mensual (opcional)" hint="La aplicación te mostrará cuánto te queda antes de llegar a este valor."><MoneyInput bind:value={cBudget} /></Field>
     {/if}
@@ -477,7 +461,7 @@
   open={confirmClean}
   onClose={() => (confirmClean = false)}
   title="Eliminar todos los datos"
-  message="Se eliminarán tus cuentas, movimientos, ingresos y gastos recurrentes, ahorros y categorías. Gmail seguirá conectado y volverá a leer los correos desde el principio. Esta acción no se puede deshacer."
+  message="Se eliminarán tus cuentas, movimientos, movimientos programados y ahorros. Tus categorías volverán a las iniciales. Se conservarán tu perfil, tu clave y tus tokens de acceso. Esta acción no se puede deshacer."
   confirmText="ELIMINAR"
   confirmHint="Escribe ELIMINAR para confirmar"
   busy={cleaning}
@@ -579,15 +563,6 @@
     font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text-primary);
-  }
-
-
-  .cat-keys {
-    overflow: hidden;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   .cat-preview {

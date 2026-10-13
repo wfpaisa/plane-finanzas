@@ -1,11 +1,9 @@
 /**
- * Lo importado que la persona borró no vuelve.
+ * Lo que creó el registro automático y la persona borró no vuelve.
  *
- * Cada movimiento que trae el banco o crea un fijo lleva un `external_id`
- * (el id del correo, un hash del texto, `csv:…`, `rec:…`) y eso impide crearlo
- * dos veces. Pero al borrarlo el id se iba con él, y una lectura de Gmail
- * desde cero (conexión nueva, respaldo cargado en otro servidor) o el
- * programador del día siguiente lo volvían a crear. Al borrarlo queda aquí.
+ * Cada movimiento que crea un programado lleva un `external_id` (`rec:…`) y
+ * eso impide crearlo dos veces. Pero al borrarlo el id se iba con él, y el
+ * programador del día siguiente lo volvía a crear. Al borrarlo queda aquí.
  */
 
 /** Si ese `external_id` ya existe o se borró a propósito. */

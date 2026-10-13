@@ -9,7 +9,7 @@
  * Un mes queda pagado cuando un movimiento lleva la marca del programado en
  * ese mes (`recurringKey`): en `external_id` si lo creó la app (al marcarlo o
  * con el registro automático), o en `recurring_key` si es un movimiento que
- * ya existía (uno que llegó por Gmail) y se unió al programado.
+ * ya existía (uno que la persona registró antes) y se unió al programado.
  */
 
 function pad(n) {
@@ -443,7 +443,7 @@ function findByKey(app, userId, key) {
  * `body`: `recurring`, `ym` y una de estas:
  * - nada más: crea el movimiento con los datos del programado (se pueden
  *   cambiar `amount`, `date`, `account` y `description`);
- * - `transaction`: une un movimiento que ya existe (uno que llegó por Gmail);
+ * - `transaction`: une un movimiento que ya existe (uno registrado antes);
  * - `unlink: true`: lo desmarca. Si el movimiento lo creó la app, lo borra; si
  *   se había unido, lo conserva y solo le quita la marca.
  * @returns {{ action: string, key: string, transaction: string }}

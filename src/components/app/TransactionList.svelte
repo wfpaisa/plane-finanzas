@@ -11,7 +11,6 @@
 <script lang="ts">
   import { dateLong } from "../../lib/format";
   import { colorOf, tintFor } from "../../lib/palettes";
-  import { ruleLabel } from "../../lib/rules";
   import { store } from "../../lib/store.svelte";
   import { tagsOf } from "../../lib/tags";
   import type { SvelteSet } from "svelte/reactivity";
@@ -179,11 +178,6 @@
     return store.category(t.category)?.color || "tint-10";
   }
 
-  /** La regla que lo creó o ajustó: su nombre, o sus textos. */
-  function ruleOf(t: Transaction): string {
-    return t.rule ? ruleLabel(t.expand?.rule) : "";
-  }
-
   function titleOf(t: Transaction) {
     if (t.description) return t.description;
     if (t.type === "transfer") return "Transferencia";
@@ -213,9 +207,6 @@
           {@render head("description", "Descripción")}
           {@render head("category", "Categoría")}
           {#if showAccount}{@render head("account", "Cuenta")}{/if}
-          <th class="tx-mail-col" aria-label="Origen"
-            ><Icon name="mail-01" size={14} /></th
-          >
           {@render head("amount", "Monto", "num")}
         </tr>
       </thead>
@@ -280,21 +271,6 @@
                 {/if}
               </td>
             {/if}
-            <td class="tx-mail-col">
-              {#if t.dup_of}<span
-                  class="tx-dup-ico"
-                  data-tip="Posible repetido: en Movimientos puedes unirlo o dejar los dos"
-                  ><Icon name="copy-01" size={14} /></span
-                >{/if}
-              {#if t.rule}<span
-                  class="tx-rule-ico"
-                  data-tip="Regla «{ruleOf(t)}»"
-                  ><Icon name="flash" size={14} /></span
-                >{/if}
-              {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
-                  ><Icon name="mail-01" size={14} /></span
-                >{/if}
-            </td>
             <td class="num"><Money value={t.amount} tone={t.type} /></td>
           </tr>
         {/each}
@@ -303,7 +279,7 @@
       <tfoot>
         <tr>
           <td>Total</td>
-          <td colspan={showAccount ? 4 : 3}
+          <td colspan={showAccount ? 3 : 2}
             >{items.length}
             {items.length === 1 ? "movimiento" : "movimientos"}</td
           >
@@ -359,22 +335,12 @@
                     {#if t.attachments?.length}<Icon
                         name="attachment-01"
                       />{/if}
-                    {#if t.source === "gmail"}<Icon name="mail-01" />{/if}
                   </span>
                   <!-- Ancho: la nota va debajo del título; lo demás, en columnas. -->
                   {#if t.notes}<span class="tx-notes">{t.notes}</span>{/if}
-                  {#if tagsOf(t).length || t.rule}
+                  {#if tagsOf(t).length}
                     <!-- Las propias y, sin fondo, las que hereda de su categoría. -->
                     <span class="tx-tags">
-                      {#if t.rule}
-                        <span
-                          class="tx-rule"
-                          data-tip="Categoría, etiquetas o descripción puestas por esta regla"
-                          ><Icon name="flash" size={11} />Regla: {ruleOf(
-                            t,
-                          )}</span
-                        >
-                      {/if}
                       {#each tagsOf(t) as tag (tag)}
                         {@const own = t.tags?.includes(tag)}
                         <Tag
@@ -421,19 +387,6 @@
                       name="attachment-01"
                       size={14}
                     />{/if}
-                  {#if t.dup_of}<span
-                      class="tx-dup-ico"
-                      data-tip="Posible repetido: en Movimientos puedes unirlo o dejar los dos"
-                      ><Icon name="copy-01" size={14} /></span
-                    >{/if}
-                  {#if t.rule}<span
-                      class="tx-rule-ico"
-                      data-tip="Regla «{ruleOf(t)}»"
-                      ><Icon name="flash" size={14} /></span
-                    >{/if}
-                  {#if t.source === "gmail"}<span data-tip="Importado de Gmail"
-                      ><Icon name="mail-01" size={14} /></span
-                    >{/if}
                 </span>
                 <Money value={t.amount} tone={t.type} />
               </button>
@@ -570,16 +523,6 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       cursor: pointer;
-    }
-  }
-
-  .tx-mail-col {
-    width: 1%;
-    color: var(--text-muted);
-    text-align: center;
-
-    & span {
-      display: inline-flex;
     }
   }
 
@@ -779,34 +722,6 @@
           auto
         );
     }
-  }
-
-  /* Lo que puso una regla: se distingue de las etiquetas por el acento y la varita. */
-  .tx-rule {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    max-width: 100%;
-    overflow: hidden;
-    padding: 0 var(--sp-6);
-    border: var(--border-width) dashed
-      color-mix(in oklab, var(--accent) 55%, transparent);
-    border-radius: var(--radius-pill);
-    color: var(--accent);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .tx-dup-ico {
-    display: inline-flex;
-    color: var(--warning, var(--accent));
-  }
-
-  .tx-rule-ico {
-    display: inline-flex;
-    color: var(--accent);
   }
 
   .tx-tags {

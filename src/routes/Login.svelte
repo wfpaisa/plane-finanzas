@@ -32,7 +32,7 @@
   <div class="login-art">
     <div class="login-brand"><Logo size={26} /> Finanzas</div>
     <h1>Entiende y organiza tu dinero.</h1>
-    <p>Consulta cuánto tienes, cuánto gastas y cómo avanzan tus ahorros. Si conectas Gmail, la aplicación puede registrar automáticamente las notificaciones del banco.</p>
+    <p>Consulta cuánto tienes, cuánto gastas y cómo avanzan tus ahorros. Registra tus movimientos en segundos, desde el computador o el celular.</p>
     <div class="login-bubbles" aria-hidden="true">
       <span></span>
       <span></span>

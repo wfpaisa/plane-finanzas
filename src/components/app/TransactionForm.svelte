@@ -11,15 +11,12 @@
   import { notify } from "../../lib/notify.svelte";
   import { offline } from "../../lib/offline.svelte";
   import { pb, session } from "../../lib/pb.svelte";
-  import { go } from "../../lib/router.svelte";
   import { store, touchTransactions } from "../../lib/store.svelte";
-  import { ruleLabel } from "../../lib/rules";
-  import type { Rule, Transaction, TxDraft } from "../../lib/types";
+  import type { Transaction, TxDraft } from "../../lib/types";
   import Icon from "../Icon.svelte";
   import { Button, ConfirmDialog, DateInput, Field, Input, Modal, Select, Textarea } from "../ui";
   import AccountSelect from "./AccountSelect.svelte";
   import MoneyInput from "./MoneyInput.svelte";
-  import RuleForm from "./RuleForm.svelte";
   import Segmented from "./Segmented.svelte";
   import TagInput from "./TagInput.svelte";
 
@@ -28,7 +25,6 @@
     tx = null,
     preset,
     draft,
-    origin,
     link,
     title: titleProp,
     onClose,
@@ -39,10 +35,8 @@
     tx?: Transaction | null;
     /** Valores de partida para una nueva (la cuenta desde la que se abre, por ejemplo). */
     preset?: Partial<Pick<Transaction, "type" | "account" | "category">>;
-    /** Todo ya llenado: lo que se leyó de un correo de la bandeja. */
+    /** Todo ya llenado: por ejemplo, el pago de un programado. */
     draft?: TxDraft | null;
-    /** El correo del que sale: queda guardado con el movimiento tal como llegó. */
-    origin?: { external_id: string; raw: string; source: "gmail" | "texto"; sender?: string } | null;
     /** El fijo que se paga: queda unido a él por su marca (ver `recurringKey`). */
     link?: { external_id: string } | null;
     /** Un título propio, en vez del de siempre. */
@@ -65,18 +59,6 @@
   let removed = $state<string[]>([]);
   let busy = $state(false);
   let confirmDelete = $state(false);
-  let showRaw = $state(false);
-  /** La regla que lo creó, abierta encima; al cerrarla se vuelve aquí. */
-  let rule = $state<Rule | null>(null);
-
-  async function openRule() {
-    if (!tx?.rule) return;
-    try {
-      rule = tx.expand?.rule ?? (await pb.collection("rules").getOne<Rule>(tx.rule));
-    } catch (err) {
-      notify.fail(err);
-    }
-  }
 
   // Se llena al abrir o al cambiar de tx, y solo entonces: lo demás que
   // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
@@ -96,8 +78,6 @@
       tags = [...(tx?.tags ?? draft?.tags ?? [])];
       files = [];
       removed = [];
-      rule = null;
-      showRaw = false;
     });
   });
 
@@ -138,12 +118,8 @@
         notes,
         tags,
       };
-      // Lo que viene de un correo guarda de dónde salió; así la bandeja lo da por hecho.
-      const born = origin
-        ? { source: origin.source, external_id: origin.external_id, raw: origin.raw.slice(0, 4000) }
-        : link
-          ? { source: "recurrente", external_id: link.external_id }
-          : { source: "manual" };
+      // El pago de un programado lleva su marca: así el mes queda pagado.
+      const born = link ? { source: "recurrente", external_id: link.external_id } : { source: "manual" };
       if (files.length || removed.length) {
         // Los adjuntos van directo al servidor: necesitan conexión.
         if (files.length) data["attachments+"] = files;
@@ -181,13 +157,10 @@
     }
   }
 
-  const title = $derived(titleProp ?? (tx ? "Editar movimiento" : origin ? "Movimiento del correo" : "Nuevo movimiento"));
-
-  /** Si vino de un correo de la bandeja: ahí se ve el correo y su regla. */
-  const fromMail = (t: Transaction) => !!t.external_id && (t.source === "gmail" || t.source === "texto");
+  const title = $derived(titleProp ?? (tx ? "Editar movimiento" : "Nuevo movimiento"));
 </script>
 
-<Modal open={open && !rule} {onClose} {title}>
+<Modal {open} {onClose} {title}>
   <div class="tx-form">
     <Segmented bind:value={type} options={TX_TYPES} full label="Tipo" />
 
@@ -199,7 +172,7 @@
         <DateInput bind:value={date} />
       </Field>
       <Field label={type === "transfer" ? "Desde" : "Cuenta"}>
-        <AccountSelect bind:value={account} senders={origin?.sender ? [origin.sender] : []} />
+        <AccountSelect bind:value={account} />
       </Field>
       {#if type === "transfer"}
         <Field label="Hacia">
@@ -274,38 +247,14 @@
       </label>
     </div>
 
-    {#if origin && !tx}
-      <div class="tx-origin">
-        <span>Origen: <b>{SOURCE_LABEL[origin.source]}</b></span>
-        <button type="button" class="link" onclick={() => (showRaw = !showRaw)}>{showRaw ? "Ocultar" : "Ver"} texto original</button>
-      </div>
-      {#if showRaw}<pre class="tx-raw">{origin.raw}</pre>{/if}
-    {:else if tx && ((tx.source && tx.source !== "manual") || tx.rule)}
-      <div class="tx-origin">
-        <span>
-          {#if tx.source && tx.source !== "manual"}Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b>{/if}
-          {#if tx.rule}
-            <button type="button" class="tx-origin-rule" data-tip="Ver la regla" onclick={openRule}>
-              <Icon name="flash" size={12} />Creado con la regla <b>«{ruleLabel(tx.expand?.rule)}»</b>
-            </button>
-          {/if}
-        </span>
-        {#if tx.raw}
-          <button type="button" class="link" onclick={() => (showRaw = !showRaw)}>
-            {showRaw ? "Ocultar" : "Ver"} texto original
-          </button>
-        {/if}
-      </div>
-      {#if showRaw}<pre class="tx-raw">{tx.raw}</pre>{/if}
+    {#if tx?.source && tx.source !== "manual"}
+      <p class="tx-origin">Origen: <b>{SOURCE_LABEL[tx.source] ?? tx.source}</b></p>
     {/if}
   </div>
 
   {#snippet footer()}
     {#if tx}
-      <!--
-        Borrar y Crear regla van en icono, con su globo de ayuda: con el
-        texto, los cuatro botones no caben en la fila y se montaban.
-      -->
+      <!-- Borrar va en icono, con su globo de ayuda, apartado de Guardar. -->
       <button
         type="button"
         class="btn-icon foot-icon foot-danger"
@@ -315,51 +264,12 @@
       >
         <Icon name="delete-02" size={18} />
       </button>
-      {#if fromMail(tx)}
-        <button
-          type="button"
-          class="btn-icon foot-icon"
-          aria-label="Ver el correo"
-          data-tip="Ver correo y regla"
-          onclick={() => {
-            onClose();
-            go("/correos", { correo: tx.external_id });
-          }}
-        >
-          <Icon name="mail-open-01" size={18} />
-        </button>
-      {:else if tx.description}
-        <button
-          type="button"
-          class="btn-icon foot-icon"
-          aria-label="Crear regla"
-          data-tip="Crear regla para este texto"
-          onclick={() => {
-            onClose();
-            go("/ajustes", { regla: tx.description });
-          }}
-        >
-          <Icon name="flash" size={18} />
-        </button>
-      {/if}
       <span class="flex-1 foot-break"></span>
     {/if}
     <Button onclick={onClose}>Cancelar</Button>
     <Button variant="secondary" loading={busy} onclick={save}>Guardar</Button>
   {/snippet}
 </Modal>
-
-<!-- Si la regla cambia, puede rehacer este movimiento: se cierra todo. -->
-<RuleForm
-  open={open && !!rule}
-  {rule}
-  onClose={() => (rule = null)}
-  onSaved={() => {
-    rule = null;
-    onSaved?.();
-    onClose();
-  }}
-/>
 
 <ConfirmDialog
   open={confirmDelete}
@@ -387,8 +297,8 @@
     color: var(--danger);
   }
 
-  /* En el teléfono no caben los cuatro: Cancelar y Guardar arriba,
-     repartiéndose el ancho, y los iconos en la fila de abajo. */
+  /* En el teléfono: Cancelar y Guardar arriba, repartiéndose el ancho, y el
+     icono en la fila de abajo. */
   @media (max-width: 30rem) {
     .foot-break {
       display: none;
@@ -451,39 +361,9 @@
   }
 
   .tx-origin {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-4) var(--sp-12);
-    justify-content: space-between;
+    margin: 0;
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
 
-  .tx-origin-rule {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-inline-start: var(--sp-8);
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
-
-    &:hover b {
-      text-decoration: underline;
-      text-underline-offset: 0.15em;
-    }
-  }
-
-  .tx-raw {
-    margin: 0;
-    padding: var(--sp-10);
-    border-radius: var(--radius-sm);
-    background: var(--bg-field);
-    font-size: var(--text-xs);
-    white-space: pre-wrap;
-    color: var(--text-secondary);
-  }
 </style>
