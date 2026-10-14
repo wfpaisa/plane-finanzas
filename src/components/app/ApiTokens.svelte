@@ -1,47 +1,33 @@
 <!--
-  Tokens de acceso: para que un asistente (Claude, ChatGPT…) o un programa
-  use la cuenta por la API sin la clave. El servidor genera el token y guarda
-  solo su hash, así que se muestra una única vez, al crearlo, junto con las
-  instrucciones listas para pegarle al asistente. Ver
-  pocketbase/pb_hooks/lib/tokens.js.
+  El token de acceso: para que un asistente (Claude, ChatGPT…) o un programa
+  use la cuenta por la API sin la clave. Cada persona tiene uno solo, que no
+  vence y se puede volver a ver aquí, junto con las instrucciones listas para
+  pegarle al asistente. Ver pocketbase/pb_hooks/lib/tokens.js.
 -->
 <script lang="ts">
-  import Segmented from "./Segmented.svelte";
   import Icon from "../Icon.svelte";
-  import { Button, ConfirmDialog, Field, Input, Modal, Select, Textarea } from "../ui";
-  import Tag from "../ui/Tag.svelte";
+  import { Button, ConfirmDialog, Field, Input, Textarea, WarnNote } from "../ui";
+  import { copyText } from "../../lib/copy";
   import { notify } from "../../lib/notify.svelte";
   import { pb } from "../../lib/pb.svelte";
 
   type Scope = "read" | "write";
-  type Token = { id: string; name: string; prefix: string; scope: Scope; expires: string; last_used: string; created: string };
-
-  const EXPIRY = [
-    { days: 7, label: "En 7 días" },
-    { days: 30, label: "En 30 días" },
-    { days: 90, label: "En 90 días" },
-    { days: 365, label: "En 1 año" },
-    { days: 0, label: "Nunca" },
-  ];
+  /** `token` vacío: es de antes y solo quedó su hash; `count` > 1: quedan varios de antes. */
+  type Mine = { token: string | null; scope?: Scope; last_used?: string; created?: string; count?: number };
 
   const origin = window.location.origin;
+  const PATH = "/api/finanzas/tokens";
 
-  let tokens = $state<Token[]>([]);
-  let loading = $state(true);
-
-  let open = $state(false);
-  let name = $state("");
-  let scope = $state<Scope>("read");
-  let days = $state("30");
+  let mine = $state<Mine | null>(null);
+  let scope = $state<Scope>("write");
+  let shown = $state(false);
   let busy = $state(false);
-  /** El token recién creado: solo se ve hasta cerrar la ventana. */
-  let created = $state<{ name: string; token: string; scope: Scope } | null>(null);
+  let confirm = $state<"renew" | "remove" | null>(null);
 
-  let removing = $state<Token | null>(null);
-  let deleting = $state(false);
-
-  const now = () => new Date().toISOString().replace("T", " ");
-  const expired = (t: Token) => !!t.expires && t.expires < now();
+  /** Tiene un token que se puede mostrar. */
+  const ready = $derived(!!mine?.token && mine.count === 1);
+  /** Tiene tokens de antes, que funcionan pero no se pueden mostrar. */
+  const legacy = $derived(!!mine && mine.token !== null && !ready);
 
   function day(s: string) {
     return new Date(s.replace(" ", "T")).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
@@ -61,39 +47,48 @@
     ].join("\n");
   }
 
-  async function load() {
-    try {
-      tokens = await pb.collection("api_tokens").getFullList<Token>({ sort: "-created" });
-    } catch (err) {
-      notify.fail(err);
-    } finally {
-      loading = false;
-    }
+  function apply(r: Mine) {
+    mine = r;
+    if (r.scope) scope = r.scope;
   }
 
   $effect(() => {
-    void load();
+    pb.send<Mine>(PATH, {}).then(apply, notify.fail);
   });
 
-  function startCreate() {
-    name = "";
-    scope = "read";
-    days = "30";
-    created = null;
-    open = true;
+  /** Crea el token (o uno nuevo con `renew`) o guarda el permiso. Devuelve si salió bien. */
+  async function save(renew: boolean) {
+    busy = true;
+    const first = mine?.token === null;
+    try {
+      apply(await pb.send<Mine>(PATH, { method: "POST", body: { scope, renew } }));
+      confirm = null;
+      if (renew) {
+        shown = false;
+        notify.done(first ? "Token creado. Copia las instrucciones y pégalas en tu asistente." : "Se creó un token nuevo. El anterior ya no funciona.");
+      }
+      return true;
+    } catch (err) {
+      notify.fail(err);
+      if (mine?.scope) scope = mine.scope;
+      return false;
+    } finally {
+      busy = false;
+    }
   }
 
-  async function create(e: SubmitEvent) {
-    e.preventDefault();
-    if (!name.trim()) return notify.fail(new Error("Escribe un nombre para reconocer el token, como «Claude en mi computador»."));
+  /** Con un token que ya se ve, cambiar el permiso lo guarda de una vez. */
+  async function changeScope() {
+    if (!ready || scope === mine?.scope) return;
+    if (await save(false)) notify.done(scope === "write" ? "El token ahora puede consultar y cambiar." : "El token ahora solo puede consultar.");
+  }
+
+  async function remove() {
     busy = true;
     try {
-      const r = await pb.send<{ token: string; name: string; scope: Scope }>("/api/finanzas/tokens", {
-        method: "POST",
-        body: { name: name.trim(), scope, days: +days },
-      });
-      created = { name: r.name, token: r.token, scope: r.scope };
-      await load();
+      apply(await pb.send<Mine>(PATH, { method: "DELETE" }));
+      confirm = null;
+      notify.done("Token eliminado.");
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -102,27 +97,8 @@
   }
 
   async function copy(text: string, what: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      notify.done(`${what} copiado.`);
-    } catch {
-      notify.fail(new Error("No se pudo copiar. Selecciona el texto y cópialo a mano."));
-    }
-  }
-
-  async function remove() {
-    if (!removing) return;
-    deleting = true;
-    try {
-      await pb.collection("api_tokens").delete(removing.id);
-      removing = null;
-      await load();
-      notify.done("Token eliminado.");
-    } catch (err) {
-      notify.fail(err);
-    } finally {
-      deleting = false;
-    }
+    if (await copyText(text)) notify.done(`${what} copiado.`);
+    else notify.fail(new Error("No se pudo copiar. Selecciona el texto y cópialo a mano."));
   }
 </script>
 
@@ -130,202 +106,107 @@
   <div class="card">
     <div class="card-head">
       <div>
-        <h3 class="card-title">Tokens de acceso</h3>
+        <h3 class="card-title">Token de acceso</h3>
         <p class="card-sub">
-          Un token permite que un asistente como Claude o ChatGPT, o un programa tuyo, consulte y configure tu cuenta sin conocer tu clave. Elimínalo cuando ya no lo uses.
+          El token permite que un asistente como Claude o ChatGPT, o un programa tuyo, consulte y configure tu cuenta sin conocer tu clave. No puede cambiar tu clave, cargar un respaldo ni eliminar todos tus datos. No vence: elimínalo cuando ya no lo uses.
         </p>
       </div>
-      <div class="card-head-actions">
-        <Button size="sm" variant="secondary" onclick={startCreate}><Icon name="add-01" />Crear token</Button>
-      </div>
     </div>
-    <div class="card-body">
-      {#if loading}
-        <p class="empty-card">Cargando tokens…</p>
-      {:else if tokens.length}
-        <ul class="token-list">
-          {#each tokens as t (t.id)}
-            <li class="token-row" class:token-off={expired(t)}>
-              <span class="token-ico"><Icon name="key-01" size={16} /></span>
-              <span class="token-main">
-                <span class="token-name">
-                  {t.name}
-                  <Tag tone={t.scope === "write" ? "tag-warning" : "tint-1"}>{t.scope === "write" ? "Consultar y cambiar" : "Solo consultar"}</Tag>
-                  {#if expired(t)}<Tag tone="off">Vencido</Tag>{/if}
-                </span>
-                <span class="token-meta">
-                  <code>{t.prefix}…</code> · Creado el {day(t.created)} ·
-                  {t.last_used ? `Último uso: ${day(t.last_used)}` : "Sin usar"} ·
-                  {t.expires ? `${expired(t) ? "Venció" : "Vence"} el ${day(t.expires)}` : "No vence"}
-                </span>
-              </span>
-              <Button size="sm" variant="ghost" class="btn-danger" onclick={() => (removing = t)}><Icon name="delete-02" />Eliminar</Button>
-            </li>
-          {/each}
-        </ul>
+    <div class="card-body stack">
+      {#if !mine}
+        <p class="empty-card">Cargando el token…</p>
       {:else}
-        <p class="empty-card">Aún no tienes tokens. Crea uno para que un asistente o un programa pueda usar tu cuenta.</p>
-      {/if}
-    </div>
-  </div>
+        {#if legacy}
+          <WarnNote message="Tu token actual se creó antes y no se puede mostrar. Sigue funcionando. Para verlo, crea uno nuevo: el anterior dejará de funcionar." />
+        {/if}
 
-  <div class="card">
-    <div class="card-head">
-      <div>
-        <h3 class="card-title">Cómo usarlo con un asistente</h3>
-        <p class="card-sub">El asistente trabaja solo con la API: no necesita el código de la aplicación.</p>
-      </div>
-    </div>
-    <div class="card-body">
-      <ol class="token-steps">
-        <li>Crea un token. Elige <b>Solo consultar</b> si solo quieres que revise y proponga, o <b>Consultar y cambiar</b> si quieres que registre movimientos o cree categorías.</li>
-        <li>Copia las instrucciones que aparecen al crearlo y pégalas en el asistente. Incluyen el token y la dirección de la guía.</li>
-        <li>El asistente lee la guía en <code>{origin}/api/finanzas/guia</code>, donde están los datos que puede usar y los pasos de cada tarea.</li>
-        <li>Revisa lo que propone antes de aceptar cambios. Ningún token puede cambiar tu clave, cargar un respaldo ni eliminar todos tus datos.</li>
-      </ol>
+        <!-- Consultar va siempre: sin él el token no sirve. Cambiar se quita para dejarlo de solo lectura. -->
+        <fieldset class="token-perms">
+          <legend class="field-label">Permisos</legend>
+          <label class="token-perm">
+            <input type="checkbox" checked disabled />
+            <span>
+              <b>Consultar</b>
+              <small>Ver tus cuentas, movimientos, categorías y movimientos programados. Siempre incluido.</small>
+            </span>
+          </label>
+          <label class="token-perm">
+            <input
+              type="checkbox"
+              checked={scope === "write"}
+              disabled={busy}
+              onchange={(e) => {
+                scope = e.currentTarget.checked ? "write" : "read";
+                void changeScope();
+              }}
+            />
+            <span>
+              <b>Cambiar</b>
+              <small>Crear, editar y eliminar cuentas, categorías, movimientos y movimientos programados. Sin este permiso, solo podrá proponerte cambios.</small>
+            </span>
+          </label>
+        </fieldset>
+
+        {#if ready}
+          <Field label="Tu token" hint={`Creado el ${day(mine.created!)} · ${mine.last_used ? `Último uso: ${day(mine.last_used)}` : "Aún no se ha usado"}`}>
+            <div class="token-copy">
+              <Input value={mine.token!} type={shown ? "text" : "password"} readonly onfocus={(e) => e.currentTarget.select()} />
+              <Button variant="ghost" onclick={() => (shown = !shown)} aria-label={shown ? "Ocultar token" : "Mostrar token"}>
+                <Icon name={shown ? "view-off" : "view"} />
+              </Button>
+              <Button onclick={() => copy(mine!.token!, "Token")}><Icon name="copy-01" />Copiar</Button>
+            </div>
+          </Field>
+          <Field label="Instrucciones para el asistente" hint="Pégalas en Claude, ChatGPT u otro asistente. Cambia la última línea por lo que necesites.">
+            <!-- Con el token oculto, las instrucciones tampoco lo muestran; al copiarlas sí va completo. -->
+            <Textarea value={prompt(shown ? mine.token! : `${mine.token!.slice(0, 6)}••••••••`, scope)} rows={7} readonly />
+          </Field>
+          <div class="token-actions">
+            <Button variant="secondary" onclick={() => copy(prompt(mine!.token!, scope), "Instrucciones")}><Icon name="copy-01" />Copiar instrucciones</Button>
+            <span class="flex-1"></span>
+            <span class="token-actions">
+              <Button variant="ghost" onclick={() => (confirm = "renew")}><Icon name="refresh" />Crear token nuevo</Button>
+              <Button variant="ghost" class="btn-danger" onclick={() => (confirm = "remove")}><Icon name="delete-02" />Eliminar token</Button>
+            </span>
+          </div>
+        {:else}
+          <div class="token-actions">
+            <Button variant="secondary" loading={busy} onclick={() => (legacy ? (confirm = "renew") : save(true))}>
+              <Icon name="add-01" />{legacy ? "Crear token nuevo" : "Crear token"}
+            </Button>
+            {#if legacy}
+              <span class="flex-1"></span>
+              <Button variant="ghost" class="btn-danger" onclick={() => (confirm = "remove")}><Icon name="delete-02" />Eliminar token</Button>
+            {/if}
+          </div>
+        {/if}
+      {/if}
     </div>
   </div>
 </div>
 
-<Modal {open} onClose={() => (open = false)} title={created ? "Token creado" : "Crear token de acceso"}>
-  {#if created}
-    <div class="stack">
-      <p class="token-warn"><Icon name="alert-02" />Copia el token ahora. Por seguridad, no podrás volver a verlo.</p>
-      <Field label="Token de «{created.name}»">
-        <div class="token-copy">
-          <Input value={created.token} readonly onfocus={(e) => e.currentTarget.select()} />
-          <Button onclick={() => copy(created!.token, "Token")}><Icon name="copy-01" />Copiar</Button>
-        </div>
-      </Field>
-      <Field label="Instrucciones para el asistente" hint="Pégalas en Claude, ChatGPT u otro asistente. Cambia la última línea por lo que necesites.">
-        <Textarea value={prompt(created.token, created.scope)} rows={8} readonly />
-      </Field>
-    </div>
-  {:else}
-    <form id="token-form" class="stack" onsubmit={create}>
-      <Field label="Nombre" hint="Para reconocerlo en la lista, por ejemplo «Claude en mi computador».">
-        <Input bind:value={name} maxlength={80} autofocus required />
-      </Field>
-      <div class="field block" role="group" aria-labelledby="token-scope-label">
-        <span class="field-label" id="token-scope-label">Permiso</span>
-        <Segmented
-          label="Permiso"
-          bind:value={scope}
-          full
-          options={[
-            { id: "read", label: "Solo consultar" },
-            { id: "write", label: "Consultar y cambiar" },
-          ]}
-        />
-        <span class="field-hint">
-          {scope === "write"
-            ? "Podrá crear, editar y eliminar cuentas, categorías, movimientos y movimientos programados."
-            : "Podrá ver tus datos y proponer cambios, pero no hacerlos."}
-        </span>
-      </div>
-      <Field label="Vencimiento" hint="Después de esta fecha el token deja de funcionar.">
-        <Select bind:value={days}>
-          {#each EXPIRY as x (x.days)}<option value={String(x.days)}>{x.label}</option>{/each}
-        </Select>
-      </Field>
-    </form>
-  {/if}
-  {#snippet footer()}
-    {#if created}
-      <Button onclick={() => copy(prompt(created!.token, created!.scope), "Instrucciones")}><Icon name="copy-01" />Copiar instrucciones</Button>
-      <Button variant="secondary" onclick={() => (open = false)}>Listo, ya lo copié</Button>
-    {:else}
-      <Button onclick={() => (open = false)}>Cancelar</Button>
-      <Button variant="secondary" type="submit" form="token-form" loading={busy}>Crear token</Button>
-    {/if}
-  {/snippet}
-</Modal>
+<ConfirmDialog
+  open={confirm === "renew"}
+  onClose={() => (confirm = null)}
+  title="Crear token nuevo"
+  message="El token actual dejará de funcionar de inmediato. Tendrás que darle el nuevo a cada asistente o programa que lo use. Tus datos no cambian."
+  confirmLabel="Crear token nuevo"
+  confirmVariant="secondary"
+  {busy}
+  onConfirm={() => save(true)}
+/>
 
 <ConfirmDialog
-  open={!!removing}
-  onClose={() => (removing = null)}
+  open={confirm === "remove"}
+  onClose={() => (confirm = null)}
   title="Eliminar token"
-  message={`«${removing?.name}» dejará de funcionar de inmediato y quien lo use ya no podrá entrar a tu cuenta. Tus datos no cambian. Esta acción no se puede deshacer.`}
+  message="El token dejará de funcionar de inmediato y quien lo use ya no podrá entrar a tu cuenta. Tus datos no cambian. Puedes crear otro cuando quieras."
   confirmLabel="Eliminar token"
-  busy={deleting}
+  {busy}
   onConfirm={remove}
 />
 
 <style>
-  .token-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-6);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .token-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-10);
-    padding: var(--sp-8);
-    border: var(--border-width) solid var(--border);
-    border-radius: var(--radius-md);
-
-    @media (max-width: 40rem) {
-      flex-wrap: wrap;
-    }
-  }
-
-  .token-off {
-    opacity: 0.6;
-  }
-
-  .token-ico {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: var(--radius-sm);
-    background: var(--bg-hover);
-  }
-
-  .token-main {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    flex-direction: column;
-    gap: var(--sp-4);
-  }
-
-  .token-name {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-6);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .token-meta {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-
-  .token-steps {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-8);
-    margin: 0;
-    padding-left: 1.25rem;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-  }
-
-  code {
-    font-size: 0.95em;
-    overflow-wrap: anywhere;
-  }
-
   .token-copy {
     display: flex;
     gap: var(--sp-8);
@@ -335,13 +216,61 @@
     }
   }
 
-  .token-warn {
+  .token-perms {
     display: flex;
+    flex-direction: column;
+    gap: var(--sp-10);
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    & legend {
+      margin-bottom: var(--sp-8);
+      padding: 0;
+    }
+  }
+
+  .token-perm {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-10);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+
+    & input {
+      flex: none;
+      width: 1.125rem;
+      height: 1.125rem;
+      margin: 0.125rem 0 0;
+      accent-color: var(--accent);
+      cursor: inherit;
+    }
+
+    &:has(input:disabled) {
+      cursor: default;
+    }
+
+    & span {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-2, 0.125rem);
+    }
+
+    & b {
+      font-weight: 500;
+    }
+
+    & small {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+  }
+
+  .token-actions {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-8);
-    margin: 0;
-    font-size: var(--text-sm);
-    font-weight: 500;
-    color: var(--text-primary);
   }
 </style>

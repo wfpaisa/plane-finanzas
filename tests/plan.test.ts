@@ -15,6 +15,7 @@ const cases: f.RecurringLike[] & { id: string }[] = [
   { id: "e", kind: "expense", amount: 450_000, frequency: "once", start_date: "2026-11-20" },
   { id: "f", kind: "expense", amount: 200_000, frequency: "monthly", day_of_month: 5, start_date: "2026-09-20", end_date: "2027-02-03" },
   { id: "g", kind: "transfer", amount: 500_000, frequency: "monthly", day_of_month: 10 },
+  { id: "i", kind: "transfer", amount: 150_000, frequency: "monthly", day_of_month: 15, for_payment: true },
   { id: "h", kind: "expense", amount: 60_000, frequency: "monthly", day_of_month: 1, paused: true },
 ] as never;
 

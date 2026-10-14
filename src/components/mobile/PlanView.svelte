@@ -44,7 +44,7 @@
   const plan = $derived(store.planFor(ym));
   const card = $derived(cards.current.total);
   const free = $derived(plan.free - card);
-  // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
+  // Las transferencias van con los gastos: también son pagos. Solo suman en el plan las que reservan dinero para un pago.
   const items = $derived(store.recurring.filter((r) => (kind === "income" ? r.kind === "income" : r.kind !== "income")));
   const barBase = $derived(Math.max(plan.income, plan.fixed + card + plan.savings));
   const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
@@ -138,7 +138,7 @@
             <span class="pl-main">
               <span class="pl-name">{r.name}</span>
               <span class="pl-sub">
-                {#if r.kind === "transfer"}Transferencia · {/if}{freqLabel(r)}{#if r.auto_create} · registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
+                {#if r.kind === "transfer"}{r.for_payment ? "Reserva para un pago" : "Transferencia"} · {/if}{freqLabel(r)}{#if r.auto_create} · registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
               </span>
               {#if r.category}<CategoryPill id={r.category} />{/if}
             </span>

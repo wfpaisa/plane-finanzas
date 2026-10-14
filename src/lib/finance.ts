@@ -20,6 +20,8 @@ export interface RecurringLike {
   start_date?: string;
   end_date?: string;
   paused?: boolean;
+  /** Una transferencia que reserva dinero para un pago: cuenta como pago programado. */
+  for_payment?: boolean;
 }
 
 export interface SavingLike {
@@ -168,7 +170,7 @@ export function activeIn(r: RecurringLike, ym: string): boolean {
  * otro año no son del plan de hoy.
  */
 export function monthlyEquivalent(r: RecurringLike, ym?: string): number {
-  if (r.paused || r.kind === "transfer") return 0;
+  if (r.paused || (r.kind === "transfer" && !r.for_payment)) return 0;
   const freq = r.frequency || "monthly";
   if (freq === "once" || (ym && !activeIn(r, ym))) return 0;
   return freq === "yearly" ? r.amount / 12 : r.amount;
@@ -245,13 +247,14 @@ export function incomeIn(r: RecurringLike, ym: string): number {
 /**
  * El plan del mes `ym` (por defecto, el actual). Los ingresos, los que caen en
  * el mes; los pagos, promediados (el anual en doce): se reservan mes a mes.
+ * Una transferencia solo cuenta si reserva dinero para un pago (`for_payment`).
  */
 export function planSummary(recurring: RecurringLike[], savings: SavingLike[], ym = today().slice(0, 7)): PlanSummary {
   let income = 0;
   let fixed = 0;
   for (const r of recurring) {
     if (r.kind === "income") income += incomeIn(r, ym);
-    else if (r.kind === "expense") fixed += monthlyEquivalent(r, ym);
+    else fixed += monthlyEquivalent(r, ym);
   }
   const sav = savings.filter((s) => !s.archived).reduce((a, s) => a + savingMonthly(s), 0);
   return { income, fixed, savings: sav, free: income - fixed - sav };

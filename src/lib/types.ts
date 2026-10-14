@@ -137,6 +137,8 @@ export interface Recurring extends RecordModel {
   tags: string[] | null;
   /** La provisión: dónde se aparta mes a mes para pagarlo (un ahorro de tipo "provision"). */
   saving?: string;
+  /** Una transferencia que reserva dinero para un pago: suma en los pagos programados. */
+  for_payment?: boolean;
   paused: boolean;
   auto_create: boolean;
 }

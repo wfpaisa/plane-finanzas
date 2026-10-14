@@ -45,6 +45,8 @@
   let auto = $state(false);
   /** Apartarlo mes a mes (una provisión): solo para gastos anuales o de una vez. */
   let reserve = $state(false);
+  /** Una transferencia que reserva dinero para un pago: cuenta en los pagos programados. */
+  let forPayment = $state(false);
   let busy = $state(false);
 
   // Se llena al abrir o al cambiar de item, y solo entonces: lo demás que
@@ -69,6 +71,7 @@
       paused = item?.paused ?? false;
       auto = item?.auto_create ?? false;
       reserve = !!provision(item);
+      forPayment = item?.for_payment ?? false;
     });
   });
 
@@ -133,6 +136,7 @@
         to_account: kind === "transfer" ? toAccount : "",
         tags,
         saving,
+        for_payment: kind === "transfer" && forPayment,
         paused,
         auto_create: auto,
       };
@@ -237,6 +241,7 @@
     <div class="flex flex-wrap gap-5">
       <Switch bind:checked={auto} label="Registrar automáticamente" />
       {#if canReserve}<Switch bind:checked={reserve} label="Separar dinero cada mes" />{/if}
+      {#if kind === "transfer"}<Switch bind:checked={forPayment} label="Es dinero reservado para un pago" />{/if}
       <Switch bind:checked={paused} label="Pausar esta programación" />
     </div>
     {#if canReserve && reserve}
@@ -248,6 +253,12 @@
     {:else if canReserve && provision(item) && saved > 0}
       <WarnNote>Si guardas con esta opción desactivada, dejarán de aparecer como reservados <Money value={saved} />.</WarnNote>
     {/if}
+    {#if kind === "transfer" && forPayment}
+      <p class="small muted">
+        Esta transferencia contará como un pago programado: su monto se sumará al dinero por reservar y se restará de lo
+        disponible para gastar.
+      </p>
+    {/if}
     {#if auto}
       <p class="small muted">
         La aplicación creará este movimiento según la frecuencia y la fecha indicadas. No hará operaciones en tu banco.
@@ -255,11 +266,13 @@
     {/if}
   </div>
   {#snippet footer()}
+    <!-- Al editar no va "Cancelar": no cabe junto a "Eliminar programación", y la X del título ya cierra sin guardar. -->
     {#if item}
       <Button variant="ghost" class="btn-danger" onclick={remove}><Icon name="delete-02" />Eliminar programación</Button>
       <span class="flex-1"></span>
+    {:else}
+      <Button onclick={onClose}>Cancelar</Button>
     {/if}
-    <Button onclick={onClose}>Cancelar</Button>
     <Button variant="secondary" loading={busy} onclick={save}>{item ? "Guardar cambios" : "Crear programación"}</Button>
   {/snippet}
 </Modal>

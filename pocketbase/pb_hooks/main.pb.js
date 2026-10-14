@@ -28,12 +28,35 @@ routerUse(
   ),
 );
 
+// El token de cada persona: verlo, crearlo o cambiar su permiso, y borrarlo.
+// Un token no llega aquí (ver DENIED en lib/tokens.js): hace falta la sesión.
+routerAdd(
+  "GET",
+  "/api/finanzas/tokens",
+  (e) => {
+    const tokens = require(`${__hooks}/lib/tokens.js`);
+    return e.json(200, tokens.mine(e.app, e.auth.id));
+  },
+  $apis.requireAuth("users"),
+);
+
 routerAdd(
   "POST",
   "/api/finanzas/tokens",
   (e) => {
     const tokens = require(`${__hooks}/lib/tokens.js`);
-    return e.json(200, tokens.create(e.app, e.auth.id, e.requestInfo().body));
+    return e.json(200, tokens.save(e.app, e.auth.id, e.requestInfo().body));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "DELETE",
+  "/api/finanzas/tokens",
+  (e) => {
+    const tokens = require(`${__hooks}/lib/tokens.js`);
+    tokens.clear(e.app, e.auth.id);
+    return e.json(200, { token: null });
   },
   $apis.requireAuth("users"),
 );

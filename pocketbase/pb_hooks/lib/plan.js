@@ -92,7 +92,7 @@ function occursIn(r, ym) {
 }
 
 function monthlyEquivalent(r, ym) {
-  if (r.paused || r.kind === "transfer") return 0;
+  if (r.paused || (r.kind === "transfer" && !r.for_payment)) return 0;
   var freq = r.frequency || "monthly";
   if (freq === "once" || (ym && !activeIn(r, ym))) return 0;
   return freq === "yearly" ? r.amount / 12 : r.amount;
@@ -137,7 +137,7 @@ function summary(recurring, savings, ym) {
   var fixed = 0;
   for (var i = 0; i < recurring.length; i++) {
     if (recurring[i].kind === "income") income += incomeIn(recurring[i], ym);
-    else if (recurring[i].kind === "expense") fixed += monthlyEquivalent(recurring[i], ym);
+    else fixed += monthlyEquivalent(recurring[i], ym);
   }
   var sav = 0;
   for (var j = 0; j < savings.length; j++) if (!savings[j].archived) sav += (savings[j].monthly_amount || 0) * (savings[j].share === undefined ? 1 : savings[j].share);
@@ -190,6 +190,7 @@ function recurringOf(r) {
     tags: jsonOf(r, "tags", []),
     saving: r.getString("saving"),
     paused: r.getBool("paused"),
+    for_payment: r.getBool("for_payment"),
     auto_create: r.getBool("auto_create"),
   };
 }
@@ -335,6 +336,7 @@ function monthPlan(app, userId, ym, opts) {
         frequency: r.frequency,
         day_of_month: r.day_of_month,
         auto_create: r.auto_create,
+        for_payment: r.for_payment,
         account: r.account,
         account_name: names[r.account] || "",
         to_account: r.to_account,

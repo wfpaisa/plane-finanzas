@@ -21,7 +21,7 @@ var VERSION = 1;
 var FIELDS = {
   categories: ["name", "kind", "icon", "color", "budget", "tags"],
   accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "credit_limit", "exclude_from_total", "archived", "sort", "notes"],
-  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "saving", "paused", "auto_create"],
+  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "saving", "for_payment", "paused", "auto_create"],
   transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "recurring_key"],
   savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes", "kind"],
   saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],

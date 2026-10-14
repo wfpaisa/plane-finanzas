@@ -46,7 +46,7 @@
     void store.txVersion;
     const y = year;
     let alive = true;
-    const filter = pb.filter('type != "transfer" && date >= {:from} && date < {:to}', { from: `${y}-01-01`, to: `${Number(y) + 1}-01-01` });
+    const filter = pb.filter('date >= {:from} && date < {:to}', { from: `${y}-01-01`, to: `${Number(y) + 1}-01-01` });
     cachedList<Row>(
       `year:${y}`,
       () => pb.collection("transactions").getFullList<Row>({ filter, fields: "type,amount,account,external_id,recurring_key", batch: 1000 }),
@@ -59,9 +59,13 @@
   const recorded = $derived.by(() => {
     const programmed = (t: Row) => !!t.recurring_key || (t.external_id ?? "").startsWith("rec:");
     const cardIds = new Set(store.accounts.filter(isCard).map((a) => a.id));
+    // De las transferencias solo cuentan las que reservan dinero para un pago.
+    const forPayment = new Set(store.recurring.filter((r) => r.kind === "transfer" && r.for_payment).map((r) => r.id));
     const sum = { income: 0, incomeOther: 0, fixed: 0, card: 0, other: 0, savings: 0 };
     for (const t of yearTxs) {
-      if (t.type === "income") {
+      if (t.type === "transfer") {
+        if (forPayment.has((t.recurring_key || t.external_id || "").split(":")[1])) sum.fixed += t.amount;
+      } else if (t.type === "income") {
         sum.income += t.amount;
         if (!programmed(t)) sum.incomeOther += t.amount;
       } else if (programmed(t)) sum.fixed += t.amount;
@@ -97,7 +101,7 @@
   );
 
   const incomes = $derived(store.recurring.filter((r) => r.kind === "income"));
-  // Las transferencias van con los gastos: también son pagos, aunque no sumen en el plan.
+  // Las transferencias van con los gastos: también son pagos. Solo suman en el plan las que reservan dinero para un pago.
   const expenses = $derived(store.recurring.filter((r) => r.kind !== "income"));
 
   const share = (n: number) => (income > 0 ? Math.max(0, (n / income) * 100) : 0);
@@ -272,7 +276,7 @@
     <span class="fixed-main">
       <span class="fixed-name">{r.name}</span>
       <span class="fixed-sub">
-        {#if r.kind === "transfer"}Transferencia · {/if}{freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
+        {#if r.kind === "transfer"}{r.for_payment ? "Reserva para un pago" : "Transferencia"} · {/if}{freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
       </span>
     </span>
     {#if r.category}<CategoryPill id={r.category} />{/if}

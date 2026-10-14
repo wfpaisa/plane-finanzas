@@ -9,6 +9,7 @@ export { default as Button } from "./Button.svelte";
 export { default as Calendar } from "./Calendar.svelte";
 export { default as ConfirmDialog } from "./ConfirmDialog.svelte";
 export { default as DateInput } from "./DateInput.svelte";
+export { default as DayInput } from "./DayInput.svelte";
 export { default as Dropdown } from "./Dropdown.svelte";
 export { default as EmptyState } from "./EmptyState.svelte";
 export { default as ErrorNote } from "./ErrorNote.svelte";

@@ -12,7 +12,9 @@
  * borrarlo todo, buscar a otros usuarios ni sacar una sesión normal
  * (auth-refresh). Con permiso de lectura, además, solo consulta.
  *
- * Del token se guarda solo su hash; se muestra una vez, al crearlo.
+ * Cada persona tiene un solo token y no vence. Se guarda su hash, para
+ * reconocerlo, y el token en un campo oculto (`secret`), para que la persona
+ * lo vuelva a ver en Ajustes; solo lo entrega una ruta que exige su sesión.
  */
 
 var PREFIX = "fz_";
@@ -40,7 +42,6 @@ var DENIED = [
 /** POST que solo consultan: los puede usar un token de lectura. */
 var READ_POSTS = [/^\/api\/files\/token$/];
 
-var DAY_MS = 24 * 60 * 60 * 1000;
 
 function pbDate(ms) {
   return new Date(ms).toISOString().replace("T", " ");
@@ -120,28 +121,62 @@ function authenticate(app, raw) {
   return { user: user, token: rec };
 }
 
-/**
- * Crea un token. `body`: { name, scope: "read" | "write", days: 0 (no vence) | n }.
- * Devuelve el token en claro: es la única vez que se ve.
- */
-function create(app, userId, body) {
-  body = body || {};
-  var name = String(body.name || "").trim();
-  if (!name) throw new BadRequestError("Escribe un nombre para reconocer el token.");
-  var scope = body.scope === "write" ? "write" : "read";
-  var days = Math.max(0, Math.floor(+body.days || 0));
-  if (days > 3650) throw new BadRequestError("Elige un vencimiento de máximo 10 años.");
+/** El token de la persona (el más reciente, si quedan varios de antes) y cuántos tiene. */
+function find(app, userId) {
+  var list = app.findRecordsByFilter("api_tokens", "owner = {:u}", "-created", 0, 0, { u: userId });
+  return { rec: list.length ? list[0] : null, count: list.length };
+}
 
+/**
+ * El token de la persona, para verlo en Ajustes. `token` va vacío si se creó
+ * antes de que se guardara (solo quedó su hash): hay que crear uno nuevo.
+ */
+function mine(app, userId) {
+  var f = find(app, userId);
+  if (!f.rec) return { token: null };
+  var r = f.rec;
+  return {
+    token: r.getString("secret"),
+    scope: r.getString("scope"),
+    expires: r.getString("expires"),
+    last_used: r.getString("last_used"),
+    created: r.getString("created"),
+    count: f.count,
+  };
+}
+
+/** Borra todos los tokens de la persona. */
+function clear(app, userId) {
+  var list = app.findRecordsByFilter("api_tokens", "owner = {:u}", "", 0, 0, { u: userId });
+  for (var i = 0; i < list.length; i++) app.delete(list[i]);
+}
+
+/**
+ * Cada persona tiene un solo token, que no vence. `body`: { scope: "read" |
+ * "write", renew }. Si ya tiene uno que se puede mostrar y no pide `renew`,
+ * solo cambia su permiso; si no, borra los que tenga y crea otro.
+ */
+function save(app, userId, body) {
+  body = body || {};
+  var scope = body.scope === "write" ? "write" : "read";
+  var f = find(app, userId);
+  if (f.rec && f.count === 1 && f.rec.getString("secret") && !body.renew) {
+    f.rec.set("scope", scope);
+    app.save(f.rec);
+    return mine(app, userId);
+  }
+  clear(app, userId);
   var raw = PREFIX + $security.randomStringWithAlphabet(40, ALPHABET);
   var rec = new Record(app.findCollectionByNameOrId("api_tokens"));
   rec.set("owner", userId);
-  rec.set("name", name.slice(0, 80));
+  rec.set("name", "Token de acceso");
   rec.set("prefix", raw.slice(0, 8));
   rec.set("hash", hash(raw));
+  rec.set("secret", raw);
   rec.set("scope", scope);
-  rec.set("expires", days ? pbDate(Date.now() + days * DAY_MS) : "");
+  rec.set("expires", "");
   app.save(rec);
-  return { id: rec.id, token: raw, name: rec.getString("name"), scope: scope, expires: rec.getString("expires") };
+  return mine(app, userId);
 }
 
 // ---------- La guía: cómo usar la API, para quien no ve el código ----------
@@ -190,7 +225,7 @@ function guide(app, user, token, baseUrl) {
   ];
   if (token) {
     who.push("- Permiso de este token: " + (scope === "write" ? "consultar y cambiar" : "solo consultar (GET)"));
-    who.push("- Vence: " + (expires ? expires.slice(0, 10) : "no vence"));
+    if (expires) who.push("- Vence: " + expires.slice(0, 10));
   }
 
   return [
@@ -243,7 +278,7 @@ function guide(app, user, token, baseUrl) {
     "- **account_balances**: saldo actual de cada cuenta (solo lectura; el `id` es el de la cuenta).",
     "- **categories**: categorías de ingreso (`kind: income`) o gasto (`kind: expense`). `budget`: límite mensual. `tags`: etiquetas que heredan sus movimientos.",
     "- **transactions**: movimientos. `type`: " + Object.keys(TYPES).map(function (k) { return "`" + k + "` (" + TYPES[k] + ")"; }).join(", ") + ". Una transferencia usa `account` (origen) y `to_account` (destino) y no lleva categoría. Lo que registres tú lleva `source: manual`. `recurring_key` dice qué movimiento programado paga (ver «Gastos e ingresos y movimientos programados»).",
-    "- **recurring**: movimientos programados (sueldo, arriendo, servicios). `frequency`: `monthly`, `yearly` u `once`. `auto_create`: la app registra el movimiento en su fecha. Ver «Gastos e ingresos y movimientos programados».",
+    "- **recurring**: movimientos programados (sueldo, arriendo, servicios). `frequency`: `monthly`, `yearly` u `once`. `auto_create`: la app registra el movimiento en su fecha. `for_payment` (solo transferencias): el dinero que mueve queda reservado para un pago. Ver «Gastos e ingresos y movimientos programados».",
     "- **savings** y **saving_movements**: ahorros con meta y sus aportes (positivo) o retiros (negativo).",
     "- **ignored_imports**: marcas de movimientos que creó el registro automático y la persona borró; no se vuelven a crear. Se llena solo.",
     "",
@@ -257,7 +292,7 @@ function guide(app, user, token, baseUrl) {
     "## Gastos e ingresos y movimientos programados",
     "",
     "- **Cuándo toca**: uno mensual cae cada mes en `day_of_month` (o el último día, si el mes es más corto); uno anual, en `month` y `day_of_month`; uno de una vez, en `start_date`. `day_of_month: 0` es «sin día fijo»: toca el mes entero y no se registra solo. `start_date` y `end_date` limitan los meses; `paused` lo saca de todo.",
-    "- **El plan del mes** (`summary`): ingresos programados menos gastos programados menos el aporte mensual a los ahorros (en uno compartido, solo la parte de la persona). Lo que queda (`free`) es lo que se puede gastar. Un ingreso cuenta completo en el mes en que cae (uno anual, como una prima, solo en su mes). Un gasto anual cuenta como la doceava parte cada mes; un gasto de una vez y las transferencias no cuentan. En la app, lo que se debe en tarjetas de crédito también se suma a lo que hay que reservar y se resta de lo disponible para gastar (sin contar los pagos programados de ese mes hechos con tarjeta, que ya están en los gastos programados).",
+    "- **El plan del mes** (`summary`): ingresos programados menos gastos programados menos el aporte mensual a los ahorros (en uno compartido, solo la parte de la persona). Lo que queda (`free`) es lo que se puede gastar. Un ingreso cuenta completo en el mes en que cae (uno anual, como una prima, solo en su mes). Un gasto anual cuenta como la doceava parte cada mes; un gasto de una vez no cuenta. Una transferencia solo cuenta, como pago programado, si tiene `for_payment: true` (reserva dinero para un pago, por ejemplo el predial). En la app, lo que se debe en tarjetas de crédito también se suma a lo que hay que reservar y se resta de lo disponible para gastar (sin contar los pagos programados de ese mes hechos con tarjeta, que ya están en los gastos programados).",
     "- **Pagado**: un mes queda pagado cuando un movimiento lleva la marca de ese mes: `rec:<id>:<AAAA-MM>` (mensual), `rec:<id>:<AAAA>` (anual) o `rec:<id>` (de una vez). Si lo creó la app (al marcarlo o con el registro automático), la marca va en `external_id` y `source` es `recurrente`. Si es un movimiento que ya existía (uno que la persona registró antes), va en `recurring_key`.",
     "- **Estados** de lo que falta: `vencido` (la fecha ya pasó), `hoy`, `previsto`, `automatico` (se registrará solo en su fecha) y `sin_fecha`.",
     "- **Registro automático**: cada día, a las 6 a. m., crea los de `auto_create` cuya fecha ya llegó y que no estén pagados. Si la persona borró el de un mes, no lo vuelve a crear.",
@@ -310,6 +345,8 @@ module.exports = {
   fromHeader: fromHeader,
   denied: denied,
   authenticate: authenticate,
-  create: create,
+  mine: mine,
+  save: save,
+  clear: clear,
   guide: guide,
 };

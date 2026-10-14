@@ -69,6 +69,14 @@ describe("ingresos del mes", () => {
     expect(planSummary([prima, quincena], [], "2026-12").income).toBe(12_900_000);
   });
 
+  test("una transferencia cuenta como pago solo si reserva dinero para un pago", () => {
+    const predial = { kind: "transfer" as const, amount: 150_000, frequency: "monthly" as const, day_of_month: 15, for_payment: true };
+    const aNequi = { kind: "transfer" as const, amount: 300_000, frequency: "monthly" as const, day_of_month: 15 };
+    const p = planSummary([quincena, predial, aNequi], [], "2026-10");
+    expect(p.fixed).toBe(150_000);
+    expect(p.free).toBe(3_850_000);
+  });
+
   test("un gasto anual se sigue repartiendo en doce", () => {
     expect(planSummary([seguro], [], "2026-10").fixed).toBe(100_000);
   });
