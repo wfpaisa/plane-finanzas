@@ -119,6 +119,69 @@ routerAdd(
   $apis.requireAuth("users"),
 );
 
+// ---------- Invitaciones: la única forma de tener cuenta ----------
+// Ver `pb_migrations/1792500000_invitations.js`. El enlace vence a los 7 días;
+// quien invita puede volver a copiarlo, renovarlo o cancelar la invitación.
+
+routerAdd(
+  "POST",
+  "/api/finanzas/invitations",
+  (e) => {
+    const inv = require(`${__hooks}/lib/invitations.js`);
+    const body = e.requestInfo().body || {};
+    return e.json(200, inv.create(e.app, e.auth.id, body.email, body.name));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "POST",
+  "/api/finanzas/invitations/{id}/renew",
+  (e) => {
+    const inv = require(`${__hooks}/lib/invitations.js`);
+    return e.json(200, inv.renew(e.app, e.auth.id, e.request.pathValue("id")));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "DELETE",
+  "/api/finanzas/invitations/{id}",
+  (e) => {
+    const inv = require(`${__hooks}/lib/invitations.js`);
+    inv.cancel(e.app, e.auth.id, e.request.pathValue("id"));
+    return e.noContent(204);
+  },
+  $apis.requireAuth("users"),
+);
+
+// Sin sesión: lo que ve la persona invitada al abrir el enlace.
+routerAdd("GET", "/api/finanzas/invite/{token}", (e) => {
+  const inv = require(`${__hooks}/lib/invitations.js`);
+  return e.json(200, inv.describe(e.app, e.request.pathValue("token")));
+});
+
+// Sin sesión: la persona invitada elige su clave y queda dentro.
+routerAdd("POST", "/api/finanzas/invite/{token}", (e) => {
+  const inv = require(`${__hooks}/lib/invitations.js`);
+  const body = e.requestInfo().body || {};
+  const user = inv.accept(e.app, e.request.pathValue("token"), body.password);
+  return $apis.recordAuthResponse(e, user, "password");
+});
+
+// Sin sesión: en una instalación nueva, sin usuarios, la primera cuenta.
+routerAdd("GET", "/api/finanzas/setup", (e) => {
+  const inv = require(`${__hooks}/lib/invitations.js`);
+  return e.json(200, { open: inv.setupOpen(e.app) });
+});
+
+routerAdd("POST", "/api/finanzas/setup", (e) => {
+  const inv = require(`${__hooks}/lib/invitations.js`);
+  const body = e.requestInfo().body || {};
+  const user = inv.setup(e.app, body.email, body.name, body.password);
+  return $apis.recordAuthResponse(e, user, "password");
+});
+
 // ---------- Usuario nuevo: sus categorías de partida ----------
 onRecordAfterCreateSuccess((e) => {
   const backup = require(`${__hooks}/lib/backup.js`);

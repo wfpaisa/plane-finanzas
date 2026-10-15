@@ -37,6 +37,7 @@ var DENIED = [
   /^\/api\/finanzas\/tokens(\/|$)/,
   /^\/api\/finanzas\/clean$/,
   /^\/api\/finanzas\/users\//,
+  /^\/api\/finanzas\/(invitations|invite|setup)(\/|$)/,
 ];
 
 /** POST que solo consultan: los puede usar un token de lectura. */

@@ -217,7 +217,8 @@
   ]);
 </script>
 
-{#if !session.user}
+<!-- El enlace de invitación se abre aunque haya otra sesión en este navegador. -->
+{#if !session.user || route.path === "/invitacion"}
   <Login />
 {:else if route.path === "/m"}
   {#if store.loaded}

@@ -4,7 +4,8 @@
  *
  *   bun run seed -- --email yo@correo.com --password "clave-larga" [--name "Yo"] [--file otro.csv] [--url http://127.0.0.1:8093]
  *
- * Si el usuario no existe lo crea. Se puede correr varias veces: las filas
+ * Si el usuario no existe lo crea, siempre que la base no tenga usuarios (las
+ * cuentas nuevas son por invitación). Se puede correr varias veces: las filas
  * del CSV no se duplican y el plan solo se crea si todavía no hay fijos.
  */
 import { readFileSync } from "node:fs";
@@ -32,8 +33,12 @@ pb.autoCancellation(false);
 try {
   await pb.collection("users").authWithPassword(email, password);
 } catch {
-  await pb.collection("users").create({ email, password, passwordConfirm: password, name });
-  await pb.collection("users").authWithPassword(email, password);
+  // Las cuentas nuevas son por invitación: solo se crea en una base sin usuarios.
+  const res = await pb.send("/api/finanzas/setup", { method: "POST", body: { email, password, name } }).catch((err) => {
+    console.error(`No se pudo entrar ni crear el usuario ${email}: ${err.message}`);
+    process.exit(1);
+  });
+  pb.authStore.save(res.token, res.record);
   console.log(`Usuario creado: ${email}`);
 }
 const owner = pb.authStore.record!.id;

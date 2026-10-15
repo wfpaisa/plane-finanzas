@@ -1,6 +1,7 @@
 <!--
   Ajustes, en tres secciones para no bajar por una página larga:
-  - Cuenta y datos: el perfil, la clave, lo automático y el respaldo.
+  - Cuenta y datos: el perfil, la clave, las invitaciones, lo automático y
+    el respaldo.
   - Categorías: icono, color, etiquetas y presupuesto. Gasto e ingreso en la
     misma lista.
   - Acceso por API: los tokens para asistentes y programas.
@@ -9,6 +10,7 @@
 <script lang="ts">
   import ApiTokens from "../components/app/ApiTokens.svelte";
   import IconSelect from "../components/app/IconSelect.svelte";
+  import InvitationsCard from "../components/app/InvitationsCard.svelte";
   import MoneyInput from "../components/app/MoneyInput.svelte";
   import PasswordCard from "../components/app/PasswordCard.svelte";
   import Money from "../components/app/Money.svelte";
@@ -323,6 +325,8 @@
         </div>
         <PasswordCard />
       </div>
+
+      <InvitationsCard />
 
       <div class="card">
         <div class="card-head">

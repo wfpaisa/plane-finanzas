@@ -1,27 +1,74 @@
-<!-- Entrar o crear cuenta. Cada persona tiene sus propias finanzas. -->
+<!--
+  Entrar. Las cuentas nuevas solo llegan por invitación: el enlace
+  (`#/invitacion?token=…`) abre aquí el formulario para elegir la clave. En una
+  instalación nueva, sin usuarios, la primera persona crea su cuenta aquí mismo.
+  Cada persona tiene sus propias finanzas.
+-->
 <script lang="ts">
+  import { ClientResponseError } from "pocketbase";
+
   import Logo from "../components/Logo.svelte";
   import { Button, Field, Input } from "../components/ui";
   import { notify } from "../lib/notify.svelte";
-  import { pb } from "../lib/pb.svelte";
+  import { errorMessage, pb } from "../lib/pb.svelte";
+  import { route } from "../lib/router.svelte";
+  import type { User } from "../lib/types";
 
-  let mode = $state<"login" | "register">("login");
+  type Invite = { email: string; name: string; invited_by: string };
+
+  const token = $derived(route.path === "/invitacion" ? (route.query.get("token") ?? "") : "");
+
+  let setupOpen = $state(false);
+  let invite = $state<Invite | null>(null);
+  let inviteError = $state("");
   let name = $state("");
   let email = $state("");
   let password = $state("");
+  let confirm = $state("");
   let busy = $state(false);
+
+  const mode = $derived(token ? "invite" : setupOpen ? "setup" : "login");
+
+  // Una instalación sin usuarios todavía: se ofrece crear la primera cuenta.
+  $effect(() => {
+    pb.send<{ open: boolean }>("/api/finanzas/setup", {})
+      .then((r) => (setupOpen = r.open))
+      .catch(() => {});
+  });
+
+  $effect(() => {
+    if (!token) return;
+    invite = null;
+    inviteError = "";
+    pb.send<Invite>(`/api/finanzas/invite/${encodeURIComponent(token)}`, {})
+      .then((r) => (invite = r))
+      .catch((err) => (inviteError = errorMessage(err)));
+  });
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
     busy = true;
     try {
-      if (mode === "register") {
-        if (password.length < 8) throw new Error("La clave debe tener al menos 8 caracteres.");
-        await pb.collection("users").create({ name, email, password, passwordConfirm: password });
+      if (mode === "login") {
+        await pb.collection("users").authWithPassword(email, password);
+        return;
       }
-      await pb.collection("users").authWithPassword(email, password);
+      if (password.length < 8) throw new Error("La clave debe tener al menos 8 caracteres.");
+      if (password !== confirm) throw new Error("La confirmación no coincide con la clave. Escríbela otra vez.");
+      const res =
+        mode === "invite"
+          ? await pb.send<{ token: string; record: User }>(`/api/finanzas/invite/${encodeURIComponent(token)}`, {
+              method: "POST",
+              body: { password },
+            })
+          : await pb.send<{ token: string; record: User }>("/api/finanzas/setup", { method: "POST", body: { name, email, password } });
+      pb.authStore.save(res.token, res.record);
+      // Fuera del enlace: recargarlo ya no serviría.
+      if (mode === "invite") location.replace("#/");
     } catch (err) {
-      notify.fail(err);
+      if (err instanceof ClientResponseError && err.status === 400 && mode === "login") {
+        notify.fail(new Error("El correo o la clave no coinciden. Revísalos e inténtalo de nuevo."));
+      } else notify.fail(err);
     } finally {
       busy = false;
     }
@@ -41,34 +88,74 @@
     </div>
   </div>
 
-  <form class="login-card card card-solid" onsubmit={submit}>
-    <div class="card-head">
-      <div>
-        <h2 class="card-title">{mode === "login" ? "Entrar" : "Crear cuenta"}</h2>
-        <p class="card-sub">{mode === "login" ? "Escribe tus datos para continuar." : "Crea una cuenta para empezar."}</p>
+  {#if mode === "invite"}
+    <form class="login-card card card-solid" onsubmit={submit}>
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">{inviteError ? "Enlace de invitación no válido" : "Crea tu clave"}</h2>
+          <p class="card-sub">
+            {#if invite}
+              {invite.invited_by ? `${invite.invited_by} te invitó a Finanzas.` : "Te invitaron a Finanzas."} Elige una clave para entrar.
+              Después entrarás con tu correo y esta clave.
+            {:else if inviteError}
+              No se puede crear la clave con este enlace.
+            {:else}
+              Revisando el enlace de invitación…
+            {/if}
+          </p>
+        </div>
       </div>
-    </div>
-    <div class="card-body login-fields">
-      {#if mode === "register"}
-        <Field label="Nombre"><Input bind:value={name} autocomplete="name" required /></Field>
-      {/if}
-      <Field label="Correo"><Input type="email" bind:value={email} autocomplete="email" required /></Field>
-      <Field label="Clave">
-        <Input
-          type="password"
-          bind:value={password}
-          autocomplete={mode === "login" ? "current-password" : "new-password"}
-          required
-        />
-      </Field>
-      <Button type="submit" variant="secondary" loading={busy} class="login-submit">
-        {mode === "login" ? "Entrar" : "Crear cuenta"}
-      </Button>
-      <button type="button" class="link login-switch" onclick={() => (mode = mode === "login" ? "register" : "login")}>
-        {mode === "login" ? "¿No tienes cuenta? Crea una" : "¿Ya tienes cuenta? Entra"}
-      </button>
-    </div>
-  </form>
+      <div class="card-body login-fields">
+        {#if invite}
+          <Field label="Nombre"><Input value={invite.name} readonly /></Field>
+          <Field label="Correo"><Input type="email" value={invite.email} autocomplete="username" readonly /></Field>
+          <Field label="Clave" hint="Usa al menos 8 caracteres.">
+            <Input type="password" bind:value={password} autocomplete="new-password" required />
+          </Field>
+          <Field label="Confirmar clave">
+            <Input type="password" bind:value={confirm} autocomplete="new-password" required />
+          </Field>
+          <Button type="submit" variant="secondary" loading={busy} class="login-submit">Crear clave y entrar</Button>
+        {:else if inviteError}
+          <p class="login-note">{inviteError}</p>
+          <a class="link login-switch" href="#/">Ir a la pantalla para entrar</a>
+        {/if}
+      </div>
+    </form>
+  {:else}
+    <form class="login-card card card-solid" onsubmit={submit}>
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">{mode === "setup" ? "Crea la primera cuenta" : "Entrar"}</h2>
+          <p class="card-sub">
+            {mode === "setup"
+              ? "Aún no hay cuentas en esta instalación. Crea la tuya; después podrás invitar a otras personas desde Ajustes."
+              : "Escribe tu correo y tu clave para continuar."}
+          </p>
+        </div>
+      </div>
+      <div class="card-body login-fields">
+        {#if mode === "setup"}
+          <Field label="Nombre"><Input bind:value={name} autocomplete="name" required /></Field>
+        {/if}
+        <Field label="Correo"><Input type="email" bind:value={email} autocomplete="email" required /></Field>
+        <Field label="Clave" hint={mode === "setup" ? "Usa al menos 8 caracteres." : undefined}>
+          <Input type="password" bind:value={password} autocomplete={mode === "setup" ? "new-password" : "current-password"} required />
+        </Field>
+        {#if mode === "setup"}
+          <Field label="Confirmar clave">
+            <Input type="password" bind:value={confirm} autocomplete="new-password" required />
+          </Field>
+        {/if}
+        <Button type="submit" variant="secondary" loading={busy} class="login-submit">
+          {mode === "setup" ? "Crear cuenta" : "Entrar"}
+        </Button>
+        {#if mode === "login"}
+          <p class="login-note">¿No tienes cuenta? Pide a alguien que ya use Finanzas que te invite.</p>
+        {/if}
+      </div>
+    </form>
+  {/if}
 </div>
 
 <style>
@@ -92,8 +179,7 @@
     overflow: hidden;
     background:
       radial-gradient(50% 60% at 85% 10%, oklch(1 0 0 / 0.12), transparent 70%),
-      radial-gradient(40% 50% at 10% 90%, oklch(1 0 0 / 0.08), transparent 70%),
-      oklch(0.14 0 0);
+      radial-gradient(40% 50% at 10% 90%, oklch(1 0 0 / 0.08), transparent 70%), oklch(0.14 0 0);
     color: oklch(0.97 0 0);
 
     & h1 {
@@ -172,5 +258,12 @@
   .login-switch {
     align-self: center;
     font-size: var(--text-sm);
+  }
+
+  .login-note {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    text-align: center;
   }
 </style>
