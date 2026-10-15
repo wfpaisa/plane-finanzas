@@ -67,7 +67,10 @@ if ((await pb.collection("recurring").getList(1, 1)).totalItems === 0) {
   const acc = (n: string) => accs.find((a) => a.name === n)?.id ?? "";
   const cat = (n: string) => cats.find((c) => c.name === n)?.id ?? "";
   const main = acc("Banco Principal");
-  const today = new Date().toISOString().slice(0, 10);
+  // El plan empieza en el mes del primer movimiento del registro, para que
+  // cubra todo lo importado aunque el registro sea de meses atrás.
+  const first = plan.transactions.reduce((m, t) => (t.date < m ? t.date : m), new Date().toISOString().slice(0, 10));
+  const start = `${first.slice(0, 7)}-01`;
 
   const RECURRING = [
     { name: "Sueldo", kind: "income", amount: 6500000, day_of_month: 1, category: cat("Salario") },
@@ -78,7 +81,7 @@ if ((await pb.collection("recurring").getList(1, 1)).totalItems === 0) {
     { name: "Declaración de renta", kind: "expense", amount: 60000, day_of_month: 1, category: cat("Impuestos") },
   ];
   for (const x of RECURRING) {
-    await pb.collection("recurring").create({ ...x, owner, frequency: "monthly", account: main, start_date: today });
+    await pb.collection("recurring").create({ ...x, owner, frequency: "monthly", account: main, start_date: start });
   }
 
   const SAVINGS = [
@@ -86,8 +89,14 @@ if ((await pb.collection("recurring").getList(1, 1)).totalItems === 0) {
     { name: "Viaje a Cartagena", monthly_amount: 300000, palette: "mono-teal", icon: "airplane-01", annual_rate: 9, account: "Fondo de inversión", target: 4000000 },
     { name: "Retiro", monthly_amount: 100000, palette: "mono-emerald", icon: "umbrella", annual_rate: 10, account: "Fondo de inversión" },
   ];
+  // Un aporte de cada ahorro el día 15 de cada mes del registro, hasta su último movimiento.
+  const last = plan.transactions.reduce((m, t) => (t.date > m ? t.date : m), first);
+  const months: string[] = [];
+  for (let d = new Date(`${start}T12:00:00Z`); d.toISOString().slice(0, 10) <= last; d.setUTCMonth(d.getUTCMonth() + 1)) {
+    if (`${d.toISOString().slice(0, 7)}-15` <= last) months.push(`${d.toISOString().slice(0, 7)}-15`);
+  }
   for (const s of SAVINGS) {
-    await pb.collection("savings").create({
+    const saving = await pb.collection("savings").create({
       owner,
       name: s.name,
       icon: s.icon,
@@ -99,8 +108,18 @@ if ((await pb.collection("recurring").getList(1, 1)).totalItems === 0) {
       allocations: [{ account: acc(s.account) || main, percent: 100 }],
       auto: false,
     });
+    const account = acc(s.account) || main;
+    for (const date of months) {
+      await pb.collection("saving_movements").create({
+        saving: saving.id,
+        account,
+        created_by: owner,
+        amount: s.monthly_amount,
+        date: `${date} 12:00:00.000Z`,
+      });
+    }
   }
-  console.log(`Plan: ${RECURRING.length} fijos y ${SAVINGS.length} ahorros.`);
+  console.log(`Plan: ${RECURRING.length} fijos y ${SAVINGS.length} ahorros con ${months.length} aportes cada uno.`);
 }
 
 console.log(`Listo para ${email}.`);
