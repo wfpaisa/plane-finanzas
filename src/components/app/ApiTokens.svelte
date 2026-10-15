@@ -2,7 +2,7 @@
   El token de acceso: para que un asistente (Claude, ChatGPT…) o un programa
   use la cuenta por la API sin la clave. Cada persona tiene uno solo, que no
   vence y se puede volver a ver aquí, junto con las instrucciones listas para
-  pegarle al asistente. Ver pocketbase/pb_hooks/lib/tokens.js.
+  pegarle al asistente. Debajo, el contexto que el asistente lee en la guía. Ver pocketbase/pb_hooks/lib/tokens.js.
 -->
 <script lang="ts">
   import Icon from "../Icon.svelte";
@@ -96,6 +96,28 @@
     }
   }
 
+  // El contexto para el asistente: texto libre que va dentro de la guía.
+  let ctx = $state<string | null>(null);
+  let ctxSaved = $state("");
+  let ctxBusy = $state(false);
+
+  $effect(() => {
+    pb.send<{ context: string }>("/api/finanzas/contexto", {}).then((r) => (ctx = ctxSaved = r.context), notify.fail);
+  });
+
+  async function saveContext() {
+    ctxBusy = true;
+    try {
+      const r = await pb.send<{ context: string }>("/api/finanzas/contexto", { method: "PUT", body: { context: ctx ?? "" } });
+      ctx = ctxSaved = r.context;
+      notify.done("Contexto guardado. El asistente lo leerá la próxima vez que consulte la guía.");
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      ctxBusy = false;
+    }
+  }
+
   async function copy(text: string, what: string) {
     if (await copyText(text)) notify.done(`${what} copiado.`);
     else notify.fail(new Error("No se pudo copiar. Selecciona el texto y cópialo a mano."));
@@ -180,6 +202,33 @@
             {/if}
           </div>
         {/if}
+      {/if}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h3 class="card-title">Contexto para el asistente</h3>
+        <p class="card-sub">
+          Lo que quieres que el asistente sepa al leer tus mensajes del banco: qué llave o terminación es cada cuenta, en qué categoría va cada comercio. Escribe un dato por línea. El asistente lo lee al empezar y, con el permiso Cambiar, puede agregar lo que descubra si le das el visto bueno.
+        </p>
+      </div>
+    </div>
+    <div class="card-body stack">
+      {#if ctx === null}
+        <p class="empty-card">Cargando el contexto…</p>
+      {:else}
+        <Textarea
+          bind:value={ctx}
+          rows={6}
+          maxlength={10000}
+          aria-label="Contexto para el asistente"
+          placeholder={"La llave @ana123 es mi cuenta Nubank.\nLa cuenta *1234 es Banco Principal.\nLo que diga Rappi va en la categoría Domicilios."}
+        />
+        <div class="token-actions">
+          <Button variant="secondary" loading={ctxBusy} disabled={ctx.trim() === ctxSaved} onclick={saveContext}>Guardar contexto</Button>
+        </div>
       {/if}
     </div>
   </div>

@@ -59,7 +59,7 @@ function exportData(app, userId) {
     });
 
   var user = app.findRecordById("users", userId);
-  data.profile = { name: user.getString("name"), tint: user.getString("tint") };
+  data.profile = { name: user.getString("name"), tint: user.getString("tint"), assistant_context: user.getString("assistant_context") };
   return {
     app: "finanzas",
     version: VERSION,
@@ -236,11 +236,12 @@ function restoreData(app, userId, data, counts) {
       r.set("external_id", remapKey(row.external_id));
     });
 
-    // Nombre y color de fondo; los respaldos de antes no los traen.
+    // Nombre, color de fondo y contexto para el asistente; los respaldos de antes no los traen.
     if (data.profile) {
       var u = tx.findRecordById("users", userId);
       if (data.profile.name) u.set("name", data.profile.name);
       u.set("tint", data.profile.tint || "");
+      if (data.profile.assistant_context !== undefined) u.set("assistant_context", data.profile.assistant_context);
       tx.save(u);
     }
   });

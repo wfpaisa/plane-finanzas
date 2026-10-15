@@ -4,6 +4,10 @@
  * Cada movimiento que crea un programado lleva un `external_id` (`rec:…`) y
  * eso impide crearlo dos veces. Pero al borrarlo el id se iba con él, y el
  * programador del día siguiente lo volvía a crear. Al borrarlo queda aquí.
+ *
+ * Aquí quedan también los correos de Gmail que un asistente revisó y no eran
+ * un movimiento, y los movimientos de correo que la persona borró: así no se
+ * vuelven a registrar (ver lib/mail.js).
  */
 
 /** Si ese `external_id` ya existe o se borró a propósito. */

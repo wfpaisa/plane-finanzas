@@ -61,6 +61,50 @@ routerAdd(
   $apis.requireAuth("users"),
 );
 
+// El contexto para el asistente: lo usan la app y los tokens (uno de solo
+// lectura puede leerlo, no cambiarlo).
+routerAdd(
+  "GET",
+  "/api/finanzas/contexto",
+  (e) => {
+    const tokens = require(`${__hooks}/lib/tokens.js`);
+    return e.json(200, tokens.context(e.app, e.auth.id));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "PUT",
+  "/api/finanzas/contexto",
+  (e) => {
+    const tokens = require(`${__hooks}/lib/tokens.js`);
+    return e.json(200, tokens.saveContext(e.app, e.auth.id, e.requestInfo().body));
+  },
+  $apis.requireAuth("users"),
+);
+
+// Los correos que revisa un asistente: cuáles ya se registraron o se
+// descartaron (ver lib/mail.js).
+routerAdd(
+  "GET",
+  "/api/finanzas/correos",
+  (e) => {
+    const mail = require(`${__hooks}/lib/mail.js`);
+    return e.json(200, mail.status(e.app, e.auth.id, e.request.url.query().get("ids")));
+  },
+  $apis.requireAuth("users"),
+);
+
+routerAdd(
+  "POST",
+  "/api/finanzas/correos/descartar",
+  (e) => {
+    const mail = require(`${__hooks}/lib/mail.js`);
+    return e.json(200, mail.skip(e.app, e.auth.id, (e.requestInfo().body || {}).ids));
+  },
+  $apis.requireAuth("users"),
+);
+
 routerAdd(
   "GET",
   "/api/finanzas/guia",

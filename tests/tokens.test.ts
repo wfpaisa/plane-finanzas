@@ -26,6 +26,8 @@ describe("denied", () => {
     expect(ok("read", "GET", "/api/collections/recurring/records/abc")).toBe(true);
     expect(ok("read", "GET", "/api/finanzas/guia")).toBe(true);
     expect(ok("read", "GET", "/api/finanzas/plan")).toBe(true);
+    expect(ok("read", "GET", "/api/finanzas/contexto")).toBe(true);
+    expect(ok("read", "GET", "/api/finanzas/correos")).toBe(true);
   });
 
   test("lectura: no cambia nada", () => {
@@ -33,6 +35,8 @@ describe("denied", () => {
     expect(ok("read", "PATCH", "/api/collections/categories/records/abc")).toBe(false);
     expect(ok("read", "DELETE", "/api/collections/transactions/records/abc")).toBe(false);
     expect(ok("read", "POST", "/api/finanzas/recurring/mark")).toBe(false);
+    expect(ok("read", "PUT", "/api/finanzas/contexto")).toBe(false);
+    expect(ok("read", "POST", "/api/finanzas/correos/descartar")).toBe(false);
   });
 
   test("escritura: registra movimientos y edita colecciones", () => {
@@ -41,6 +45,8 @@ describe("denied", () => {
     expect(ok("write", "PATCH", "/api/collections/categories/records/abc")).toBe(true);
     expect(ok("write", "DELETE", "/api/collections/transactions/records/abc")).toBe(true);
     expect(ok("write", "GET", "/api/finanzas/backup")).toBe(true);
+    expect(ok("write", "PUT", "/api/finanzas/contexto")).toBe(true);
+    expect(ok("write", "POST", "/api/finanzas/correos/descartar")).toBe(true);
   });
 
   test("nadie toca el usuario, los tokens ni lo destructivo", () => {

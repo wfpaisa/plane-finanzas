@@ -179,6 +179,25 @@ function save(app, userId, body) {
   return mine(app, userId);
 }
 
+// ---------- El contexto para el asistente ----------
+
+var CONTEXT_MAX = 10000;
+
+/** El contexto que la persona dejó para el asistente. */
+function context(app, userId) {
+  return { context: app.findRecordById("users", userId).getString("assistant_context") };
+}
+
+/** Guarda el contexto completo (reemplaza el anterior). `body`: { context }. */
+function saveContext(app, userId, body) {
+  var text = String((body && body.context) || "").trim();
+  if (text.length > CONTEXT_MAX) throw new BadRequestError("El contexto puede tener máximo " + CONTEXT_MAX + " caracteres. Quita lo que ya no sirva.");
+  var u = app.findRecordById("users", userId);
+  u.set("assistant_context", text);
+  app.save(u);
+  return { context: text };
+}
+
 // ---------- La guía: cómo usar la API, para quien no ve el código ----------
 
 var TYPES = { income: "ingreso", expense: "gasto", transfer: "transferencia" };
@@ -218,6 +237,7 @@ function schema(app) {
 function guide(app, user, token, baseUrl) {
   var scope = token ? token.getString("scope") : "write";
   var expires = token ? token.getString("expires") : "";
+  var ctx = user.getString("assistant_context").trim();
   var who = [
     "- URL base: `" + baseUrl + "`",
     "- Id de usuario (va en el campo `owner` al crear registros): `" + user.id + "`",
@@ -246,6 +266,16 @@ function guide(app, user, token, baseUrl) {
     "```",
     "",
     "Respuestas y cuerpos en JSON (`Content-Type: application/json`). Los errores traen `message` y, por campo, `data`.",
+    "",
+    "## Contexto de la persona",
+    "",
+    "Lo que la persona quiere que sepas: qué llave, usuario o terminación es cada cuenta, en qué categoría va cada comercio y otras preferencias. Úsalo al leer sus mensajes del banco para elegir la cuenta, la categoría y el tipo (por ejemplo, un envío a una llave que es otra cuenta suya es una transferencia, no un gasto).",
+    "",
+    ctx ? "```\n" + ctx + "\n```" : "(Todavía no hay contexto.)",
+    "",
+    "- Si descubres algo nuevo que sirva la próxima vez (una llave, una terminación, un comercio frecuente), pregúntale a la persona si lo agregas. Con su visto bueno, guárdalo con `PUT /api/finanzas/contexto` `{\"context\": \"...\"}`: envía el texto completo, con lo de antes más lo nuevo.",
+    "- Una línea por dato, corta. No guardes montos, saldos ni movimientos: eso ya está en la app.",
+    "- Si algo del contexto ya no es cierto, propón corregirlo o quitarlo.",
     "",
     "## Antes de cambiar algo",
     "",
@@ -277,17 +307,33 @@ function guide(app, user, token, baseUrl) {
     "- **accounts**: cuentas (banco, tarjeta, efectivo…). `archived: true` la saca de las listas sin borrar sus movimientos. Una tarjeta de crédito (`type: tarjeta`) tiene saldo negativo mientras se deba; `credit_limit` es su cupo, y lo disponible es el cupo más el saldo. Pagar la tarjeta es una transferencia hacia ella.",
     "- **account_balances**: saldo actual de cada cuenta (solo lectura; el `id` es el de la cuenta).",
     "- **categories**: categorías de ingreso (`kind: income`) o gasto (`kind: expense`). `budget`: límite mensual. `tags`: etiquetas que heredan sus movimientos.",
-    "- **transactions**: movimientos. `type`: " + Object.keys(TYPES).map(function (k) { return "`" + k + "` (" + TYPES[k] + ")"; }).join(", ") + ". Una transferencia usa `account` (origen) y `to_account` (destino) y no lleva categoría. Lo que registres tú lleva `source: manual`. `recurring_key` dice qué movimiento programado paga (ver «Gastos e ingresos y movimientos programados»).",
+    "- **transactions**: movimientos. `type`: " + Object.keys(TYPES).map(function (k) { return "`" + k + "` (" + TYPES[k] + ")"; }).join(", ") + ". Una transferencia usa `account` (origen) y `to_account` (destino) y no lleva categoría. Lo que registres tú lleva `source: manual`; lo que registres desde un correo, `source: gmail` (ver «Registrar desde Gmail»). `recurring_key` dice qué movimiento programado paga (ver «Gastos e ingresos y movimientos programados»).",
     "- **recurring**: movimientos programados (sueldo, arriendo, servicios). `frequency`: `monthly`, `yearly` u `once`. `auto_create`: la app registra el movimiento en su fecha. `for_payment` (solo transferencias): el dinero que mueve queda reservado para un pago. Ver «Gastos e ingresos y movimientos programados».",
     "- **savings** y **saving_movements**: ahorros con meta y sus aportes (positivo) o retiros (negativo).",
-    "- **ignored_imports**: marcas de movimientos que creó el registro automático y la persona borró; no se vuelven a crear. Se llena solo.",
+    "- **ignored_imports**: marcas de lo que no se debe volver a crear: movimientos del registro automático o de correos que la persona borró, y correos descartados. Se llena solo; para descartar correos usa `correos/descartar`.",
     "",
     "## Registrar un movimiento",
     "",
     "`POST /api/collections/transactions/records` con `owner`, `type`, `date`, `account`, `amount`, `description` y `source: \"manual\"`. Un gasto o ingreso lleva `category` de su mismo tipo; una transferencia lleva `to_account` distinta de `account` y no lleva categoría. `tags` y `notes` son opcionales.",
     "",
     "- Antes de registrar, busca si ya existe uno igual (mismo tipo, cuenta y monto, en fechas cercanas) y pregunta si es el mismo.",
+    "- Si viene de un correo, sigue «Registrar desde Gmail».",
     "- Si es el pago de un movimiento programado, no lo crees aquí: usa `recurring/mark` (ver abajo).",
+    "",
+    "## Registrar desde Gmail",
+    "",
+    "Finanzas no lee el correo: si tienes acceso al Gmail de la persona, búscalos tú. Finanzas recuerda qué correos ya se revisaron, para que ni tú ni otro asistente registren dos veces el mismo.",
+    "",
+    "1. Busca en Gmail los avisos de los bancos, billeteras y tarjetas de la persona: compras, pagos, transferencias enviadas y recibidas, retiros. Usa los remitentes que estén en el contexto; si no hay, búscalos por palabras como «compraste», «transferiste», «recibiste», «pagaste» y en las fechas recientes.",
+    "2. Con los ids de los mensajes de Gmail (el `id` de la API de Gmail), pide `GET /api/finanzas/correos?ids=<id1>,<id2>`. Cada uno viene `registrado`, `descartado` o `nuevo`. Sigue solo con los `nuevo`.",
+    "3. De cada correo nuevo saca el tipo, el monto, la fecha, la cuenta y el comercio o la persona. Usa el contexto para saber qué cuenta es cada llave o terminación y en qué categoría va cada comercio.",
+    "4. Busca si la persona ya lo registró a mano (mismo tipo, monto y cuenta, en fechas cercanas) o si es el pago de un movimiento programado (ver «Gastos e ingresos y movimientos programados»).",
+    "5. Muéstrale a la persona la tabla de lo que vas a registrar y espera su visto bueno.",
+    "6. Registra cada uno con `source: \"gmail\"` y el id del mensaje en `external_id`. Si la respuesta dice que `external_id` ya existe, ese correo ya está registrado: no lo repitas.",
+    "7. Los correos revisados que no son un movimiento (publicidad, avisos de seguridad, extractos) márcalos con `POST /api/finanzas/correos/descartar` `{\"ids\": [\"<id>\"]}` para no revisarlos otra vez.",
+    "8. Si aprendiste algo que sirva la próxima vez (un remitente de un banco, una llave, un comercio), propón agregarlo al contexto.",
+    "",
+    "No copies el texto del correo en `notes` ni en el contexto: basta con el movimiento.",
     "",
     "## Gastos e ingresos y movimientos programados",
     "",
@@ -314,6 +360,10 @@ function guide(app, user, token, baseUrl) {
     "| `GET /api/finanzas/plan?ym=AAAA-MM&months=12&recurring=` | La proyección de un mes (por defecto, el actual): `summary` (ingresos, gastos programados, ahorros y lo libre), `items` (cada programado que toca, con `date`, `status`, el movimiento que lo pagó o sus `candidates`), `extra` (lo marcado cuyo programado ya no toca), `reserves` (dinero por reservar) y `next` (los meses siguientes). Con `recurring`, solo ese programado. No guarda nada. |",
     "| `POST /api/finanzas/recurring/mark` `{\"recurring\": \"<id>\", \"ym\": \"AAAA-MM\"}` | Marca un programado como pagado o recibido en un mes. Sin más, crea el movimiento con sus datos (se pueden cambiar `amount`, `date`, `account` y `description`). Con `transaction: \"<id>\"` une un movimiento que ya existe. Con `unlink: true` lo desmarca: borra el que creó la app o le quita la marca al que se unió. Acepta `dry_run`. Devuelve `{action, key, transaction}`. |",
     "| `POST /api/finanzas/automatic/run` | Registra ahora los movimientos programados y aportes automáticos pendientes. |",
+    "| `GET /api/finanzas/correos?ids=<id1>,<id2>` | Qué pasó con cada correo de Gmail (máximo 200): `{items: {<id>: {status, transaction}}}`, con `status` `registrado`, `descartado` o `nuevo`. |",
+    "| `POST /api/finanzas/correos/descartar` `{\"ids\": [...]}` | Marca correos revisados que no son un movimiento, para no revisarlos otra vez. |",
+    "| `GET /api/finanzas/contexto` | El contexto de la persona: `{context}`. |",
+    "| `PUT /api/finanzas/contexto` `{\"context\": \"...\"}` | Reemplaza el contexto completo. Pide antes el visto bueno de la persona. |",
     "| `GET /api/finanzas/backup` | Todos los datos en un JSON. |",
     "",
     "## Receta: poner al día los pagos programados",
@@ -348,5 +398,7 @@ module.exports = {
   mine: mine,
   save: save,
   clear: clear,
+  context: context,
+  saveContext: saveContext,
   guide: guide,
 };

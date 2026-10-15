@@ -41,7 +41,7 @@ Banco, tarjeta de crédito, efectivo, billeteras digitales, inversiones… Cada 
 ![Cuentas](docs/capturas/cuentas.png)
 
 ### Registrar con un asistente
-Además de anotarlos a mano, puedes pedirle a un asistente (Claude, ChatGPT…) que registre tus movimientos por ti: le cuentas «ayer gasté $45.900 en el mercado con la tarjeta» y lo anota. Se conecta con el token de *Ajustes → Acceso por API* (ver «Y además…»). La app no lee tu correo ni se conecta a tu banco: todo lo que está en ella lo registraste tú o tu asistente.
+Además de anotarlos a mano, puedes pedirle a un asistente (Claude, ChatGPT…) que registre tus movimientos por ti: le cuentas «ayer gasté $45.900 en el mercado con la tarjeta» y lo anota. Se conecta con el token de *Ajustes → Acceso por API* (ver «Y además…»). Si le das acceso a tu Gmail, el asistente puede buscar ahí los avisos de tus bancos y registrarlos; la app recuerda qué correos ya revisó, para que ningún asistente registre dos veces el mismo. La app no lee tu correo ni se conecta a tu banco: todo lo que está en ella lo registraste tú o tu asistente.
 
 ### Entender en qué se va tu plata
 Debajo del **Resumen**, en el análisis, comparas ingresos y gastos por semana, mes o año, y ves el reparto por categoría con un presupuesto para cada una.
@@ -90,7 +90,7 @@ Además **funciona sin internet**: lo que anotes sin señal se guarda en el tel�
 - **Modo claro y oscuro**, y un estilo sólido (sin degradados) para quien prefiere colores planos.
 - **Respaldo**: exporta todos tus datos a un archivo y vuelve a cargarlos cuando quieras, incluso en otro servidor.
 - **Varios usuarios**: cada persona se registra con su correo y solo ve sus datos. La clave se cambia en *Ajustes → Cuenta y datos*.
-- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas tu token (solo consultar, o consultar y cambiar). Es uno solo, no vence y lo puedes volver a ver cuando quieras; copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, registrar los movimientos que le cuentes. También conoce la proyección: qué pagos programados tocan cada mes, cuáles están vencidos y cuáles ya se pagaron, y puede marcarlos. Antes de marcar un pago, el asistente puede simularlo (`dry_run`) y mostrarte qué cambiaría. Ningún token puede cambiar tu clave, cargar un respaldo ni borrar todos tus datos.
+- **Acceso por API para asistentes**: en *Ajustes → Acceso por API* creas tu token (solo consultar, o consultar y cambiar). Es uno solo, no vence y lo puedes volver a ver cuando quieras; copias unas instrucciones listas para pegar en Claude, ChatGPT u otro asistente. El asistente lee la guía en `/api/finanzas/guia` —colecciones, rutas y pasos, generada desde el servidor— y puede, por ejemplo, registrar los movimientos que le cuentes. También conoce la proyección: qué pagos programados tocan cada mes, cuáles están vencidos y cuáles ya se pagaron, y puede marcarlos. Debajo del token hay un **contexto para el asistente**: un texto donde anotas, por ejemplo, qué llave o terminación es cada cuenta y en qué categoría va cada comercio. El asistente lo lee al empezar y, con tu visto bueno, le agrega lo que descubra al leer tus mensajes del banco. Antes de marcar un pago, el asistente puede simularlo (`dry_run`) y mostrarte qué cambiaría. Ningún token puede cambiar tu clave, cargar un respaldo ni borrar todos tus datos.
 
 ![Modo oscuro](docs/capturas/resumen-oscuro.png)
 
