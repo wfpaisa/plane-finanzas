@@ -461,11 +461,12 @@
         <ul style:--n={summary.length}>
           {#each summary as item (item.text)}
             <li class="insight {item.tone}">
-              <span class="insight-ico"><Icon name={item.icon} size={18} /></span>
-              <span class="insight-body">
-                <b class="insight-figure">{item.figure}</b>
-                <span class="insight-text">{item.text}</span>
+              <span class="insight-head">
+                <span class="insight-ico"><Icon name={item.icon} size={16} /></span>
+                <span class="insight-title">{item.title}</span>
               </span>
+              <b class="insight-figure">{item.figure}</b>
+              <span class="insight-text">{item.text}</span>
             </li>
           {/each}
         </ul>
@@ -893,11 +894,15 @@
 
   .insight {
     display: flex;
-    align-items: flex-start;
-    gap: var(--sp-12);
-    padding: var(--sp-12) var(--sp-14);
+    flex-direction: column;
+    gap: var(--sp-6);
+    min-width: 0;
+    padding: var(--sp-14) var(--sp-16);
+    border: var(--border-width, 1px) solid var(--border);
     border-radius: var(--radius-md);
-    background: color-mix(in oklab, var(--tone) 6%, transparent);
+    /* Una franja de color arriba dice si es bueno o malo; el fondo queda neutro. */
+    box-shadow: inset 0 2px 0 color-mix(in oklab, var(--tone) 70%, transparent);
+    background: color-mix(in oklab, var(--text-muted) 4%, transparent);
 
     --tone: var(--text-muted);
 
@@ -905,20 +910,28 @@
       --tone: var(--success);
     }
 
-    /* Lo malo se lee en rojo de una: gastar de más, la categoría que más se lleva. */
+    /* Lo malo se marca en rojo: gastar de más o gastar más que antes. */
     &.bad {
       --tone: var(--danger);
     }
   }
 
-  .insight-body {
+  .insight-head {
     display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
+    align-items: center;
+    gap: var(--sp-8);
     min-width: 0;
   }
 
+  .insight-title {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text-muted);
+  }
+
   .insight-figure {
+    margin-top: var(--sp-4);
     font-size: var(--text-xl);
     font-weight: 700;
     line-height: 1.15;
@@ -934,20 +947,17 @@
 
   .insight-text {
     font-size: var(--text-sm);
-    line-height: 1.4;
+    line-height: 1.45;
     color: var(--text-secondary);
-
-    .bad & {
-      color: color-mix(in oklab, var(--danger) 80%, var(--text-secondary));
-    }
+    text-wrap: pretty;
   }
 
   .insight-ico {
     display: grid;
     flex: none;
     place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 1.75rem;
+    height: 1.75rem;
     border-radius: 99rem;
     background: color-mix(in oklab, var(--tone) 14%, transparent);
     color: var(--tone);

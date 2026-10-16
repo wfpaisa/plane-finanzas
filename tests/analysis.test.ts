@@ -69,7 +69,7 @@ describe("insights", () => {
 
   test("cuenta lo que quedó, el cambio, la mayor y la que más subió", () => {
     const out = insights(base);
-    expect(out.map((x) => x.tone)).toEqual(["good", "bad", "bad", "bad"]);
+    expect(out.map((x) => x.tone)).toEqual(["good", "bad", "neutral", "bad"]);
     expect(out[0].text).toBe("Te quedó el 40% de tus ingresos después de los gastos.");
     expect(out[1].figure).toBe("+20%");
     expect(out[1].text).toContain("más que a esta altura del mes pasado");

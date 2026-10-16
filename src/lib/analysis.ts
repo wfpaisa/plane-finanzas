@@ -85,6 +85,8 @@ export function cumulative(txs: TxLike[], kind: Kind, n: number, slot: (date: st
 export interface Insight {
   icon: string;
   tone: "good" | "bad" | "neutral";
+  /** De qué trata, en pocas palabras, encima de la cifra. */
+  title: string;
   /** La cifra que se lee primero, en grande: un monto o un porcentaje. */
   figure: string;
   text: string;
@@ -125,18 +127,20 @@ export function insights(i: InsightInput): Insight[] {
   const word = `${spend ? "gastos" : "ingresos"}${loose ? " no programados" : ""}`;
 
   if (i.income > 0 || i.expense > 0) {
+    const title = "Ingresos menos gastos";
     const left = i.income - i.expense;
-    if (i.income === 0) out.push({ icon: "alert-02", tone: "bad", figure: money(i.expense), text: "Registraste gastos, pero no ingresos en este periodo." });
+    if (i.income === 0) out.push({ title, icon: "alert-02", tone: "bad", figure: money(i.expense), text: "Registraste gastos, pero no ingresos en este periodo." });
     else if (left === 0)
-      out.push({ icon: "tick-02", tone: "neutral", figure: money(0), text: "Tus gastos igualaron tus ingresos en este periodo." });
+      out.push({ title, icon: "tick-02", tone: "neutral", figure: money(0), text: "Tus gastos igualaron tus ingresos en este periodo." });
     else if (left > 0)
       out.push({
+        title,
         icon: "piggy-bank",
         tone: "good",
         figure: money(left),
         text: `${i.ongoing ? "Hasta hoy te queda" : "Te quedó"} el ${pct((left / i.income) * 100)} de tus ingresos después de los gastos.`,
       });
-    else out.push({ icon: "alert-02", tone: "bad", figure: money(-left), text: "Tus gastos superaron tus ingresos en este periodo." });
+    else out.push({ title, icon: "alert-02", tone: "bad", figure: money(-left), text: "Tus gastos superaron tus ingresos en este periodo." });
   }
 
   if (i.prev) {
@@ -146,18 +150,20 @@ export function insights(i: InsightInput): Insight[] {
     const c = change(now, before);
     const when = i.prev.ongoing ? `a esta altura ${i.prev.name.replace(/^el /, "del ")}` : i.prev.name;
     // "Sin contar los pagos programados, gastaste…" o "Gastaste…".
+    const title = `Frente ${i.prev.name.replace(/^el /, "al ")}`;
     const lead = (verb: string) =>
       loose ? `Sin contar los ${spend ? "pagos" : "ingresos"} programados, ${verb}` : verb[0].toUpperCase() + verb.slice(1);
     if (c !== null && Math.abs(c) >= 1) {
       const up = c > 0;
       out.push({
+        title,
         icon: up ? "chart-increase" : "chart-decrease",
         tone: up === spend ? "bad" : "good",
         figure: `${up ? "+" : "−"}${pct(c)}`,
         text: `${lead(spend ? "gastaste" : "recibiste")} ${up ? "más" : "menos"} que ${when}: ${money(now)} contra ${money(before)}.`,
       });
     } else if (c !== null) {
-      out.push({ icon: "tick-02", tone: "neutral", figure: money(now), text: `${lead(spend ? "gastaste" : "recibiste")} casi lo mismo que ${when} (${money(before)}).` });
+      out.push({ title, icon: "tick-02", tone: "neutral", figure: money(now), text: `${lead(spend ? "gastaste" : "recibiste")} casi lo mismo que ${when} (${money(before)}).` });
     }
   }
 
@@ -165,8 +171,10 @@ export function insights(i: InsightInput): Insight[] {
   const top = i.cats[0];
   if (top && total > 0) {
     out.push({
+      title: spend ? "Categoría con más gastos" : "Categoría con más ingresos",
       icon: "crown",
-      tone: spend ? "bad" : "neutral",
+      // Que una categoría sea la mayor no es bueno ni malo: solo se informa.
+      tone: "neutral",
       figure: money(top.total),
       text: spend
         ? `${top.name} representó el ${pct((top.total / total) * 100)} de tus ${word}.`
@@ -186,6 +194,7 @@ export function insights(i: InsightInput): Insight[] {
     if (best && total > 0 && Math.abs(best.diff) >= total * 0.03) {
       const up = best.diff > 0;
       out.push({
+        title: "Mayor cambio",
         icon: up ? "arrow-up-right-01" : "arrow-down-right-01",
         tone: up === spend ? "bad" : "good",
         figure: `${up ? "+" : "−"}\u2060${money(Math.abs(best.diff))}`,
