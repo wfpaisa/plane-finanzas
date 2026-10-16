@@ -82,7 +82,7 @@
                   <ColorDot color={s?.palette} />
                   <span class="em-text"><span class="em-title">{savingName(it.saving)}</span><span class="em-kind">{what.label}</span></span>
                 </button>
-                <span class="em-bar"><span style:width="{Math.max(0, share)}%" style:background={colorOf(s?.palette)}></span></span>
+                <span class="em-bar"><span style:width="{Math.max(0, share)}%"></span></span>
                 <span class="em-pct">{share}%</span>
                 <Money value={it.amount} tone={it.amount < 0 ? "expense" : undefined} />
               </li>
@@ -211,6 +211,8 @@
       display: block;
       height: 100%;
       border-radius: inherit;
+      /* El color de la app, no el del ahorro: un ahorro rojo haría creer que algo va mal. */
+      background: var(--tinte, var(--chart-1));
     }
   }
 

@@ -308,9 +308,10 @@
           {#each savingsList as { s, current } (s.id)}
             {@const target = s.target_amount || 0}
             {@const pct = target ? (current / target) * 100 : 0}
-            <li class="cr" style:--tinte={colorOf(s.palette)}>
+            <li class="cr">
               <a class="cr-main" href="#/ahorros">
-                <span class="cr-ico"><Icon name={s.icon || "piggy-bank"} size={16} /></span>
+                <!-- El color del ahorro solo en el ícono: en la barra, uno rojo haría creer que algo va mal. -->
+                <span class="cr-ico" style:--tinte={colorOf(s.palette)}><Icon name={s.icon || "piggy-bank"} size={16} /></span>
                 <span class="cr-text">
                   <span class="cr-name">{s.name}</span>
                   <span class="cr-meta">

@@ -336,10 +336,6 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: 0 var(--sp-16) var(--sp-12) calc(var(--sp-16) + 2.25rem + var(--sp-10));
-
-    & .bar-track span {
-      background: var(--c);
-    }
   }
 
   .sv-body {

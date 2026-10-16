@@ -213,7 +213,7 @@
                   {#if s.target_amount}
                     <span class="sv-goal">
                       <span class="sv-goal-top"><b>{Math.round(pct)}%</b><span>de <Money value={s.target_amount} /></span></span>
-                      <span class="bar-track"><span style:width="{pct}%" style:background={colorOf(s.palette)}></span></span>
+                      <span class="bar-track"><span style:width="{pct}%"></span></span>
                       <span class="sv-sub">
                         {#if e && e.months === 0}Objetivo alcanzado{:else if e}Llega en {monthLabel(e.month)}{:else}Sin aporte, sin fecha estimada{/if}
                       </span>
