@@ -235,12 +235,17 @@
     return ym < now ? `${ym}-${String(lastDayOf(ym)).padStart(2, "0")}` : `${ym}-01`;
   }
 
+  /** Lo pagado en el mes actual se registra hoy, el día en que se marca; en otro mes, en su fecha programada. */
+  function paidDate(d: Due) {
+    return now.slice(0, 7) === ym ? now : dateFor(d);
+  }
+
   function draftOf(d: Due): TxDraft {
     const r = d.r;
     return {
       type: r.kind,
       amount: r.amount,
-      date: dateFor(d),
+      date: paidDate(d),
       account: r.account,
       to_account: r.kind === "transfer" ? r.to_account : "",
       category: r.kind === "transfer" ? "" : r.category,
