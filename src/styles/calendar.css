@@ -5,6 +5,9 @@
  * con ponerlas una vez basta.
  */
 .calendar .vc {
+  /* La librería le pone 17rem de mínimo: dentro de un menú con relleno se
+     sale y aparece un desplazamiento de lado. Que ocupe lo que le den. */
+  min-width: 0;
   --vc-bg: transparent;
   --vc-color: var(--text-primary);
   --vc-focus-outline-color: var(--focus-ring);

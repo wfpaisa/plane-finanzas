@@ -622,15 +622,15 @@
     padding: var(--sp-14);
   }
 
-  /* Con filtros puestos, que se note: la tarjeta y cada control encendido. */
+  /* Con filtros puestos, que se note: la tarjeta y cada control encendido,
+     en el color de acento de la app. */
   .filters.is-filtered {
-    --on-blue: light-dark(oklch(0.55 0.22 258), oklch(0.7 0.2 255));
-    box-shadow: inset 0 0 0 1px var(--on-blue);
+    box-shadow: inset 0 0 0 1px var(--accent);
 
     & :global(.field-control.is-on) {
-      border-color: var(--on-blue);
-      background: color-mix(in oklab, var(--on-blue) 16%, var(--bg-field));
-      box-shadow: 0 0 0 1px var(--on-blue);
+      border-color: var(--accent);
+      background: color-mix(in oklab, var(--accent) 16%, var(--bg-field));
+      box-shadow: 0 0 0 1px var(--accent);
     }
   }
 
@@ -641,8 +641,8 @@
     padding: var(--sp-4) var(--sp-12);
     border: 0;
     border-radius: 999px;
-    background: var(--on-blue);
-    color: light-dark(oklch(0.99 0 0), oklch(0.18 0.04 255));
+    background: var(--accent);
+    color: var(--accent-text);
     font-size: var(--text-xs);
     font-weight: 600;
     cursor: pointer;
