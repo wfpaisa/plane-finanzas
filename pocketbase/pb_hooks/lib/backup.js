@@ -213,10 +213,16 @@ function restoreData(app, userId, data, counts) {
       );
     });
     insert("saving_movements", data.saving_movements, function (r, row) {
-      r.set("saving", map("savings", row.saving));
+      var saving = map("savings", row.saving);
+      r.set("saving", saving);
       // Los aportes de otros miembros siguen siendo suyos si esa persona
-      // existe aquí; su cuenta no viaja en el respaldo y queda vacía.
-      r.set("created_by", userExists(tx, row.created_by) ? row.created_by : userId);
+      // existe aquí y es miembro del ahorro; su cuenta no viaja en el respaldo
+      // y queda vacía. A nadie más se le puede atribuir un aporte.
+      var members = [];
+      try {
+        if (saving) members = tx.findRecordById("savings", saving).getStringSlice("members");
+      } catch (_) {}
+      r.set("created_by", members.indexOf(row.created_by) >= 0 && userExists(tx, row.created_by) ? row.created_by : userId);
       r.set("account", map("accounts", row.account));
       if (row.external_id) r.set("external_id", remapKey(row.external_id));
     });

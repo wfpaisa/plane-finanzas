@@ -7,6 +7,25 @@
  * este archivo, por eso cada uno hace su propio `require`.
  */
 
+// ---------- Cabeceras de seguridad, en todas las respuestas ----------
+// Que ningún otro sitio meta la app en un marco (para engañar clics), que el
+// navegador no adivine tipos de archivo y que las direcciones no se filtren a
+// otros sitios. HSTS va en el proxy, que es quien sirve HTTPS.
+routerUse(
+  new Middleware(
+    (e) => {
+      const h = e.response.header();
+      h.set("X-Content-Type-Options", "nosniff");
+      h.set("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+      h.set("Referrer-Policy", "strict-origin-when-cross-origin");
+      h.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+      return e.next();
+    },
+    -2000,
+    "finanzasSecurityHeaders",
+  ),
+);
+
 // ---------- Tokens de acceso: la API sin la clave (ver lib/tokens.js) ----------
 // Corre antes que el de PocketBase (-1020): si el token es de los nuestros deja
 // `e.auth` puesto y aquel no hace nada.

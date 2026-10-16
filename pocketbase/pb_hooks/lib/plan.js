@@ -517,6 +517,12 @@ function mark(app, userId, body) {
 
   var account = String(body.account || r.account || "");
   if (!account) throw new BadRequestError("«" + r.name + "» no tiene cuenta: indica `account`.");
+  // Se guarda sin las reglas de la colección: la cuenta se revisa aquí.
+  var acc = null;
+  try {
+    acc = app.findRecordById("accounts", account);
+  } catch (_) {}
+  if (!acc || acc.getString("owner") !== userId) throw new NotFoundError("No se encontró la cuenta " + account + ".");
   if (r.kind === "transfer" && (!r.to_account || r.to_account === account)) throw new BadRequestError("«" + r.name + "» no tiene una cuenta de destino distinta.");
   var date = String(body.date || dateFor(due, ym, today())).slice(0, 10);
   var nt = new Record(app.findCollectionByNameOrId("transactions"));
