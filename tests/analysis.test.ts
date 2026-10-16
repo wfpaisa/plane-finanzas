@@ -99,6 +99,10 @@ describe("insights", () => {
     expect(out[3].text).toContain("Mercado fue la categoría que más disminuyó entre tus gastos no programados");
   });
 
+  test("si el periodo no ha terminado, lo que queda es hasta hoy", () => {
+    expect(insights({ ...base, ongoing: true })[0].text).toBe("Hasta hoy te queda el 40% de tus ingresos después de los gastos.");
+  });
+
   test("gastar más de lo que entró es malo", () => {
     expect(insights({ ...base, expense: 1500, prev: null })[0]).toMatchObject({ tone: "bad" });
   });

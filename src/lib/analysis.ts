@@ -106,6 +106,8 @@ export interface InsightInput {
    * antes o después que el mes pasado no dice nada de cómo vas gastando.
    */
   loose?: { income: number; expense: number };
+  /** El periodo todavía no termina: lo que queda puede cambiar. */
+  ongoing?: boolean;
 }
 
 const pct = (n: number) => `${Math.round(Math.abs(n))}%`;
@@ -132,7 +134,7 @@ export function insights(i: InsightInput): Insight[] {
         icon: "piggy-bank",
         tone: "good",
         figure: money(left),
-        text: `Te quedó el ${pct((left / i.income) * 100)} de tus ingresos después de los gastos.`,
+        text: `${i.ongoing ? "Hasta hoy te queda" : "Te quedó"} el ${pct((left / i.income) * 100)} de tus ingresos después de los gastos.`,
       });
     else out.push({ icon: "alert-02", tone: "bad", figure: money(-left), text: "Tus gastos superaron tus ingresos en este periodo." });
   }

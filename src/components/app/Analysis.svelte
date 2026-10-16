@@ -122,12 +122,16 @@
   const fixedIncome = $derived(sumOf(inRange.filter(programmed), "income"));
   const fixedExpense = $derived(sumOf(inRange.filter(programmed), "expense"));
 
+  // El periodo que se mira incluye hoy: lo que queda todavía puede cambiar.
+  const ongoing = $derived(range[0] <= now && now < range[1]);
+
   const summary = $derived.by(() => {
     const hasFixed = [...inRange, ...inPrev].some(programmed);
     const now = hasFixed ? inRange.filter((t) => !programmed(t)) : inRange;
     const before = hasFixed ? inPrev.filter((t) => !programmed(t)) : inPrev;
     return insights({
       kind: catKind,
+      ongoing,
       income,
       expense,
       loose: hasFixed ? { income: sumOf(now, "income"), expense: sumOf(now, "expense") } : undefined,
@@ -439,7 +443,15 @@
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico"><Icon name="coins-01" /></span><span class="kpi-label">Ingresos menos gastos</span></div>
         <div class="kpi-val"><Money value={income - expense} tone="auto" /></div>
-        <div class="kpi-foot">{income <= 0 ? "Sin ingresos en el periodo" : savingRate > 0 ? `Te quedó el ${Math.round(savingRate)}% de tus ingresos` : savingRate < 0 ? `Tus gastos superaron tus ingresos en un ${Math.round(-savingRate)}%` : "Gastaste todos tus ingresos"}</div>
+        <div class="kpi-foot">{income <= 0
+            ? "Sin ingresos en el periodo"
+            : savingRate > 0
+              ? `${ongoing ? "Hasta hoy te queda" : "Te quedó"} el ${Math.round(savingRate)}% de tus ingresos`
+              : savingRate < 0
+                ? `${ongoing ? "Hasta hoy tus gastos superan" : "Tus gastos superaron"} tus ingresos en un ${Math.round(-savingRate)}%`
+                : ongoing
+                  ? "Hasta hoy gastaste todos tus ingresos"
+                  : "Gastaste todos tus ingresos"}</div>
       </div>
     </div>
 
