@@ -8,6 +8,7 @@
   import { SvelteSet } from "svelte/reactivity";
 
   import AccountForm from "../components/app/AccountForm.svelte";
+  import AccountKpis from "../components/app/AccountKpis.svelte";
   import ColorDot from "../components/app/ColorDot.svelte";
   import EarmarkedModal from "../components/app/EarmarkedModal.svelte";
   import Money from "../components/app/Money.svelte";
@@ -15,7 +16,7 @@
   import Icon from "../components/Icon.svelte";
   import { Button, InfoTip, Switch } from "../components/ui";
   import { band, flowLayout } from "../lib/analysis";
-  import { accountAvailability, cardCredit, isCard } from "../lib/cards";
+  import { cardCredit, isCard } from "../lib/cards";
   import { accountTypeIcon, accountTypeLabel, BALANCE_TIPS } from "../lib/labels";
   import { colorOf } from "../lib/palettes";
   import { go } from "../lib/router.svelte";
@@ -41,10 +42,6 @@
   const counted = $derived(store.activeAccounts.filter((a) => !a.exclude_from_total));
   const positives = $derived(counted.filter((a) => store.balance(a.id) > 0));
   const debts = $derived(counted.filter((a) => store.balance(a.id) < 0).reduce((s, a) => s + store.balance(a.id), 0));
-  // Solo lo reservado en las cuentas que suman en el total: así el total es
-  // lo reservado más lo que queda sin reservar.
-  const earmarked = $derived(counted.reduce((s, a) => s + store.earmarked(a.id), 0));
-  const availability = $derived(accountAvailability(store.activeAccounts, (id) => store.balance(id), earmarked));
   const credit = (a: Account) => cardCredit(a, store.balance(a.id));
 
   // Lo marcado para sumar. Solo cuenta lo que está a la vista: si se
@@ -208,46 +205,7 @@
   </header>
 
   <div class="stack">
-    <div class="kpis-auto">
-      <div class="card kpi">
-        <div class="kpi-head">
-          <span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label"
-            ><span class="label-tip">Saldo neto<InfoTip text={BALANCE_TIPS.total} /></span></span
-          >
-        </div>
-        <div class="kpi-val"><Money value={store.total} /></div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-head">
-          <span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label"
-            ><span class="label-tip">Reservado<InfoTip text={BALANCE_TIPS.earmarked} /></span></span
-          >
-        </div>
-        <div class="kpi-val"><Money value={earmarked} /></div>
-        {#if earmarked > 0}<button type="button" class="link small kpi-link" onclick={() => showEarmarked(null)}>Ver para qué →</button>{/if}
-      </div>
-      <div class="card kpi">
-        <div class="kpi-head">
-          <span class="kpi-ico tone-income"><Icon name="coins-01" /></span><span class="kpi-label"
-            ><span class="label-tip">Disponible<InfoTip text={BALANCE_TIPS.available} /></span></span
-          >
-        </div>
-        <div class="kpi-val"><Money value={availability.available} tone={availability.available < 0 ? "expense" : undefined} /></div>
-        {#if availability.debt > 0}
-          <p class="available-before-debts">Antes de deudas: <Money value={availability.beforeDebts} /></p>
-        {/if}
-      </div>
-      {#if availability.debt > 0}
-        <div class="card kpi">
-          <div class="kpi-head">
-            <span class="kpi-ico tone-expense"><Icon name="credit-card" /></span><span class="kpi-label"
-              ><span class="label-tip">Deudas<InfoTip text="Lo que debes en tarjetas de crédito y otras deudas: la suma de los saldos negativos." /></span></span
-            >
-          </div>
-          <div class="kpi-val"><Money value={availability.debt} tone="expense" /></div>
-        </div>
-      {/if}
-    </div>
+    <div class="kpis-auto"><AccountKpis /></div>
 
     {#if list.length}
       {#if accounts.length}
@@ -320,12 +278,6 @@
 <EarmarkedModal open={earmarkOpen} account={earmarkAccount} accounts={counted} onClose={() => (earmarkOpen = false)} />
 
 <style>
-  .available-before-debts {
-    margin: var(--sp-4) 0 0;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-
   /* El flujo de las cuentas al total: el SVG se estira a lo ancho y las
      etiquetas van encima en HTML, como en el plan de Gastos e ingresos. */
   .aflow {
@@ -404,10 +356,6 @@
 
   .acc-free.same {
     opacity: 0.55;
-  }
-
-  .kpi-link {
-    align-self: flex-start;
   }
 
   /* El total apartado se abre en su desglose: se ve como enlace. */

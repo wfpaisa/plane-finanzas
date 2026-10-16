@@ -17,7 +17,8 @@
   apartar para pagarlo: marcarlo abre el formulario del aporte a su ahorro,
   sin mover plata. En el mes en curso avisa lo que quedó sin reservar. Al pagarlo, el servidor libera lo apartado (pb_hooks/lib/provisions.js).
 
-  Con `mobile` (Gastos e ingresos en el celular) el título lo pone la página, el
+  En el escritorio el selector de mes lo pone la página, junto a su título.
+  Con `mobile` (Gastos e ingresos en el celular) va arriba de la lista, el
   movimiento se abre en la pantalla del celular (mobile/TxScreen) y el botón
   de atrás del teléfono cierra lo que esté abierto.
 -->
@@ -412,17 +413,6 @@
       <MonthNav bind:ym />
       <p class="card-sub">{@render progress()}</p>
     </div>
-  {:else}
-    <header class="rm-header">
-      <div class="rm-heading">
-        <h2>Movimientos programados del mes</h2>
-        <p class="card-sub">Marca cada uno cuando lo pagues o lo recibas.</p>
-      </div>
-      <div class="rm-head">
-        <MonthNav bind:ym />
-        <p class="card-sub">{@render progress()}</p>
-      </div>
-    </header>
   {/if}
 
   {#each groups as g (g.id)}
@@ -658,32 +648,6 @@
   .rm {
     display: grid;
     gap: var(--sp-12);
-  }
-
-  /* El título y el mes van fuera de las tarjetas; cada grupo, en la suya. */
-  .rm-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-12);
-    margin-top: var(--sp-16);
-  }
-
-  .rm-heading {
-    flex: 1 1 15rem;
-    min-width: 0;
-
-    & h2 {
-      margin: 0 0 var(--sp-4);
-      font-size: 1.25rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-
-    & .card-sub {
-      margin: 0;
-    }
   }
 
   .rm-head {

@@ -1,20 +1,23 @@
 <!--
-  Resumen: cuánto hay, cuánto queda para gastar este mes y cómo van los
-  ahorros; debajo, en escritorio, el análisis de ingresos y gastos (antes su
-  propia pantalla). Lo primero que se ve al entrar. En el celular es la
+  Resumen: primero cuánto reservar y cuánto queda para gastar este mes; después
+  las cifras de las cuentas (las mismas de Cuentas); debajo, en escritorio, el
+  análisis de ingresos y gastos (antes su propia pantalla). Lo primero que se ve al entrar. En el celular es la
   pestaña Resumen, que tiene su propia pestaña de Análisis: allá sigue con
   sus gráficas de siempre.
 -->
 <script lang="ts">
   import type { ChartConfiguration } from "chart.js";
 
+  import AccountKpis from "../components/app/AccountKpis.svelte";
   import Analysis from "../components/app/Analysis.svelte";
   import Money from "../components/app/Money.svelte";
+  import PlanCards from "../components/app/PlanCards.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button } from "../components/ui";
+  import { useCardPlan } from "../lib/cardPlan.svelte";
   import { alpha, colorsFor, tintColor, token } from "../lib/colors";
-  import { addMonths, bucketize, budgetUse, byCategory, monthRange, today } from "../lib/finance";
+  import { addMonths, bucketize, byCategory, monthRange, today } from "../lib/finance";
   import { money, moneyShort, monthLabel } from "../lib/format";
   import { notify } from "../lib/notify.svelte";
   import { cachedList } from "../lib/offline.svelte";
@@ -22,7 +25,7 @@
   import { pb, session } from "../lib/pb.svelte";
   import { go, route } from "../lib/router.svelte";
   import { store } from "../lib/store.svelte";
-  import { byTag, FIXED_TAG, hasTag, tagsOf } from "../lib/tags";
+  import { byTag, hasTag, tagsOf } from "../lib/tags";
   import type { Transaction } from "../lib/types";
 
   // En el celular la gráfica es angosta: el eje abrevia las cifras ($14.2M)
@@ -62,12 +65,7 @@
   const monthExpenses = $derived(month.filter((t) => t.type === "expense"));
   const expense = $derived(monthExpenses.reduce((s, t) => s + t.amount, 0));
   const plan = $derived(store.plan);
-  // Contra lo libre van los gastos variables: los que no llevan #fijo (propia
-  // o de su categoría), como en el móvil. Ver `budgetUse`.
-  const use = $derived(budgetUse(plan, monthExpenses.map((t) => ({ amount: t.amount, fixed: hasTag(t, FIXED_TAG) }))));
-  const budget = $derived(use.budget);
-  const left = $derived(use.left);
-  const pctUsed = $derived(use.pct);
+  const cards = useCardPlan(() => ym);
   const review = $derived(month.filter((t) => t.tags?.includes("revisar")).length);
 
   const months = Array.from({ length: 6 }, (_, i) => addMonths(ym, i - 5));
@@ -201,7 +199,6 @@
   const savingsList = $derived(
     store.activeSavings.slice(0, 5).map((s) => ({ s, current: store.savingCurrent(s.id) })),
   );
-  const savedTotal = $derived(store.activeSavings.reduce((t, x) => t + store.savingCurrent(x.id), 0));
   /** Sin meta, la barra se mide contra el ahorro más grande. */
   const savingsMax = $derived(Math.max(0, ...savingsList.map((x) => x.current)));
 </script>
@@ -227,13 +224,10 @@
   </header>
 
   <div class="stack dash">
+    <PlanCards {ym} cards={cards.current} />
     {#if mobile}
       <div class="kpis-auto">
-        <div class="card kpi">
-          <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
-          <div class="kpi-val"><Money value={store.total} /></div>
-          <div class="kpi-foot">{store.activeAccounts.length} cuentas</div>
-        </div>
+        <AccountKpis />
         <div class="card kpi">
           <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="money-receive-01" /></span><span class="kpi-label">Ingresos del mes</span></div>
           <div class="kpi-val"><Money value={income} tone="income" /></div>
@@ -242,18 +236,6 @@
         <div class="card kpi">
           <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="money-send-01" /></span><span class="kpi-label">Gastos del mes</span></div>
           <div class="kpi-val"><Money value={expense} tone="expense" /></div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-head">
-            <span class="kpi-ico {left < 0 ? 'tone-expense' : left < budget * 0.15 ? 'tone-warn' : 'tone-income'}"><Icon name="coins-01" /></span>
-            <span class="kpi-label">{left >= 0 ? "Te puedes gastar" : "Gastaste de más"}</span>
-          </div>
-          <div class="kpi-val"><Money value={Math.abs(left)} tone={left < 0 ? "expense" : undefined} /></div>
-          <progress class="progress" max="100" value={pctUsed}></progress>
-          <div class="kpi-foot">Has usado {Math.round(pctUsed)}% de lo disponible: <Money value={budget} /></div>
-          {#if use.fixedOver > 0}
-            <div class="kpi-foot">Incluye <Money value={use.fixedOver} /> de gastos fijos por encima de lo planeado.</div>
-          {/if}
         </div>
       </div>
 
@@ -302,28 +284,7 @@
       <!-- Ingresos y gastos del mes van en el análisis, con su comparación;
            el detalle de cada ahorro, en Ahorros. -->
       <div class="kpis-auto">
-        <div class="card kpi">
-          <div class="kpi-head"><span class="kpi-ico"><Icon name="wallet-01" /></span><span class="kpi-label">Saldo neto</span></div>
-          <div class="kpi-val"><Money value={store.total} /></div>
-          <div class="kpi-foot">{store.activeAccounts.length} cuentas</div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-head">
-            <span class="kpi-ico {left < 0 ? 'tone-expense' : left < budget * 0.15 ? 'tone-warn' : 'tone-income'}"><Icon name="coins-01" /></span>
-            <span class="kpi-label">{left >= 0 ? "Te puedes gastar" : "Gastaste de más"}</span>
-          </div>
-          <div class="kpi-val"><Money value={Math.abs(left)} tone={left < 0 ? "expense" : undefined} /></div>
-          <progress class="progress" max="100" value={pctUsed}></progress>
-          <div class="kpi-foot">Has usado {Math.round(pctUsed)}% de lo disponible: <Money value={budget} /></div>
-          {#if use.fixedOver > 0}
-            <div class="kpi-foot">Incluye <Money value={use.fixedOver} /> de gastos fijos por encima de lo planeado.</div>
-          {/if}
-        </div>
-        <a class="card kpi kpi-link" href="#/ahorros">
-          <div class="kpi-head"><span class="kpi-ico"><Icon name="piggy-bank" /></span><span class="kpi-label">Ahorros</span></div>
-          <div class="kpi-val"><Money value={savedTotal} copy={false} /></div>
-          <div class="kpi-foot"><Money value={plan.savings} /> al mes · {store.activeSavings.length} {store.activeSavings.length === 1 ? "ahorro" : "ahorros"}</div>
-        </a>
+        <AccountKpis />
       </div>
 
       <Analysis />
@@ -433,20 +394,7 @@
     }
   }
 
-  .kpi-link {
-    color: inherit;
-    text-decoration: none;
-
-    &:hover {
-      border-color: var(--border-strong, var(--border));
-    }
-  }
-
   .tag-note {
     margin: var(--sp-8) 0 0;
-  }
-
-  .kpi .progress {
-    height: 0.375rem;
   }
 </style>

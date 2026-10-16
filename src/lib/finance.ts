@@ -260,48 +260,6 @@ export function planSummary(recurring: RecurringLike[], savings: SavingLike[], y
   return { income, fixed, savings: sav, free: income - fixed - sav };
 }
 
-export interface BudgetUse {
-  /** Lo que el plan deja libre (nunca menos de cero). */
-  budget: number;
-  /** Gastos fijos del mes (con #fijo) y variables (el resto). */
-  fixed: number;
-  variable: number;
-  /** Lo que los fijos pasan de lo planeado. */
-  fixedOver: number;
-  /** Lo que ya se usó de lo libre: los variables más ese exceso. */
-  used: number;
-  /** Lo que queda; negativo si se gastó de más. */
-  left: number;
-  /** Porcentaje usado de lo libre, de 0 a 100. */
-  pct: number;
-}
-
-/**
- * Cómo va lo libre del mes. Lo libre ya descontó los fijos planeados, así
- * que contra él solo van los gastos variables; si los fijos pasan de lo
- * planeado, el exceso también sale de ahí. `fixed` dice qué gasto es fijo.
- */
-export function budgetUse(plan: PlanSummary, expenses: { amount: number; fixed: boolean }[]): BudgetUse {
-  let fixed = 0;
-  let variable = 0;
-  for (const e of expenses) {
-    if (e.fixed) fixed += e.amount;
-    else variable += e.amount;
-  }
-  const budget = Math.max(0, plan.free);
-  const fixedOver = Math.max(0, fixed - plan.fixed);
-  const used = variable + fixedOver;
-  return {
-    budget,
-    fixed,
-    variable,
-    fixedOver,
-    used,
-    left: budget - used,
-    pct: budget > 0 ? Math.min(100, (used / budget) * 100) : 0,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Ahorros
 // ---------------------------------------------------------------------------

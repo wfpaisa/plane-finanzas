@@ -28,7 +28,7 @@ Cada persona entra con su correo y su clave, y solo ve sus propios datos. Las cu
 ## ¿Qué puedes hacer?
 
 ### Ver cómo vas este mes
-El **Resumen** te muestra de un vistazo tu **saldo neto** (lo que tienes menos lo que debes), **cuánto puedes gastar** todavía este mes y cuánto llevas ahorrado. Debajo está el análisis del mes.
+El **Resumen** te muestra primero cuánto **dinero debes reservar** y cuánto tienes **disponible para gastar** este mes. Debajo están las cifras de tus cuentas, las mismas de Cuentas: **saldo neto** (lo que tienes menos lo que debes), lo reservado, lo disponible y tus deudas. Al final está el análisis del mes.
 
 ### Entender en qué se va tu plata
 En el análisis, dentro del **Resumen**, comparas ingresos y gastos por semana, mes o año, y los filtras por etiqueta o por cuenta. Un bloque «En pocas palabras» resume lo importante: cuánto te quedó libre, si gastas más o menos que el mes pasado y qué categoría se llevó más. También ves el ritmo de gasto frente al mes anterior y el reparto por categoría, con un presupuesto para cada una.

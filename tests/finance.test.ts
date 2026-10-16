@@ -4,7 +4,6 @@ import {
   activeIn,
   addMonths,
   bucketize,
-  budgetUse,
   daysBetween,
   dueDate,
   futureValue,
@@ -191,34 +190,6 @@ describe("plan", () => {
     // Sin mes, el promedio de siempre: el anual en doce y el de una vez fuera.
     expect(monthlyEquivalent({ kind: "expense", amount: 1200, frequency: "yearly" })).toBe(100);
     expect(monthlyEquivalent({ kind: "expense", amount: 1200, frequency: "once", start_date: "2026-09-01" }, "2026-09")).toBe(0);
-  });
-
-  describe("lo libre del mes", () => {
-    // Sueldo 6,5 M, fijos 2,8 M, ahorros 0,2 M: quedan 3,5 M libres.
-    const plan = { income: 6500000, fixed: 2800000, savings: 200000, free: 3500000 };
-
-    test("los fijos pagados no se descuentan dos veces", () => {
-      const u = budgetUse(plan, [
-        { amount: 1800000, fixed: true },
-        { amount: 95000, fixed: true },
-        { amount: 457900, fixed: false },
-      ]);
-      expect(u).toMatchObject({ budget: 3500000, fixed: 1895000, variable: 457900, fixedOver: 0, used: 457900, left: 3042100 });
-      expect(u.pct).toBeCloseTo(13.08, 2);
-    });
-
-    test("lo que los fijos pasan de lo planeado sale de lo libre", () => {
-      const u = budgetUse(plan, [
-        { amount: 3000000, fixed: true },
-        { amount: 100000, fixed: false },
-      ]);
-      expect(u).toMatchObject({ fixedOver: 200000, used: 300000, left: 3200000 });
-    });
-
-    test("sin plan no hay nada libre: todo lo variable es de más", () => {
-      const u = budgetUse({ income: 0, fixed: 0, savings: 0, free: 0 }, [{ amount: 50000, fixed: false }]);
-      expect(u).toMatchObject({ budget: 0, left: -50000, pct: 0 });
-    });
   });
 
   test("de un ahorro compartido cuenta solo la parte propia", () => {

@@ -1,7 +1,5 @@
 <!--
-  Gastos e ingresos en el celular: cuánto reservar y cuánto queda para gastar
-  en el mes (con lo que se debe en tarjetas de crédito), los programados del
-  mes para marcar, los ingresos y pagos programados y cómo se reparten los
+  Gastos e ingresos en el celular: los programados del mes para marcar, los ingresos y pagos programados y cómo se reparten los
   próximos meses.
 -->
 <script lang="ts">
@@ -9,7 +7,6 @@
   import Icon from "../Icon.svelte";
   import CategoryPill from "../app/CategoryPill.svelte";
   import Money from "../app/Money.svelte";
-  import PlanCards from "../app/PlanCards.svelte";
   import RecurringForm from "../app/RecurringForm.svelte";
   import RecurringMonth from "../app/RecurringMonth.svelte";
   import Segmented from "../app/Segmented.svelte";
@@ -90,16 +87,7 @@
 <header class="page-head pl-head">
   <div>
     <h1>Gastos e ingresos</h1>
-    <p>Marca los pagos e ingresos programados de cada mes y mira cuánto dinero debes reservar y cuánto te queda para gastar.</p>
-  </div>
-</header>
-
-<div class="pl-cards"><PlanCards {ym} cards={cards.current} /></div>
-
-<header class="section-head pl-section">
-  <div>
-    <h2>Movimientos programados</h2>
-    <p>Marca los pagos e ingresos de cada mes a medida que ocurren.</p>
+    <p>Marca los pagos e ingresos programados de cada mes cuando los hagas o los recibas.</p>
   </div>
 </header>
 
@@ -173,10 +161,6 @@
 
 <style>
   .pl-month {
-    margin: var(--sp-12);
-  }
-
-  .pl-cards {
     margin: var(--sp-12);
   }
 

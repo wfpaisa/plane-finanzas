@@ -100,6 +100,12 @@ export interface InsightInput {
   cats: { name: string; total: number }[];
   /** Lo del periodo anterior por nombre de categoría. */
   prevCats: Map<string, number>;
+  /**
+   * Lo del periodo sin los movimientos programados. Con él, `prev`, `cats` y
+   * `prevCats` también vienen sin ellos: un pago programado que cae unos días
+   * antes o después que el mes pasado no dice nada de cómo vas gastando.
+   */
+  loose?: { income: number; expense: number };
 }
 
 const pct = (n: number) => `${Math.round(Math.abs(n))}%`;
@@ -113,7 +119,8 @@ const pct = (n: number) => `${Math.round(Math.abs(n))}%`;
 export function insights(i: InsightInput): Insight[] {
   const out: Insight[] = [];
   const spend = i.kind === "expense";
-  const word = spend ? "gastos" : "ingresos";
+  const loose = !!i.loose;
+  const word = `${spend ? "gastos" : "ingresos"}${loose ? " no programados" : ""}`;
 
   if (i.income > 0 || i.expense > 0) {
     const left = i.income - i.expense;
@@ -123,26 +130,30 @@ export function insights(i: InsightInput): Insight[] {
         icon: "piggy-bank",
         tone: "good",
         figure: money(left),
-        text: `Te quedaron libres: guardaste ${pct((left / i.income) * 100)} de lo que entró.`,
+        text: `Te quedó libre el ${pct((left / i.income) * 100)} de lo que entró.`,
       });
     else out.push({ icon: "alert-02", tone: "bad", figure: money(-left), text: "Gastaste de más: salió más de lo que entró." });
   }
 
   if (i.prev) {
-    const now = spend ? i.expense : i.income;
+    const cur = i.loose ?? i;
+    const now = spend ? cur.expense : cur.income;
     const before = spend ? i.prev.expense : i.prev.income;
     const c = change(now, before);
     const when = i.prev.ongoing ? `a esta altura ${i.prev.name.replace(/^el /, "del ")}` : i.prev.name;
+    // "Sin contar los pagos programados, gastaste…" o "Gastaste…".
+    const lead = (verb: string) =>
+      loose ? `Sin contar los ${spend ? "pagos" : "ingresos"} programados, ${verb}` : verb[0].toUpperCase() + verb.slice(1);
     if (c !== null && Math.abs(c) >= 1) {
       const up = c > 0;
       out.push({
         icon: up ? "chart-increase" : "chart-decrease",
         tone: up === spend ? "bad" : "good",
         figure: `${up ? "+" : "−"}${pct(c)}`,
-        text: `${spend ? "Gastaste" : "Recibiste"} ${up ? "más" : "menos"} que ${when}: ${money(now)} contra ${money(before)}.`,
+        text: `${lead(spend ? "gastaste" : "recibiste")} ${up ? "más" : "menos"} que ${when}: ${money(now)} contra ${money(before)}.`,
       });
     } else if (c !== null) {
-      out.push({ icon: "tick-02", tone: "neutral", figure: money(now), text: `Vas casi igual que ${when} (${money(before)}).` });
+      out.push({ icon: "tick-02", tone: "neutral", figure: money(now), text: `${lead("vas")} casi igual que ${when} (${money(before)}).` });
     }
   }
 
@@ -172,7 +183,7 @@ export function insights(i: InsightInput): Insight[] {
         icon: up ? "arrow-up-right-01" : "arrow-down-right-01",
         tone: up === spend ? "bad" : "good",
         figure: `${up ? "+" : "−"}\u2060${money(Math.abs(best.diff))}`,
-        text: `Lo que más ${up ? "subió" : "bajó"}: ${best.name}, frente ${i.prev.name.replace(/^el /, "al ")}.`,
+        text: `Lo que más ${up ? "subió" : "bajó"}${loose ? ` en tus ${word}` : ""}: ${best.name}, frente ${i.prev.name.replace(/^el /, "al ")}.`,
       });
     }
   }

@@ -1,12 +1,11 @@
 <!--
-  Gastos e ingresos: cuánto reservar y cuánto queda para gastar en el mes
-  (con lo que se debe en tarjetas de crédito), los programados del mes para
-  marcar, el resumen del mes o del año y la lista de cada programado.
+  Gastos e ingresos: el mes que se ve (su selector va junto al título), los
+  programados del mes para marcar, el resumen del mes o del año y la lista de cada programado.
 -->
 <script lang="ts">
   import CategoryPill from "../components/app/CategoryPill.svelte";
   import Money from "../components/app/Money.svelte";
-  import PlanCards from "../components/app/PlanCards.svelte";
+  import MonthNav from "../components/mobile/MonthNav.svelte";
   import RecurringForm from "../components/app/RecurringForm.svelte";
   import RecurringMonth from "../components/app/RecurringMonth.svelte";
   import Segmented from "../components/app/Segmented.svelte";
@@ -155,13 +154,12 @@
   <header class="page-head">
     <div>
       <h1>Gastos e ingresos</h1>
-      <p>Marca los pagos e ingresos programados de cada mes y mira cuánto dinero debes reservar y cuánto te queda para gastar.</p>
+      <p>Marca los pagos e ingresos programados de cada mes cuando los hagas o los recibas.</p>
     </div>
+    <div class="page-actions"><MonthNav bind:ym /></div>
   </header>
 
   <div class="stack">
-    <PlanCards {ym} cards={cards.current} />
-
     <RecurringMonth bind:ym />
 
     <!-- El ingreso a la izquierda se abre en bandas hacia lo que se lleva

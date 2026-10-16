@@ -75,7 +75,7 @@
           b,
           acc: account,
         }),
-        fields: "id,type,date,amount,category,account,tags",
+        fields: "id,type,date,amount,category,account,tags,recurring_key,external_id",
         batch: 1000,
       })
       .then((r) => alive && (txs = r))
@@ -114,16 +114,31 @@
   const prevCats = $derived(new Map(byCategory(inPrev, catKind).map((c) => [c.category || "none", c.total])));
   const catName = (id: string) => store.category(id)?.name ?? "Sin categoría";
 
-  const summary = $derived(
-    insights({
+  // Lo que vino de un movimiento programado (el salario, la cuota del
+  // crédito…). Caen en fechas fijas, así que al comparar con el mes pasado
+  // a esta altura solo dicen si el pago cayó antes o después.
+  const programmed = (t: Transaction) => (t.recurring_key || t.external_id || "").startsWith("rec:");
+  const sumOf = (list: Transaction[], type: Kind) => list.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0);
+  const fixedIncome = $derived(sumOf(inRange.filter(programmed), "income"));
+  const fixedExpense = $derived(sumOf(inRange.filter(programmed), "expense"));
+
+  const summary = $derived.by(() => {
+    const hasFixed = [...inRange, ...inPrev].some(programmed);
+    const now = hasFixed ? inRange.filter((t) => !programmed(t)) : inRange;
+    const before = hasFixed ? inPrev.filter((t) => !programmed(t)) : inPrev;
+    return insights({
       kind: catKind,
       income,
       expense,
-      prev: prev && inPrev.length ? { income: prevIncome, expense: prevExpense, name: prev.name, ongoing: prev.ongoing } : null,
-      cats: cats.map((c) => ({ name: catName(c.category), total: c.total })),
-      prevCats: new Map([...prevCats].map(([k, v]) => [catName(k === "none" ? "" : k), v])),
-    }),
-  );
+      loose: hasFixed ? { income: sumOf(now, "income"), expense: sumOf(now, "expense") } : undefined,
+      prev:
+        prev && inPrev.length
+          ? { income: sumOf(before, "income"), expense: sumOf(before, "expense"), name: prev.name, ongoing: prev.ongoing }
+          : null,
+      cats: byCategory(now, catKind).map((c) => ({ name: catName(c.category), total: c.total })),
+      prevCats: new Map(byCategory(before, catKind).map((c) => [catName(c.category), c.total])),
+    });
+  });
 
   // A dónde fue el dinero: lo que entró por categoría y a dónde salió,
   // más lo que quedó o lo que faltó para que los dos lados cuadren.
@@ -353,7 +368,7 @@
   <header class="page-head analysis-head">
     <div>
       <h2 id="analysis-title">Análisis de ingresos y gastos</h2>
-      <p>Compara cuánto dinero entró y salió en {title}.</p>
+      <p>Los ingresos y gastos que ya registraste en {title}. Las transferencias entre tus cuentas no cuentan.</p>
     </div>
     <div class="page-actions">
       <Segmented
@@ -408,19 +423,23 @@
   <div class="stack">
     <div class="kpis-auto">
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="money-receive-01" /></span><span class="kpi-label">Ingresos</span>{@render delta(income, prevIncome, true)}</div>
+        <div class="kpi-head"><span class="kpi-ico tone-income"><Icon name="money-receive-01" /></span><span class="kpi-label">Ingresos registrados</span>{@render delta(income, prevIncome, true)}</div>
         <div class="kpi-val"><Money value={income} tone="income" /></div>
-        <div class="kpi-foot">Promedio <Money value={income / periods} /> por {per}</div>
+        <div class="kpi-foot">
+          {#if fixedIncome > 0}Programados: <Money value={fixedIncome} />{:else}Promedio <Money value={income / periods} /> por {per}{/if}
+        </div>
       </div>
       <div class="card kpi">
-        <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="money-send-01" /></span><span class="kpi-label">Gastos</span>{@render delta(expense, prevExpense, false)}</div>
+        <div class="kpi-head"><span class="kpi-ico tone-expense"><Icon name="money-send-01" /></span><span class="kpi-label">Gastos registrados</span>{@render delta(expense, prevExpense, false)}</div>
         <div class="kpi-val"><Money value={expense} tone="expense" /></div>
-        <div class="kpi-foot">Promedio <Money value={expense / periods} /> por {per}</div>
+        <div class="kpi-foot">
+          {#if fixedExpense > 0}Pagos programados: <Money value={fixedExpense} />{:else}Promedio <Money value={expense / periods} /> por {per}{/if}
+        </div>
       </div>
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico"><Icon name="coins-01" /></span><span class="kpi-label">Ingresos menos gastos</span></div>
         <div class="kpi-val"><Money value={income - expense} tone="auto" /></div>
-        <div class="kpi-foot">{income > 0 ? `Guardaste el ${Math.round(savingRate)}% de lo que entró` : "Sin ingresos en el periodo"}</div>
+        <div class="kpi-foot">{income > 0 ? `Te quedó el ${Math.round(savingRate)}% de lo que entró` : "Sin ingresos en el periodo"}</div>
       </div>
     </div>
 

@@ -70,7 +70,7 @@ describe("insights", () => {
   test("cuenta lo que quedó, el cambio, la mayor y la que más subió", () => {
     const out = insights(base);
     expect(out.map((x) => x.tone)).toEqual(["good", "bad", "bad", "bad"]);
-    expect(out[0].text).toContain("40%");
+    expect(out[0].text).toBe("Te quedó libre el 40% de lo que entró.");
     expect(out[1].figure).toBe("+20%");
     expect(out[1].text).toContain("más que a esta altura del mes pasado");
     expect(out[2].text).toBe("Arriendo se llevó 67% de tus gastos.");
@@ -81,6 +81,22 @@ describe("insights", () => {
 
   test("sin periodo anterior no compara", () => {
     expect(insights({ ...base, prev: null })).toHaveLength(2);
+  });
+
+  test("sin los programados, compara y reparte solo lo demás", () => {
+    // El arriendo cayó este mes y el anterior todavía no: no cuenta.
+    const out = insights({
+      ...base,
+      loose: { income: 0, expense: 200 },
+      prev: { income: 0, expense: 300, name: "el mes pasado", ongoing: true },
+      cats: [{ name: "Mercado", total: 200 }],
+      prevCats: new Map([["Mercado", 300]]),
+    });
+    expect(out[0].text).toBe("Te quedó libre el 40% de lo que entró.");
+    expect(out[1]).toMatchObject({ tone: "good", figure: "−33%" });
+    expect(out[1].text).toContain("Sin contar los pagos programados, gastaste menos");
+    expect(out[2].text).toBe("Mercado se llevó 100% de tus gastos no programados.");
+    expect(out[3].text).toContain("Lo que más bajó en tus gastos no programados: Mercado");
   });
 
   test("gastar más de lo que entró es malo", () => {
