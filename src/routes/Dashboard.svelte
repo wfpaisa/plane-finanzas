@@ -244,7 +244,7 @@
         <section class="dash-flow">
           <header class="section-head">
             <div>
-              <h2>Dinero que entró y salió</h2>
+              <h2>Ingresos y gastos</h2>
               <p>Últimos 6 meses</p>
             </div>
           </header>
@@ -268,13 +268,13 @@
           <div class="card card-body">
             {#if showTags}
               <Chart config={tagDoughnutConfig} height={240} label="Gastos del mes por etiqueta" />
-              <p class="small muted tag-note">Toca una etiqueta para ver sus categorías. Un gasto con varias etiquetas suma en cada una.</p>
+              <p class="small muted tag-note">Elige una etiqueta para ver sus categorías. Un gasto con varias etiquetas suma en cada una.</p>
             {:else if cats.length}
               {#key catTag}
                 <Chart config={doughnutConfig} height={240} label="Gastos del mes por categoría" />
               {/key}
             {:else}
-              <div class="empty-card">Todavía no hay gastos este mes.</div>
+              <div class="empty-card">No hay gastos registrados este mes.</div>
             {/if}
           </div>
         </section>
@@ -339,7 +339,7 @@
           {/each}
         </ul>
       {:else}
-        <div class="empty-card">No hay ahorros registrados. Crea uno para consultar su avance.</div>
+        <div class="empty-card">No hay ahorros. Crea uno para ver su avance.</div>
       {/if}
     </div>
   </section>

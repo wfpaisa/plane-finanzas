@@ -490,7 +490,7 @@
         <div class="day-head">
           <h3 class="card-title">{dateLong(day)}</h3>
           <button type="button" class="btn sm" onclick={() => txModal.new({ type: "expense", date: day })}
-            ><Icon name="add-01" size={14} />Anotar</button
+            ><Icon name="add-01" size={14} />Registrar</button
           >
         </div>
         {#if dayItems.length}
@@ -525,7 +525,7 @@
     />
   {:else}
     <div class="card empty-card">
-      No hay movimientos {filtered ? "con esos filtros" : "este mes"}.
+      {filtered ? "No hay movimientos con estos filtros." : "No hay movimientos en este periodo."}
     </div>
   {/if}
   {#if charted.length}
@@ -536,7 +536,7 @@
             {picked.length
               ? "Lo seleccionado"
               : filtered
-                ? "Lo buscado"
+                ? "Movimientos filtrados"
                 : "Movimientos"} en el tiempo
           </h3>
           <p class="card-sub">

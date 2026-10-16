@@ -124,15 +124,17 @@ export function insights(i: InsightInput): Insight[] {
 
   if (i.income > 0 || i.expense > 0) {
     const left = i.income - i.expense;
-    if (i.income === 0) out.push({ icon: "alert-02", tone: "bad", figure: money(i.expense), text: "Salieron y no se anotaron ingresos." });
-    else if (left >= 0)
+    if (i.income === 0) out.push({ icon: "alert-02", tone: "bad", figure: money(i.expense), text: "Registraste gastos, pero no ingresos en este periodo." });
+    else if (left === 0)
+      out.push({ icon: "tick-02", tone: "neutral", figure: money(0), text: "Tus gastos igualaron tus ingresos en este periodo." });
+    else if (left > 0)
       out.push({
         icon: "piggy-bank",
         tone: "good",
         figure: money(left),
-        text: `Te quedó libre el ${pct((left / i.income) * 100)} de lo que entró.`,
+        text: `Te quedó el ${pct((left / i.income) * 100)} de tus ingresos después de los gastos.`,
       });
-    else out.push({ icon: "alert-02", tone: "bad", figure: money(-left), text: "Gastaste de más: salió más de lo que entró." });
+    else out.push({ icon: "alert-02", tone: "bad", figure: money(-left), text: "Tus gastos superaron tus ingresos en este periodo." });
   }
 
   if (i.prev) {
@@ -153,7 +155,7 @@ export function insights(i: InsightInput): Insight[] {
         text: `${lead(spend ? "gastaste" : "recibiste")} ${up ? "más" : "menos"} que ${when}: ${money(now)} contra ${money(before)}.`,
       });
     } else if (c !== null) {
-      out.push({ icon: "tick-02", tone: "neutral", figure: money(now), text: `${lead("vas")} casi igual que ${when} (${money(before)}).` });
+      out.push({ icon: "tick-02", tone: "neutral", figure: money(now), text: `${lead(spend ? "gastaste" : "recibiste")} casi lo mismo que ${when} (${money(before)}).` });
     }
   }
 
@@ -164,7 +166,9 @@ export function insights(i: InsightInput): Insight[] {
       icon: "crown",
       tone: spend ? "bad" : "neutral",
       figure: money(top.total),
-      text: `${top.name} se llevó ${pct((top.total / total) * 100)} de tus ${word}.`,
+      text: spend
+        ? `${top.name} representó el ${pct((top.total / total) * 100)} de tus ${word}.`
+        : `${top.name} aportó el ${pct((top.total / total) * 100)} de tus ${word}.`,
     });
   }
 
@@ -183,7 +187,7 @@ export function insights(i: InsightInput): Insight[] {
         icon: up ? "arrow-up-right-01" : "arrow-down-right-01",
         tone: up === spend ? "bad" : "good",
         figure: `${up ? "+" : "−"}\u2060${money(Math.abs(best.diff))}`,
-        text: `Lo que más ${up ? "subió" : "bajó"}${loose ? ` en tus ${word}` : ""}: ${best.name}, frente ${i.prev.name.replace(/^el /, "al ")}.`,
+        text: `${best.name} fue la categoría que más ${up ? "aumentó" : "disminuyó"}${loose ? ` entre tus ${word}` : ""} frente ${i.prev.name.replace(/^el /, "al ")}.`,
       });
     }
   }

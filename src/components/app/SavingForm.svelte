@@ -108,7 +108,7 @@
     if (!email) return;
     try {
       const u = await pb.send<User>("/api/finanzas/users/lookup", { query: { email } });
-      if (u.id === session.id) throw new Error("Ese eres tú.");
+      if (u.id === session.id) throw new Error("No puedes compartir un ahorro contigo mismo.");
       if (!members.some((m) => m.id === u.id)) members = [...members, u];
       memberEmail = "";
     } catch (err) {
@@ -117,7 +117,7 @@
   }
 
   async function save() {
-    if (!name.trim()) return notify.fail(new Error("Ponle nombre al ahorro."));
+    if (!name.trim()) return notify.fail(new Error("Escribe un nombre para el ahorro."));
     busy = true;
     try {
       const shares = shared ? await sharesToSave() : {};
@@ -170,16 +170,16 @@
 <Modal {open} {onClose} title={saving ? "Editar ahorro" : "Nuevo ahorro"} width="modal-panel-width-lg">
   <div class="saving-form">
     <div class="form-grid">
-      <Field label="Nombre" tip="El objetivo para el que guardas dinero. Así aparecerá en Ahorros, Resumen y Gastos e ingresos."><Input bind:value={name} placeholder="Viajes, imprevistos, vejez…" autofocus /></Field>
+      <Field label="Nombre" tip="Así aparecerá en Ahorros, Resumen y Gastos e ingresos."><Input bind:value={name} placeholder="Viajes, imprevistos, vejez…" autofocus /></Field>
       {#if shared}
-        <Field label="Tu aporte al mes" tip="Lo que pones tú cada mes, desde tus cuentas. Cada persona define el suyo y el aporte del ahorro es la suma. Solo tu parte deja de contarse como dinero disponible."><MoneyInput bind:value={monthly} /></Field>
+        <Field label="Tu aporte mensual" tip="Cada persona define su aporte. Solo el tuyo se resta del dinero disponible."><MoneyInput bind:value={monthly} /></Field>
       {:else}
-        <Field label="Cuánto guardarás al mes" tip="Esta cantidad se reserva cada mes y deja de contarse como dinero disponible para otros gastos."><MoneyInput bind:value={monthly} /></Field>
+        <Field label="Aporte mensual" tip="Se reserva cada mes y se resta del dinero disponible."><MoneyInput bind:value={monthly} /></Field>
       {/if}
       <Field label="Día del aporte" tip="Día del mes en que se registra el aporte automático. Si el mes es más corto, se usa su último día."><DayInput bind:value={day} /></Field>
-      <Field label="Interés anual (%)" tip="El porcentaje que esperas ganar en un año por tener este dinero guardado. Se usa solo para calcular el futuro. Escribe 0 si la cuenta no paga intereses."><Input type="number" min="0" max="100" step="0.1" bind:value={rate} /></Field>
-      <Field label="Objetivo de ahorro (opcional)" tip="Cantidad total que deseas ahorrar. La barra mostrará el avance hacia este objetivo."><MoneyInput bind:value={target} /></Field>
-      <Field label="Fecha objetivo (opcional)" tip="Fecha en la que deseas completar el ahorro. Con la cantidad y la fecha objetivo, se calcula el aporte mensual necesario."><DateInput bind:value={targetDate} clearable /></Field>
+      <Field label="Interés anual (%)" tip="Se usa solo para proyectar el ahorro. Escribe 0 si no genera intereses."><Input type="number" min="0" max="100" step="0.1" bind:value={rate} /></Field>
+      <Field label="Meta (opcional)" tip="Cantidad que quieres ahorrar. Verás el avance hacia esta meta."><MoneyInput bind:value={target} /></Field>
+      <Field label="Fecha de la meta (opcional)" tip="Con la meta y esta fecha se calcula el aporte mensual necesario."><DateInput bind:value={targetDate} clearable /></Field>
     </div>
 
     {#if others.length}

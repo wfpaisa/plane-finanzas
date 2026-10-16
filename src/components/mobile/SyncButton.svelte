@@ -12,9 +12,9 @@
     const n = offline.pending;
     if (offline.authNeeded && n) return { icon: "alert-02", label: "Entra de nuevo para enviar", tone: "warn" };
     const f = offline.failed.length;
-    if (f) return { icon: "alert-02", label: f === 1 ? "1 cambio sin guardar" : `${f} cambios sin guardar`, tone: "bad" };
+    if (f) return { icon: "alert-02", label: f === 1 ? "1 cambio rechazado" : `${f} cambios rechazados`, tone: "bad" };
     if (!offline.online) return { icon: "wifi-off-01", label: n ? `Sin conexión · ${n} por enviar` : "Sin conexión", tone: "" };
-    if (n) return { icon: "cloud-upload", label: `Enviando ${n}…`, tone: "" };
+    if (n) return { icon: "cloud-upload", label: offline.syncing ? `Enviando ${n}…` : `${n} por enviar`, tone: "" };
     return null;
   });
   const count = $derived(offline.pending + offline.failed.length);

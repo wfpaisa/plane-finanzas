@@ -214,7 +214,7 @@
   async function save(again = false) {
     if (!amount) {
       panel = "amount";
-      return notify.fail(new Error("Escribe la cantidad de dinero."));
+      return notify.fail(new Error("Escribe un monto mayor que cero."));
     }
     if (!account) {
       panel = "account";
@@ -251,12 +251,12 @@
       }
       notify.done(
         !offline.online
-          ? "Guardado en el teléfono: se envía al volver la conexión"
+          ? "Guardado en este dispositivo. Se enviará al reconectar."
           : editing
-            ? "Guardado"
+            ? "Movimiento guardado"
             : link
               ? `${description.trim() || TITLE[type]} quedó ${type === "income" ? "recibido" : "pagado"}`
-              : `${TITLE[type]} anotado`,
+              : `${TITLE[type]} registrado`,
       );
       if (!again) return onClose();
       // Otro con la misma fecha, tipo y cuenta.
@@ -280,7 +280,7 @@
     date = today();
     files = [];
     panel = null;
-    notify.done("Copia lista: revisa y guarda");
+    notify.done("Copia lista. Revísala y guárdala.");
   }
 
   async function remove() {

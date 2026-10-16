@@ -141,10 +141,10 @@
   {onClose}
   title={title ?? (saving ? `${saving.name}` : "Ahorro")}
   description={movement
-    ? "Corrige este movimiento del ahorro."
+    ? "Edita este aporte o retiro."
     : draft
       ? "El dinero no sale de la cuenta: queda reservado en ella hasta que registres el pago."
-      : "Registra el dinero reservado para este ahorro."}
+      : "Registra un aporte o retiro de este ahorro."}
 >
   <div class="stack">
     {#if !draft}
@@ -164,7 +164,7 @@
     {#if foreignAccount}
       <p class="small muted">Este aporte pertenece a otra persona; su cuenta no se puede cambiar desde aquí.</p>
     {:else}
-      <Field label="Cuenta" tip="Dónde queda guardado este dinero. En Cuentas, la columna «Apartado» suma lo de cada una.">
+      <Field label="Cuenta" tip="El dinero sigue en esta cuenta y aparece en la columna «Reservado» de Cuentas.">
         <Select bind:value={account}>
           {#if movement && !movement.account}<option value="">Sin cuenta</option>{/if}
           {#each store.activeAccounts as a (a.id)}<option value={a.id}>{a.name}</option>{/each}

@@ -297,7 +297,7 @@
         {#if slices.length}
           <header class="section-head st-section">
             <div>
-              <h2>{kind === "expense" ? "¿En qué gastaste?" : "¿De dónde entró?"}</h2>
+              <h2>{kind === "expense" ? "Gastos" : "Ingresos"} por {byTags ? "etiqueta" : "categoría"}</h2>
               <p>Toca {byTags ? "una etiqueta" : "una categoría"} para ver sus movimientos.</p>
             </div>
           </header>
@@ -334,7 +334,7 @@
             {/each}
           </ul>
         {:else if !loading}
-          <p class="st-empty">Nada en este periodo.</p>
+          <p class="st-empty">No hay movimientos en este periodo.</p>
         {/if}
       </SlideIn>
     </SlideIn>
@@ -374,7 +374,7 @@
 
     <header class="section-head st-section">
       <div>
-        <h2>Cómo ha venido</h2>
+        <h2>Evolución</h2>
         <p>{yearly ? "Últimos cinco años" : "Últimos ocho meses"}</p>
       </div>
     </header>
@@ -384,7 +384,7 @@
       {/key}
     </div>
 
-    <DayList txs={filtered} {onOpen} empty="Sin movimientos en este periodo." />
+    <DayList txs={filtered} {onOpen} empty="No hay movimientos en este periodo." />
   </MonthSwipe>
 {/if}
 

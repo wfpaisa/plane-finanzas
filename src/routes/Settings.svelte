@@ -96,7 +96,7 @@
   }
 
   async function saveCategory() {
-    if (!cName.trim()) return notify.fail(new Error("Ponle nombre."));
+    if (!cName.trim()) return notify.fail(new Error("Escribe un nombre para la categoría."));
     busy = true;
     try {
       const data = {
@@ -152,7 +152,7 @@
     try {
       const r = await pb.send<{ transactions: number; movements: number }>("/api/finanzas/automatic/run", { method: "POST" });
       await reload("accounts", "savings");
-      notify.done(`${r.transactions} movimientos recurrentes y ${r.movements} aportes creados.`);
+      notify.done(`${r.transactions} movimientos programados y ${r.movements} aportes registrados.`);
     } catch (err) {
       notify.fail(err);
     } finally {
@@ -264,7 +264,7 @@
       <div class="card-head">
         <div>
           <h3 class="card-title">Categorías</h3>
-          <p class="card-sub">Agrupan tus ingresos y gastos para ver en qué se va tu dinero y de dónde llega.</p>
+          <p class="card-sub">Agrupan tus ingresos y gastos para mostrar de dónde viene y en qué se va tu dinero.</p>
         </div>
         <div class="card-head-actions">
           <Button size="sm" variant="secondary" onclick={() => edit(null, catKind)}><Icon name="add-01" />Nueva categoría</Button>
@@ -307,7 +307,7 @@
             {/each}
           </div>
         {:else}
-          <p class="empty-card">{catQuery ? "Nada coincide con la búsqueda." : "Aún no hay categorías de este tipo."}</p>
+          <p class="empty-card">{catQuery ? "No hay categorías que coincidan con la búsqueda." : "No hay categorías de este tipo. Crea una para clasificar tus movimientos."}</p>
         {/if}
       </div>
     </div>
@@ -331,8 +331,8 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h3 class="card-title">Movimientos recurrentes</h3>
-            <p class="card-sub">A las 6:00 a. m., la aplicación revisa si debe registrar un ingreso, gasto o aporte programado. Este proceso no mueve dinero en el banco.</p>
+            <h3 class="card-title">Movimientos programados</h3>
+            <p class="card-sub">Cada día a las 6:00 a. m. se registran los ingresos, gastos y aportes automáticos que correspondan. No se mueve dinero en el banco.</p>
           </div>
         </div>
         <div class="card-body">
@@ -344,7 +344,7 @@
         <div class="card-head">
           <div>
             <h3 class="card-title">Apariencia</h3>
-            <p class="card-sub">El estilo de la aplicación y su color, en claro y en oscuro. El color se guarda en tu cuenta; el estilo, en este navegador.</p>
+            <p class="card-sub">Elige el estilo y el color. El color se guarda en tu cuenta y el estilo en este navegador.</p>
           </div>
         </div>
         <div class="card-body stack">
@@ -362,8 +362,8 @@
             />
             <span class="field-hint">
               {estilo.value === "solido"
-                ? "Fondo liso, vidrio sin brillos y sombras suaves. El color de abajo es el de los botones, la sección actual y los íconos."
-                : "Fondo con degradado y tarjetas de vidrio. El color de abajo tiñe el fondo."}
+                ? "Fondo liso y sombras suaves. El color se aplica a botones, secciones e íconos."
+                : "Fondo con degradado y tarjetas de vidrio. El color tiñe el fondo."}
             </span>
           </div>
           <div class="field block" role="group" aria-labelledby="color-label">
@@ -377,7 +377,7 @@
         <div class="card-head">
           <div>
             <h3 class="card-title">Datos</h3>
-            <p class="card-sub">Descarga un zip con todo: cuentas, categorías, movimientos, movimientos programados, ahorros y los adjuntos (facturas, fotos). También puedes importar respaldos .json de antes.</p>
+            <p class="card-sub">Exporta tus cuentas, categorías, movimientos, programaciones, ahorros y adjuntos en un archivo ZIP. También puedes importar respaldos ZIP o JSON anteriores.</p>
           </div>
         </div>
         <div class="card-body data-actions">
@@ -426,7 +426,7 @@
     <div>
       <p class="eyebrow">Etiquetas</p>
       <TagInput bind:value={cTags} suggestions={categoryTags()} />
-      <p class="small muted cat-tag-hint">Los movimientos de esta categoría las heredan: sirven para filtrar y sumar en Movimientos, Resumen y el móvil. Con <b>#fijo</b>, el móvil la cuenta en los gastos fijos.</p>
+      <p class="small muted cat-tag-hint">Los movimientos heredan estas etiquetas. Úsalas para filtrar y agrupar gastos. La etiqueta <b>#fijo</b> identifica gastos fijos en el móvil.</p>
     </div>
     {#if cKind === "expense"}
       <Field label="Límite de gasto mensual (opcional)" hint="La aplicación te mostrará cuánto te queda antes de llegar a este valor."><MoneyInput bind:value={cBudget} /></Field>

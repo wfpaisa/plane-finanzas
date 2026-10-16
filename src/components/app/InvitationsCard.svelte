@@ -45,7 +45,7 @@
 
   async function copy(i: Invitation) {
     const ok = await copyText(linkOf(i));
-    if (ok) notify.done(`Se copió el enlace de invitación. Envíaselo a ${firstName(i)}.`);
+    if (ok) notify.done(`Enlace copiado. Envíalo a ${firstName(i)}.`);
     else notify.fail(new Error("No se pudo copiar el enlace. Inténtalo de nuevo."));
   }
 
@@ -95,8 +95,7 @@
     <div>
       <h3 class="card-title">Invitar personas</h3>
       <p class="card-sub">
-        Solo se puede crear una cuenta con invitación. Crea un enlace y envíaselo a la persona: con él elige su clave y entra a su propia
-        cuenta. Sus datos son solo suyos. El enlace vence a los 7 días.
+        Cada persona necesita una invitación para crear su cuenta. El enlace vence a los 7 días.
       </p>
     </div>
   </div>

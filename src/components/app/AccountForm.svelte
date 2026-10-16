@@ -71,7 +71,7 @@
   });
 
   async function save() {
-    if (!name.trim()) return notify.fail(new Error("Ponle un nombre a la cuenta."));
+    if (!name.trim()) return notify.fail(new Error("Escribe un nombre para la cuenta."));
     busy = true;
     let created: Account | null = null;
     try {
@@ -145,15 +145,15 @@
         <Input bind:value={bank} placeholder="Bancolombia, Bold, Nequi…" />
       </Field>
       <Field
-        label="Dinero inicial"
+        label="Saldo inicial"
         hint={type === "tarjeta" || type === "credito"
-          ? "La deuda con la que empieza la cuenta, con signo negativo. Ejemplo: −500.000. Se suma a los movimientos."
-          : "El dinero con el que empieza la cuenta. Se suma a los movimientos."}
+          ? "Escribe la deuda inicial con signo negativo, por ejemplo, −500.000. Los movimientos se suman a este saldo."
+          : "Saldo de la cuenta antes de registrar movimientos."}
       >
         <MoneyInput bind:value={initial} allowNegative />
       </Field>
       {#if type === "tarjeta"}
-        <Field label="Cupo (opcional)" tip="Límite de crédito aprobado para esta tarjeta. Lo que debes reduce el disponible para gastar con ella.">
+        <Field label="Cupo (opcional)" tip="Límite de crédito de la tarjeta. La deuda reduce el cupo disponible.">
           <MoneyInput bind:value={creditLimit} />
         </Field>
       {/if}

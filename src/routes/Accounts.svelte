@@ -196,7 +196,7 @@
   <header class="page-head">
     <div>
       <h1>Cuentas</h1>
-      <p>Tu saldo neto, después de restar las deudas, es <b><Money value={store.total} /></b></p>
+      <p>Saldo neto de tus cuentas, después de restar las deudas: <b><Money value={store.total} /></b></p>
     </div>
     <div class="page-actions">
       <Switch bind:checked={showArchived} label="Ver archivadas" />
@@ -219,13 +219,13 @@
       </p>
     {:else}
       <button type="button" class="add-account" onclick={() => open(null)}>
-        <Icon name="add-circle" size={24} />Agregar cuenta
+        <Icon name="add-circle" size={24} />Nueva cuenta
       </button>
     {/if}
 
     {#if positives.length > 1}
       <div class="card">
-        <div class="card-head"><div><h3 class="card-title">Cuánto dinero hay en cada cuenta</h3></div></div>
+        <div class="card-head"><div><h3 class="card-title">Saldo por cuenta</h3></div></div>
         <div class="card-body">
           <div class="aflow" style:height="{FLOW_H}px">
             <div class="aflow-labels left">

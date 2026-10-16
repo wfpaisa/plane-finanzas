@@ -31,7 +31,7 @@
   {#if !compact}
     <span class="ac-foot">
       {#if saved > 0}
-        <Icon name="piggy-bank" /><Money value={saved} /> apartado
+        <Icon name="piggy-bank" /><Money value={saved} /> reservado
       {:else if account.exclude_from_total}
         No suma en el total
       {/if}

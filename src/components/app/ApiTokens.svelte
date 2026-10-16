@@ -130,7 +130,7 @@
       <div>
         <h3 class="card-title">Token de acceso</h3>
         <p class="card-sub">
-          El token permite que un asistente como Claude o ChatGPT, o un programa tuyo, consulte y configure tu cuenta sin conocer tu clave. No puede cambiar tu clave, cargar un respaldo ni eliminar todos tus datos. No vence: elimínalo cuando ya no lo uses.
+          Un token permite que un asistente o programa acceda a tus datos sin conocer tu clave. Sus permisos se definen abajo. No permite cambiar tu clave, importar respaldos ni eliminar todos tus datos. No vence; elimínalo cuando dejes de usarlo.
         </p>
       </div>
     </div>
@@ -211,7 +211,7 @@
       <div>
         <h3 class="card-title">Contexto para el asistente</h3>
         <p class="card-sub">
-          Lo que quieres que el asistente sepa al leer tus mensajes del banco: qué llave o terminación es cada cuenta, en qué categoría va cada comercio. Escribe un dato por línea. El asistente lo lee al empezar y, con el permiso Cambiar, puede agregar lo que descubra si le das el visto bueno.
+          Añade información útil para identificar cuentas y clasificar comercios. Escribe un dato por línea. El asistente leerá este contexto al consultar la guía y podrá actualizarlo con tu aprobación si tiene permiso para cambiar datos.
         </p>
       </div>
     </div>

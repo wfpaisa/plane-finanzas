@@ -300,7 +300,7 @@
   <div class="card se-sum">
     <div><span>Ingresos</span><Money value={income} tone="income" /></div>
     <div><span>Gastos</span><Money value={expense} tone="expense" /></div>
-    <div><span>Saldo neto</span><Money value={income - expense} /></div>
+    <div><span>Ingresos menos gastos</span><Money value={income - expense} /></div>
   </div>
   <DayList txs={results} onOpen={(t) => txModal.edit(t)} empty={loading ? "Buscando…" : "No hay movimientos con estos filtros."} />
 {/if}

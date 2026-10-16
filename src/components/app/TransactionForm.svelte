@@ -100,7 +100,7 @@
   });
 
   async function save() {
-    if (!amount || amount <= 0) return notify.fail(new Error("Escribe la cantidad de dinero."));
+    if (!amount || amount <= 0) return notify.fail(new Error("Escribe un monto mayor que cero."));
     if (!account) return notify.fail(new Error("Elige la cuenta."));
     if (type === "transfer" && (!toAccount || toAccount === account))
       return notify.fail(new Error("Elige una cuenta de destino distinta."));
@@ -133,7 +133,7 @@
       } else {
         await offline.create("transactions", { ...data, ...born });
       }
-      notify.done(!offline.online ? "Guardado sin conexión. Se enviará al reconectar." : tx ? "Guardado" : "Movimiento creado");
+      notify.done(!offline.online ? "Guardado en este dispositivo. Se enviará al reconectar." : tx ? "Movimiento guardado" : "Movimiento creado");
       onSaved?.();
       onClose();
     } catch (err) {

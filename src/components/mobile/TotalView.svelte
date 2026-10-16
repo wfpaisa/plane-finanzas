@@ -75,7 +75,7 @@
       <Money value={r.out} tone="expense" />
     </div>
   {:else}
-    <p class="t-empty">Sin movimientos este mes.</p>
+    <p class="t-empty">No hay movimientos este mes.</p>
   {/each}
 </section>
 

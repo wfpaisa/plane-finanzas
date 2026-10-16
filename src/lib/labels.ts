@@ -30,7 +30,7 @@ export const txTypeLabel = (t: string) => TX_TYPES.find((x) => x.id === t)?.labe
  * origen: ya no hay nada que ver de eso.
  */
 export const SOURCE_LABEL: Record<string, string> = {
-  recurrente: "Pago programado",
+  recurrente: "Movimiento programado",
   csv: "Registro CSV",
 };
 
@@ -45,7 +45,7 @@ export const BALANCE_TIPS = {
   balance: "Saldo inicial más los ingresos y menos los gastos registrados. En una deuda, un saldo negativo indica cuánto debes.",
   total: "Suma de los saldos de tus cuentas activas, menos las deudas. No incluye las cuentas que excluiste del total.",
   earmarked:
-    "Parte del saldo que reservaste para tus ahorros y para pagos programados, como el predial. Este dinero sigue en la cuenta y ya está incluido en su saldo.",
+    "Dinero destinado a ahorros o pagos programados. Sigue en la cuenta y está incluido en el saldo.",
   free: "Saldo después de restar el dinero reservado. Si es negativo, el dinero reservado supera el saldo.",
   available: "Lo que tienes a favor en tus cuentas, menos el dinero reservado y todas tus deudas.",
   limit: "Límite de crédito de la tarjeta.",

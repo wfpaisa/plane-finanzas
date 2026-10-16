@@ -66,7 +66,7 @@ export function nextMonthsChart(recurring: Recurring[], savings: number, ym: str
     data: {
       labels,
       datasets: [
-        bar("Gastos frecuentes", fixed, token("--viz-expense")),
+        bar("Pagos programados", fixed, token("--viz-expense")),
         bar("Ahorros", saving, token("--viz-saving")),
         bar("Disponible", free, token("--viz-free")),
         {

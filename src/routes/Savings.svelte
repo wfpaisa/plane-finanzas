@@ -335,7 +335,7 @@
       </div>
     {:else}
       <div class="card empty-card">
-        No hay ahorros registrados. Crea uno y define cuánto guardarás al mes.
+        No hay ahorros. Crea uno y define tu aporte mensual.
       </div>
     {/if}
 
@@ -345,7 +345,7 @@
           <div>
             {#if !selected}
               <h3 class="card-title"><Icon name="chart-line-data-01" /> Gráfica</h3>
-              <p class="card-sub">Elige abajo qué ahorros ver</p>
+              <p class="card-sub">Elige los ahorros que quieres ver</p>
             {:else if multi}
               <h3 class="card-title"><Icon name="chart-line-data-01" /> {simulated.length} ahorros</h3>
               <p class="card-sub">{view === "estado" ? "Lo que han tenido mes a mes, y el total" : "Si siguen los aportes de cada uno"}</p>
@@ -375,7 +375,7 @@
           {/if}
         </div>
         {#if !selected}
-          <div class="card-body"><p class="sv-legend-empty">Toca un ahorro de arriba para verlo en la gráfica.</p></div>
+          <div class="card-body"><p class="sv-legend-empty">Elige un ahorro para verlo en la gráfica.</p></div>
         {:else}
         <div class="card-body stack">
           {#if view === "estado"}

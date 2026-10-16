@@ -116,7 +116,7 @@
       return notify.fail(new Error("Selecciona la cuenta de destino para crear la transferencia automáticamente."));
     if (auto && dayless) return notify.fail(new Error("Escribe el día del mes para crear el movimiento automáticamente."));
     const keep = reserve && canReserve;
-    if (keep && !account) return notify.fail(new Error("Elige la cuenta en la que separarás el dinero."));
+    if (keep && !account) return notify.fail(new Error("Elige la cuenta en la que reservarás el dinero."));
     busy = true;
     try {
       const old = provision(item);
@@ -240,18 +240,17 @@
     <Field label="Etiquetas" tip="Cada movimiento creado incluirá estas etiquetas y la etiqueta #fijo."><TagInput bind:value={tags} suggestions={knownTags} /></Field>
     <div class="flex flex-wrap gap-5">
       <Switch bind:checked={auto} label="Registrar automáticamente" />
-      {#if canReserve}<Switch bind:checked={reserve} label="Separar dinero cada mes" />{/if}
-      {#if kind === "transfer"}<Switch bind:checked={forPayment} label="Es dinero reservado para un pago" />{/if}
+      {#if canReserve}<Switch bind:checked={reserve} label="Reservar dinero cada mes" />{/if}
+      {#if kind === "transfer"}<Switch bind:checked={forPayment} label="Reservar para un pago" />{/if}
       <Switch bind:checked={paused} label="Pausar esta programación" />
     </div>
     {#if canReserve && reserve}
       <p class="small muted">
-        Cada mes verás cuánto debes separar para completar este pago a tiempo. El dinero no se mueve de la cuenta:
-        solo se muestra como reservado hasta que registres el pago.
+        Cada mes verás cuánto debes reservar para este pago. El dinero sigue en tu cuenta hasta que registres el pago.
         {#if saved > 0}Ya tienes <Money value={saved} /> reservado.{/if}
       </p>
     {:else if canReserve && provision(item) && saved > 0}
-      <WarnNote>Si guardas con esta opción desactivada, dejarán de aparecer como reservados <Money value={saved} />.</WarnNote>
+      <WarnNote>Si desactivas esta opción, <Money value={saved} /> dejará de aparecer como dinero reservado.</WarnNote>
     {/if}
     {#if kind === "transfer" && forPayment}
       <p class="small muted">

@@ -333,7 +333,7 @@
           <Money value={expense} tone="expense" />
         </div>
         <div>
-          <span class="m-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Saldo neto</span>
+          <span class="m-sum-label"><span class="kpi-ico"><Icon name="coins-01" size={14} /></span>Ingresos menos gastos</span>
           <Money value={income - expense} />
         </div>
       </div>
@@ -371,7 +371,7 @@
       <header class="page-head">
         <div>
           <h1>Más</h1>
-          <p>Las demás secciones y tus preferencias.</p>
+          <p>Otras secciones y preferencias.</p>
         </div>
       </header>
 
@@ -450,7 +450,7 @@
   <button
     type="button"
     class="m-fab"
-    aria-label="Anotar"
+    aria-label="Registrar movimiento"
     onclick={() => openSheet("expense")}
   >
     <Icon name="add-01" size={28} />
@@ -480,7 +480,7 @@
         daySheet = "";
         txModal.edit(t);
       }}
-      empty="Nada este día."
+      empty="No hay movimientos este día."
     />
     <div class="m-sheet-foot pad">
       <button
@@ -511,7 +511,7 @@
     aria-label="Cambios guardados en el teléfono"
   >
     <div class="m-sheet-head">
-      <strong>Cambios en el teléfono</strong>
+      <strong>Cambios pendientes</strong>
       <button
         type="button"
         class="btn-icon sm"
@@ -524,16 +524,14 @@
 
     {#if offline.authNeeded}
       <p class="m-note">
-        Tu sesión venció. Entra de nuevo para enviar lo pendiente; no se pierde
-        nada.
+        Tu sesión venció. Entra de nuevo para enviar los cambios pendientes.
       </p>
       <button type="button" class="btn btn-primary" onclick={reauth}
         >Entrar de nuevo</button
       >
     {:else if !offline.online}
       <p class="m-note">
-        Sin conexión. Lo que anotes queda guardado aquí y se envía solo cuando
-        vuelva la señal.
+        Sin conexión. Los movimientos quedan guardados en este dispositivo y se envían al reconectar.
       </p>
     {/if}
 
@@ -561,8 +559,7 @@
 
     {#if offline.failed.length}
       <p class="m-note">
-        El servidor no aceptó estos cambios. Puedes intentar otra vez o
-        descartarlos.
+        El servidor rechazó estos cambios. Reintenta o descártalos.
       </p>
       <ul class="m-list">
         {#each offline.failed as item (item.seq)}

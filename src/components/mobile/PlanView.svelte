@@ -96,7 +96,7 @@
 <header class="section-head pl-section">
   <div>
     <h2>Tu plan del mes</h2>
-    <p>Compara lo que esperas recibir con tus pagos, tarjetas y ahorros del mes.</p>
+    <p>Compara los ingresos previstos con los pagos, las tarjetas y los ahorros del mes.</p>
   </div>
 </header>
 
@@ -126,7 +126,7 @@
             <span class="pl-main">
               <span class="pl-name">{r.name}</span>
               <span class="pl-sub">
-                {#if r.kind === "transfer"}{r.for_payment ? "Reserva para un pago" : "Transferencia"} · {/if}{freqLabel(r)}{#if r.auto_create} · registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
+                {#if r.kind === "transfer"}{r.for_payment ? "Reservada para un pago" : "Transferencia"} · {/if}{freqLabel(r)}{#if r.auto_create} · registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
               </span>
               {#if r.category}<CategoryPill id={r.category} />{/if}
             </span>
@@ -137,7 +137,7 @@
           </button>
         </li>
       {:else}
-        <li class="pl-empty">{kind === "income" ? "Aún no hay ingresos programados. Agrega tu sueldo u otro ingreso habitual." : "Aún no hay pagos programados. Agrega servicios, cuotas u otros pagos habituales."}</li>
+        <li class="pl-empty">{kind === "income" ? "No hay ingresos programados. Programa tu sueldo u otro ingreso habitual." : "No hay pagos programados. Programa servicios, cuotas u otros pagos habituales."}</li>
       {/each}
     </ul>
     <button type="button" class="pl-add" onclick={() => edit(null)}>

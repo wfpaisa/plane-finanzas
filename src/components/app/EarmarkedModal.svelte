@@ -60,10 +60,10 @@
 <Modal
   {open}
   {onClose}
-  title={account ? `Apartado en ${account.name}` : "Dinero apartado"}
+  title={account ? `Reservado en ${account.name}` : "Dinero reservado"}
   description={account
-    ? "Plata que sigue en esta cuenta pero ya tiene destino: tus ahorros y lo que vas juntando para un pago, como el predial."
-    : "Plata que sigue en tus cuentas pero ya tiene destino: tus ahorros y lo que vas juntando para un pago, cuenta por cuenta."}
+    ? "Dinero de esta cuenta destinado a ahorros o pagos programados. Sigue incluido en el saldo."
+    : "Dinero de tus cuentas destinado a ahorros o pagos programados. Sigue incluido en los saldos."}
 >
   {#if groups.length}
     <div class="em">
@@ -91,17 +91,17 @@
         </section>
       {/each}
       <div class="em-total">
-        <span>Total apartado</span><Money value={total} />
+        <span>Total reservado</span><Money value={total} />
       </div>
       {#if account}
         <div class="em-free">
           <span>Saldo de la cuenta <Money value={balance} /></span>
-          <span>Sin reservar <Money value={balance - total} tone={balance - total < 0 ? "expense" : undefined} /></span>
+          <span>Disponible <Money value={balance - total} tone={balance - total < 0 ? "expense" : undefined} /></span>
         </div>
       {/if}
     </div>
   {:else}
-    <p class="muted small">No hay dinero apartado{account ? " en esta cuenta" : ""}.</p>
+    <p class="muted small">No hay dinero reservado{account ? " en esta cuenta" : ""}.</p>
   {/if}
   {#snippet footer()}
     {#if kinds.has("/ahorros")}<Button variant="ghost" onclick={() => goTo("/ahorros")}>Ir a Ahorros</Button>{/if}

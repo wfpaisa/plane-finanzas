@@ -44,8 +44,8 @@
     {/if}
     <p class="pc-text">
       {hasCards
-        ? "Separa este monto de tus ingresos para cubrir tus pagos programados, tus ahorros y lo gastado con tarjetas de crédito."
-        : "Separa este monto de tus ingresos para cubrir tus pagos programados y tus ahorros del mes."}
+        ? "Reserva este monto de tus ingresos para pagos programados, ahorros y gastos con tarjeta de crédito."
+        : "Reserva este monto de tus ingresos para pagos programados y ahorros."}
     </p>
     <div class="pc-split">
       <div
@@ -86,7 +86,7 @@
   <section class="card pc-card pc-free" class:short>
     <div class="pc-top">
       <span class="pc-ico"><Icon name={short ? "alert-circle" : "wallet-01"} size={20} /></span>
-      <span class="pc-label">{short ? `Te falta dinero en ${month}` : `Disponible para gastar en ${month}`}</span>
+      <span class="pc-label">{short ? `Dinero faltante en ${month}` : `Disponible para gastar en ${month}`}</span>
     </div>
     <Money value={Math.abs(free)} />
     {#if hasCards}
@@ -99,9 +99,9 @@
         {hasCards ? "Tus pagos, ahorros y tarjetas" : "Tus pagos y ahorros"} superan tus ingresos del mes. Reduce un gasto o un ahorro para cubrir la
         diferencia.
       {:else if hasCards}
-        Lo que te queda de tus ingresos después de reservar los pagos programados, los ahorros y lo gastado con tarjetas de crédito. Pagar una tarjeta no cambia este monto.
+        Tus ingresos después de reservar pagos programados, ahorros y gastos con tarjeta de crédito. Pagar la tarjeta no cambia este monto.
       {:else}
-        Lo que te queda de tus ingresos después de reservar los pagos programados y los ahorros.
+        Tus ingresos después de reservar pagos programados y ahorros.
       {/if}
     </p>
     <div class="pc-meter pc-meter-split pc-available-meter" aria-hidden="true">

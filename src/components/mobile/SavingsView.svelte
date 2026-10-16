@@ -118,7 +118,7 @@
 <header class="page-head sv-head-page">
   <div>
     <h1>Ahorros</h1>
-    <p>Tus metas y cuánto les aportas al mes.</p>
+    <p>Consulta tus metas y aportes mensuales.</p>
   </div>
 </header>
 
@@ -203,7 +203,7 @@
     {/if}
   </section>
 {:else}
-  <p class="sv-empty pad">No hay ahorros registrados. Crea uno y define cuánto guardarás al mes.</p>
+  <p class="sv-empty pad">No hay ahorros. Crea uno y define tu aporte mensual.</p>
 {/each}
 
 {#if active.length}

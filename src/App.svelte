@@ -294,8 +294,8 @@
     <button
       type="button"
       class="fab"
-      aria-label="Agregar movimiento"
-      data-tip="Agregar movimiento"
+      aria-label="Nuevo movimiento"
+      data-tip="Nuevo movimiento"
       data-tip-side="left"
       onclick={() => txModal.new()}
     >

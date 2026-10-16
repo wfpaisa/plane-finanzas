@@ -213,7 +213,7 @@
       {:else}
         <p class="muted small">
           {yearly
-            ? `No hay ingresos registrados en ${period}. Registra un ingreso para ver en qué se fue tu dinero.`
+            ? `No hay ingresos registrados en ${period}. Registra uno para comparar ingresos y gastos.`
             : `No hay ingresos programados en ${monthLabel(ym, true)}. Programa un ingreso para calcular cuánto puedes destinar a pagos, ahorros y otros gastos.`}
         </p>
       {/if}
@@ -242,7 +242,7 @@
           {#each incomes as r (r.id)}
             {@render row(r)}
           {:else}
-            <div class="empty-card">Aún no hay ingresos programados. Agrega tu sueldo u otro ingreso habitual.</div>
+            <div class="empty-card">No hay ingresos programados. Programa tu sueldo u otro ingreso habitual.</div>
           {/each}
         </div>
       </div>
@@ -260,7 +260,7 @@
           {#each expenses as r (r.id)}
             {@render row(r)}
           {:else}
-            <div class="empty-card">Aún no hay pagos programados. Agrega servicios, cuotas u otros pagos habituales.</div>
+            <div class="empty-card">No hay pagos programados. Programa servicios, cuotas u otros pagos habituales.</div>
           {/each}
         </div>
       </div>
@@ -274,7 +274,7 @@
     <span class="fixed-main">
       <span class="fixed-name">{r.name}</span>
       <span class="fixed-sub">
-        {#if r.kind === "transfer"}{r.for_payment ? "Reserva para un pago" : "Transferencia"} · {/if}{freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
+        {#if r.kind === "transfer"}{r.for_payment ? "Reservada para un pago" : "Transferencia"} · {/if}{freqLabel(r)}{#if r.auto_create} · <Icon name="repeat" /> registro automático{/if}{#if r.saving} · reserva mensual{/if}{#if r.paused} · en pausa{/if}{#if out} · {out}{/if}
       </span>
     </span>
     {#if r.category}<CategoryPill id={r.category} />{/if}

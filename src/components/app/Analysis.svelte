@@ -150,7 +150,7 @@
       tint: store.category(c.category)?.color || "tint-10",
     }));
     const out = topN(items, 4, { id: "_rest", label: "Otros ingresos", tint: "tint-10" });
-    if (expense > income) out.push({ id: "_short", label: "Faltó (de ahorros o deudas)", value: expense - income, tint: "flow-short" });
+    if (expense > income) out.push({ id: "_short", label: "Gastos superiores a los ingresos", value: expense - income, tint: "flow-short" });
     return out;
   });
   const flowRight = $derived.by((): FlowItem[] => {
@@ -161,7 +161,7 @@
       tint: store.category(c.category)?.color || "tint-10",
     }));
     const out = topN(items, income > expense ? 6 : 7, { id: "_rest", label: "Otras categorías", tint: "tint-10" });
-    if (income > expense) out.push({ id: "_saved", label: "Te quedó", value: income - expense, tint: "flow-saved" });
+    if (income > expense) out.push({ id: "_saved", label: "Ingresos no gastados", value: income - expense, tint: "flow-saved" });
     return out;
   });
 
@@ -368,7 +368,7 @@
   <header class="page-head analysis-head">
     <div>
       <h2 id="analysis-title">Análisis de ingresos y gastos</h2>
-      <p>Los ingresos y gastos que ya registraste en {title}. Las transferencias entre tus cuentas no cuentan.</p>
+      <p>Ingresos y gastos registrados en {title}. Se excluyen las transferencias entre tus cuentas.</p>
     </div>
     <div class="page-actions">
       <Segmented
@@ -439,13 +439,13 @@
       <div class="card kpi">
         <div class="kpi-head"><span class="kpi-ico"><Icon name="coins-01" /></span><span class="kpi-label">Ingresos menos gastos</span></div>
         <div class="kpi-val"><Money value={income - expense} tone="auto" /></div>
-        <div class="kpi-foot">{income > 0 ? `Te quedó el ${Math.round(savingRate)}% de lo que entró` : "Sin ingresos en el periodo"}</div>
+        <div class="kpi-foot">{income <= 0 ? "Sin ingresos en el periodo" : savingRate > 0 ? `Te quedó el ${Math.round(savingRate)}% de tus ingresos` : savingRate < 0 ? `Tus gastos superaron tus ingresos en un ${Math.round(-savingRate)}%` : "Gastaste todos tus ingresos"}</div>
       </div>
     </div>
 
     {#if summary.length}
       <section class="card insights" aria-label="En pocas palabras">
-        <h3 class="card-title">En pocas palabras</h3>
+        <h3 class="card-title">Resumen del periodo</h3>
         <ul style:--n={summary.length}>
           {#each summary as item (item.text)}
             <li class="insight {item.tone}">
@@ -466,7 +466,7 @@
           <div>
             <h3 class="card-title">{kind === "income" ? "Ingresos" : kind === "expense" ? "Gastos" : "Ingresos y gastos"} por {g === "week" ? "semana" : g === "month" ? "mes" : "año"}</h3>
             {#if focus}
-              <p class="card-sub">Solo <CategoryPill id={focus === "none" ? "" : focus} onclick={() => (focus = "")} /> · toca para quitar</p>
+              <p class="card-sub">Solo <CategoryPill id={focus === "none" ? "" : focus} onclick={() => (focus = "")} /> · selecciona para quitar el filtro</p>
             {/if}
           </div>
         </div>
@@ -503,8 +503,8 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h3 class="card-title">¿A dónde fue tu dinero?</h3>
-            <p class="card-sub">De dónde vino lo que entró y en qué se fue. Toca una categoría para verla sola.</p>
+            <h3 class="card-title">Ingresos y gastos por categoría</h3>
+            <p class="card-sub">Selecciona una categoría para ver solo sus movimientos.</p>
           </div>
         </div>
         <div class="card-body">
@@ -527,7 +527,7 @@
           <div class="card-head">
             <div>
               <h3 class="card-title">Reparto</h3>
-              <p class="card-sub">Toca una porción para verla sola en la gráfica</p>
+              <p class="card-sub">Elige una porción para verla sola en la gráfica.</p>
             </div>
           </div>
           <div class="card-body">
@@ -547,7 +547,7 @@
                 </div>
               </div>
             {:else}
-              <div class="empty-card">Nada en este periodo.</div>
+              <div class="empty-card">No hay movimientos en este periodo.</div>
             {/if}
           </div>
         </div>
@@ -614,7 +614,7 @@
                       </span>
                       {#if budget > 0}
                         <span class="cr-budget" class:over>
-                          {#if over}Te pasaste <Money value={c.total - budget} /> del límite de <Money value={budget} />
+                          {#if over}Superaste el límite de <Money value={budget} /> por <Money value={c.total - budget} />
                           {:else}Quedan <Money value={budget - c.total} /> de <Money value={budget} />{/if}
                         </span>
                       {/if}
@@ -632,7 +632,7 @@
                 {/each}
               </ul>
             {:else}
-              <div class="empty-card">Nada en este periodo.</div>
+              <div class="empty-card">No hay movimientos en este periodo.</div>
             {/if}
           </div>
         </div>
@@ -690,7 +690,7 @@
                 </div>
               </div>
             {:else}
-              <div class="empty-card">Nada en este periodo.</div>
+              <div class="empty-card">No hay movimientos en este periodo.</div>
             {/each}
           </div>
         </div>
