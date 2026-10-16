@@ -40,14 +40,11 @@
     </div>
     <Money value={reserve} />
     {#if hasCards}
-      <p class="pc-secondary">
-        {#if past}Incluye <Money value={cards.total} /> que gastaste con tarjeta de crédito en {month}.{:else}Incluye
-          <Money value={cards.total} /> que debes en tarjetas de crédito.{/if}
-      </p>
+      <p class="pc-secondary">Pagos programados + ahorros: <Money value={plan.fixed + plan.savings} /></p>
     {/if}
     <p class="pc-text">
       {hasCards
-        ? "Separa este monto de tus ingresos para cubrir tus pagos programados, tus ahorros y lo que debes en tarjetas de crédito."
+        ? "Separa este monto de tus ingresos para cubrir tus pagos programados, tus ahorros y lo gastado con tarjetas de crédito."
         : "Separa este monto de tus ingresos para cubrir tus pagos programados y tus ahorros del mes."}
     </p>
     <div class="pc-split">
@@ -84,19 +81,6 @@
         <dd><Money value={reserve} /><span class="pc-pct">{share(pct(reserve))}</span></dd>
       </div>
     </dl>
-    {#if hasCards && !past && cards.before > 0}
-      <!-- Lo de las tarjetas, partido: lo gastado este mes y lo que viene de antes. -->
-      <dl class="pc-cards">
-        <div>
-          <dt>Gastado con tarjeta en {month}</dt>
-          <dd><Money value={cards.month} /></dd>
-        </div>
-        <div>
-          <dt>Deuda de meses anteriores</dt>
-          <dd><Money value={cards.before} /></dd>
-        </div>
-      </dl>
-    {/if}
   </section>
 
   <section class="card pc-card pc-free" class:short>
@@ -115,7 +99,7 @@
         {hasCards ? "Tus pagos, ahorros y tarjetas" : "Tus pagos y ahorros"} superan tus ingresos del mes. Reduce un gasto o un ahorro para cubrir la
         diferencia.
       {:else if hasCards}
-        Lo que te queda de tus ingresos después de reservar los pagos programados, los ahorros y lo que debes en tarjetas.
+        Lo que te queda de tus ingresos después de reservar los pagos programados, los ahorros y lo gastado con tarjetas de crédito. Pagar una tarjeta no cambia este monto.
       {:else}
         Lo que te queda de tus ingresos después de reservar los pagos programados y los ahorros.
       {/if}
@@ -146,45 +130,6 @@
 </div>
 
 <style>
-  /* Lo de las tarjetas, partido, en una franja aparte bajo las cifras. */
-  .pc-cards {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-8);
-    margin: var(--sp-4) 0 0;
-    padding-top: var(--sp-10);
-    border-top: 1px dashed var(--border);
-    grid-area: cards;
-
-    & div {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-
-    & dt {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-
-      &::before {
-        content: "";
-        display: inline-block;
-        width: 0.5rem;
-        height: 0.5rem;
-        margin-right: 0.3rem;
-        border-radius: 50%;
-        background: var(--viz-card);
-        vertical-align: 0.05em;
-      }
-    }
-
-    & dd {
-      margin: 0;
-      font-size: var(--text-sm);
-      font-weight: 600;
-    }
-  }
-
   .pc {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
@@ -463,8 +408,7 @@
         "secondary secondary"
         "text text"
         "meter meter"
-        "parts parts"
-        "cards cards";
+        "parts parts";
       column-gap: var(--sp-12);
       row-gap: 0;
       padding: var(--sp-16);

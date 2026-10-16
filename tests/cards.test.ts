@@ -34,12 +34,18 @@ describe("cardPlan", () => {
     expect(p).toEqual({ total: 350_000, month: 50_000, before: 300_000 });
   });
 
-  test("sin deuda no reserva nada, aunque haya gastos ya pagados", () => {
-    expect(
-      cardPlan("2026-10", "2026-10", 0, [
-        { amount: 80_000, programmed: false },
-      ]),
-    ).toEqual({ total: 0, month: 0, before: 0 });
+  test("sin deuda ni pagos en el mes no reserva nada", () => {
+    expect(cardPlan("2026-10", "2026-10", 0, [])).toEqual({ total: 0, month: 0, before: 0 });
+  });
+
+  test("lo pagado a la tarjeta en el mes sigue reservado", () => {
+    const p = cardPlan("2026-10", "2026-10", 0, [{ amount: 80_000, programmed: false }], 300_000);
+    expect(p).toEqual({ total: 300_000, month: 80_000, before: 220_000 });
+  });
+
+  test("con un pago parcial suma lo pagado y lo que aún se debe", () => {
+    const p = cardPlan("2026-10", "2026-10", 200_000, [], 100_000);
+    expect(p).toEqual({ total: 300_000, month: 0, before: 300_000 });
   });
 
   test("en un mes pasado cuenta lo gastado con tarjeta ese mes", () => {

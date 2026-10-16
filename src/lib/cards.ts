@@ -6,6 +6,9 @@
  * cada pago (una transferencia hacia ella) lo sube. Los pagos programados del
  * mes hechos con tarjeta ya están en los gastos programados del plan: se
  * descuentan de la deuda para no contarlos dos veces.
+ *
+ * Lo que se pagó a las tarjetas en el mes sigue contando: pagar la tarjeta no
+ * devuelve lo gastado con ella a lo disponible para gastar.
  */
 import type { Account } from "./types";
 
@@ -29,9 +32,10 @@ export interface CardPlan {
 /**
  * Lo de las tarjetas en el plan del mes `ym`, visto desde `thisYm`.
  *
- * - En el mes en curso y en los que vienen: toda la deuda de hoy, menos los
- *   pagos programados del mes hechos con tarjeta. Se separa lo gastado en el
- *   mes de lo que viene de antes.
+ * - En el mes en curso y en los que vienen: toda la deuda de hoy, más lo que
+ *   se pagó a las tarjetas en el mes (`paid`), menos los pagos programados del
+ *   mes hechos con tarjeta. Se separa lo gastado en el mes de lo que viene de
+ *   antes.
  * - En un mes pasado no hay deuda de entonces: cuenta lo gastado con tarjeta
  *   ese mes.
  */
@@ -40,6 +44,7 @@ export function cardPlan(
   thisYm: string,
   debt: number,
   expenses: CardExpense[],
+  paid = 0,
 ): CardPlan {
   let month = 0;
   let programmed = 0;
@@ -48,7 +53,7 @@ export function cardPlan(
     else month += e.amount;
   }
   if (ym < thisYm) return { total: month, month, before: 0 };
-  const total = Math.max(0, debt - programmed);
+  const total = Math.max(0, debt + paid - programmed);
   const inMonth = Math.min(month, total);
   return { total, month: inMonth, before: total - inMonth };
 }

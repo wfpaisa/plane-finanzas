@@ -97,7 +97,7 @@ Además **funciona sin internet**: lo que anotes sin señal se guarda en el tel�
 - **Modo claro y oscuro**, un color de fondo a tu gusto y un estilo sólido (sin degradados) para quien prefiere colores planos.
 - **Varios usuarios**, por invitación: cada persona tiene sus propios datos. La clave se cambia en *Ajustes → Cuenta y datos*.
 - **Respaldo de tus datos**: exporta todo a un archivo y vuelve a cargarlo cuando quieras, incluso en otro servidor.
-- **Respaldos automáticos del servidor**: dos veces al día (5:00 y 17:00) se guarda una copia de toda la base de datos. Se conservan las últimas 30.
+- **Respaldos automáticos del servidor**: dos veces al día (a medianoche y a mediodía, hora de Colombia) se guarda una copia de toda la base de datos. Se conservan las últimas 30.
 - **Atajos de teclado** en el computador: `N` agrega un movimiento y `?` muestra todos los atajos.
 
 ![Modo oscuro](docs/capturas/resumen-oscuro.png)
@@ -169,7 +169,7 @@ cd /opt/finanzas && docker compose up -d
 
 ### Copias de seguridad
 
-La app guarda una copia de toda la base de datos dos veces al día, a las 5:00 y a las 17:00, en `/opt/finanzas/pb_data/backups`. Conserva las últimas 30. Puedes cambiarlo o descargar una copia en el panel `/_/` → *Settings → Backups*.
+La app guarda una copia de toda la base de datos dos veces al día, a las 5:00 y a las 17:00 UTC (medianoche y mediodía en Colombia), en `/opt/finanzas/pb_data/backups`. Conserva las últimas 30. Puedes cambiarlo o descargar una copia en el panel `/_/` → *Settings → Backups*.
 
 Esas copias quedan en el mismo servidor: cópialas a otro lugar de vez en cuando. Cada usuario también puede exportar sus datos desde **Ajustes → Cuenta y datos → Exportar**.
 

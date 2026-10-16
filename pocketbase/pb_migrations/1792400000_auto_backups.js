@@ -1,8 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * Respaldos automáticos de PocketBase: dos al día (5:00 y 17:00, hora del
- * servidor) y se guardan los últimos 30 en pb_data/backups. Los mismos que
+ * Respaldos automáticos de PocketBase: dos al día (5:00 y 17:00 UTC, que son
+ * medianoche y mediodía en Colombia: el cron de PocketBase va en UTC aunque el
+ * contenedor tenga TZ) y se guardan los últimos 30 en pb_data/backups. Los mismos que
  * tenía finanzas-lite. Se pueden cambiar en el panel /_/ → Settings → Backups.
  */
 migrate(
