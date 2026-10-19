@@ -15,7 +15,7 @@
   import Chart from "../Chart.svelte";
   import Icon from "../Icon.svelte";
   import { MonthPicker, Select } from "../ui";
-  import { change, cumulative, insights, previousPeriod, topN, type FlowItem } from "../../lib/analysis";
+  import { change, cumulative, previousPeriod, topN, type FlowItem } from "../../lib/analysis";
   import { alpha, colorsFor, token } from "../../lib/colors";
   import {
     addMonths,
@@ -45,7 +45,7 @@
   let g = $state<Granularity>("week");
   let ym = $state(now.slice(0, 7));
   let year = $state(Number(now.slice(0, 4)));
-  let kind = $state<Kind | "both">("expense");
+  let kind = $state<Kind | "both">("both");
   let account = $state("");
   let tag = $state("");
   let focus = $state("");
@@ -114,6 +114,25 @@
   const prevCats = $derived(new Map(byCategory(inPrev, catKind).map((c) => [c.category || "none", c.total])));
   const catName = (id: string) => store.category(id)?.name ?? "Sin categoría";
 
+  // Lo puesto en los ahorros (menos lo retirado), en las cuentas propias y
+  // en la cuenta elegida. La etiqueta no aplica: los ahorros no la llevan.
+  const savedIn = (from: string, to: string) => {
+    const goals = new Set(store.savings.map((g) => g.id));
+    const own = new Set(store.accounts.map((a) => a.id));
+    return store.movements
+      .filter(
+        (m) =>
+          goals.has(m.saving) &&
+          m.date.slice(0, 10) >= from &&
+          m.date.slice(0, 10) < to &&
+          (!m.account || own.has(m.account)) &&
+          (!account || m.account === account),
+      )
+      .reduce((s, m) => s + m.amount, 0);
+  };
+  const saved = $derived(savedIn(range[0], range[1]));
+  const prevSaved = $derived(prev ? savedIn(prev.same[0], prev.same[1]) : 0);
+
   // Lo que vino de un movimiento programado (el salario, la cuota del
   // crédito…). Caen en fechas fijas, así que al comparar con el mes pasado
   // a esta altura solo dicen si el pago cayó antes o después.
@@ -125,24 +144,6 @@
   // El periodo que se mira incluye hoy: lo que queda todavía puede cambiar.
   const ongoing = $derived(range[0] <= now && now < range[1]);
 
-  const summary = $derived.by(() => {
-    const hasFixed = [...inRange, ...inPrev].some(programmed);
-    const now = hasFixed ? inRange.filter((t) => !programmed(t)) : inRange;
-    const before = hasFixed ? inPrev.filter((t) => !programmed(t)) : inPrev;
-    return insights({
-      kind: catKind,
-      ongoing,
-      income,
-      expense,
-      loose: hasFixed ? { income: sumOf(now, "income"), expense: sumOf(now, "expense") } : undefined,
-      prev:
-        prev && inPrev.length
-          ? { income: sumOf(before, "income"), expense: sumOf(before, "expense"), name: prev.name, ongoing: prev.ongoing }
-          : null,
-      cats: byCategory(now, catKind).map((c) => ({ name: catName(c.category), total: c.total })),
-      prevCats: new Map(byCategory(before, catKind).map((c) => [catName(c.category), c.total])),
-    });
-  });
 
   // A dónde fue el dinero: lo que entró por categoría y a dónde salió,
   // más lo que quedó o lo que faltó para que los dos lados cuadren.
@@ -453,25 +454,19 @@
                   ? "Hasta hoy gastaste todos tus ingresos"
                   : "Gastaste todos tus ingresos"}</div>
       </div>
+      <div class="card kpi">
+        <div class="kpi-head"><span class="kpi-ico tone-saving"><Icon name="piggy-bank" /></span><span class="kpi-label">Ahorros registrados</span>{@render delta(saved, prevSaved, true)}</div>
+        <div class="kpi-val"><Money value={saved} /></div>
+        <div class="kpi-foot">{saved < 0
+            ? "Retiraste de tus ahorros más de lo que guardaste"
+            : saved === 0
+              ? "Sin ahorros registrados en el periodo"
+              : income > 0
+                ? `Equivale al ${Math.round((saved / income) * 100)}% de tus ingresos`
+                : "Sin ingresos en el periodo para comparar"}</div>
+      </div>
     </div>
 
-    {#if summary.length}
-      <section class="card insights" aria-label="En pocas palabras">
-        <h3 class="card-title">Resumen del periodo</h3>
-        <ul style:--n={summary.length}>
-          {#each summary as item (item.text)}
-            <li class="insight {item.tone}">
-              <span class="insight-head">
-                <span class="insight-ico"><Icon name={item.icon} size={16} /></span>
-                <span class="insight-title">{item.title}</span>
-              </span>
-              <b class="insight-figure">{item.figure}</b>
-              <span class="insight-text">{item.text}</span>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
 
     <div class:split-even={!!pace}>
       <div class="card">
@@ -865,102 +860,6 @@
 
   .tone-new {
     color: var(--text-secondary);
-  }
-
-  .insights {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-12);
-    padding: var(--sp-16) var(--sp-20);
-
-    & ul {
-      display: grid;
-      /* Todas en una fila si caben; si no, de a dos, para que ninguna quede sola. */
-      grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-      gap: var(--sp-10);
-
-      @media (max-width: 80rem) {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      @media (max-width: 40rem) {
-        grid-template-columns: minmax(0, 1fr);
-      }
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-  }
-
-  .insight {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-6);
-    min-width: 0;
-    padding: var(--sp-14) var(--sp-16);
-    border: var(--border-width, 1px) solid var(--border);
-    border-radius: var(--radius-md);
-    /* Una franja de color arriba dice si es bueno o malo; el fondo queda neutro. */
-    box-shadow: inset 0 2px 0 color-mix(in oklab, var(--tone) 70%, transparent);
-    background: color-mix(in oklab, var(--text-muted) 4%, transparent);
-
-    --tone: var(--text-muted);
-
-    &.good {
-      --tone: var(--success);
-    }
-
-    /* Lo malo se marca en rojo: gastar de más o gastar más que antes. */
-    &.bad {
-      --tone: var(--danger);
-    }
-  }
-
-  .insight-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-8);
-    min-width: 0;
-  }
-
-  .insight-title {
-    font-size: var(--text-xs);
-    font-weight: 600;
-    line-height: 1.3;
-    color: var(--text-muted);
-  }
-
-  .insight-figure {
-    margin-top: var(--sp-4);
-    font-size: var(--text-xl);
-    font-weight: 700;
-    line-height: 1.15;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-primary);
-    letter-spacing: -0.01em;
-
-    .bad &,
-    .good & {
-      color: var(--tone);
-    }
-  }
-
-  .insight-text {
-    font-size: var(--text-sm);
-    line-height: 1.45;
-    color: var(--text-secondary);
-    text-wrap: pretty;
-  }
-
-  .insight-ico {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: 99rem;
-    background: color-mix(in oklab, var(--tone) 14%, transparent);
-    color: var(--tone);
   }
 
   .split-cats {

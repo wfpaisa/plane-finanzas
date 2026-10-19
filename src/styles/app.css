@@ -139,6 +139,10 @@
   color: var(--danger);
 }
 
+.kpi-ico.tone-saving {
+  color: var(--viz-saving);
+}
+
 .kpi-ico.tone-warn {
   color: var(--warning);
 }

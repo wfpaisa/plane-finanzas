@@ -1,27 +1,28 @@
 <!--
-  Las dos respuestas del mes, en grande: cuánto hay que reservar para los
-  pagos programados, los ahorros y lo que se debe en tarjetas de crédito, y
-  cuánto queda para gastar. Siguen al mes que se ve en la lista del mes.
+  Las dos respuestas del mes, en grande. Sin `spent`, el plan: cuánto hay que
+  reservar para los pagos programados y los ahorros, y cuánto queda para
+  gastar (en Gastos e ingresos). Con `spent`, lo registrado: en qué se fue el
+  dinero del mes y cuánto queda de lo disponible para gastar (en el Resumen).
 -->
+<script lang="ts" module>
+  /** Lo registrado en el mes, por tipo de gasto. */
+  export type Spent = { fixed: number; variable: number; card: number; savings: number };
+</script>
+
 <script lang="ts">
   import Icon from "../Icon.svelte";
   import Money from "./Money.svelte";
-  import type { CardPlan } from "../../lib/cards";
-  import { today } from "../../lib/finance";
   import { monthLabel } from "../../lib/format";
   import { store } from "../../lib/store.svelte";
 
-  let { ym, cards }: { ym: string; cards: CardPlan } = $props();
+  let { ym, spent }: { ym: string; spent?: Spent } = $props();
 
   const plan = $derived(store.planFor(ym));
   const month = $derived(monthLabel(ym, true).split(" ")[0]);
-  const past = $derived(ym < today().slice(0, 7));
-  const reserve = $derived(plan.fixed + plan.savings + cards.total);
-  /** Lo que queda después de reservar todo, tarjetas incluidas. */
-  const free = $derived(plan.free - cards.total);
+  const reserve = $derived(plan.fixed + plan.savings);
+  const free = $derived(plan.free);
   const remaining = $derived(Math.max(0, free));
   const short = $derived(free < 0);
-  const hasCards = $derived(cards.total > 0);
   const hasSavings = $derived(plan.savings > 0);
   const pct = (n: number) => (plan.income > 0 ? Math.round(Math.max(0, (n / plan.income) * 100)) : 0);
   // La barra muestra qué parte de los ingresos va a cada cosa. Si lo
@@ -29,49 +30,127 @@
   const base = $derived(Math.max(plan.income, reserve));
   const width = (n: number) => (base > 0 ? (Math.max(0, n) / base) * 100 : 0);
   const share = (n: number) => (plan.income > 0 ? `${n}%` : "—");
-  const cardLabel = $derived(past ? "Gastos con tarjeta" : "Tarjetas de crédito");
+
+  // Lo registrado: el total de gastos del mes y, de lo disponible para
+  // gastar, cuánto ya se fue en gastos variables y con tarjeta.
+  const total = $derived(spent ? spent.fixed + spent.variable + spent.card + spent.savings : 0);
+  // La barra se mide contra el total de gastos: muestra solo cómo se reparte.
+  const spentWidth = (n: number) => (total > 0 ? (Math.max(0, n) / total) * 100 : 0);
+  const used = $derived(spent ? spent.variable + spent.card : 0);
+  const left = $derived(free - used);
+  const over = $derived(left < 0);
+  const ofFree = (n: number) => (free > 0 ? `${Math.round(Math.max(0, (n / free) * 100))}%` : "—");
+  const freeBase = $derived(Math.max(free, used));
+  const freeWidth = (n: number) => (freeBase > 0 ? (Math.max(0, n) / freeBase) * 100 : 0);
 </script>
 
 <div class="pc">
-  <section class="card pc-card pc-reserve" class:split={hasSavings || hasCards}>
+{#if spent}
+  <section class="card pc-card pc-reserve split">
     <div class="pc-top">
-      <span class="pc-ico"><Icon name="coins-01" size={20} /></span>
-      <span class="pc-label">Dinero por reservar en {month}</span>
+      <span class="pc-ico"><Icon name="money-send-01" size={20} /></span>
+      <span class="pc-label">Gastos de {month}</span>
     </div>
-    <Money value={plan.fixed + plan.savings} />
-    {#if hasCards}
-      <p class="pc-secondary">Total de gastos: <Money value={reserve} /></p>
-    {/if}
-    <p class="pc-text">
-      {hasCards
-        ? "Reserva este monto de tus ingresos para pagos programados y ahorros. El total de gastos suma también lo que debes en tarjetas de crédito."
-        : "Reserva este monto de tus ingresos para pagos programados y ahorros."}
-    </p>
+    <Money value={total} />
+    <p class="pc-text">Tus gastos del mes, en porcentaje de tus ingresos.</p>
     <div class="pc-split">
       <div
         class="pc-meter pc-meter-split"
         role="img"
         aria-label={plan.income > 0
-          ? `De tus ingresos, ${pct(plan.fixed)}% es para pagos programados, ${pct(cards.total)}% para tarjetas de crédito, ${pct(plan.savings)}% para ahorros y ${pct(remaining)}% queda disponible.`
+          ? `De tus ingresos, ${pct(spent.fixed)}% se fue en gastos fijos, ${pct(spent.variable)}% en gastos variables, ${pct(spent.savings)}% en ahorros y ${pct(spent.card)}% con tarjeta de crédito.`
+          : "Aún no hay ingresos programados este mes."}
+      >
+        <span class="is-fixed" style:width="{spentWidth(spent.fixed)}%"></span>
+        <span class="is-variable" style:width="{spentWidth(spent.variable)}%"></span>
+        <span class="is-saving" style:width="{spentWidth(spent.savings)}%"></span>
+        <span class="is-card" style:width="{spentWidth(spent.card)}%"></span>
+      </div>
+    </div>
+    <dl class="pc-parts pc-reserve-parts pc-four">
+      <div class="part-fixed">
+        <dt>Fijos</dt>
+        <dd><Money value={spent.fixed} /><span class="pc-pct">{share(pct(spent.fixed))}</span></dd>
+      </div>
+      <div class="part-variable">
+        <dt>Variables</dt>
+        <dd><Money value={spent.variable} /><span class="pc-pct">{share(pct(spent.variable))}</span></dd>
+      </div>
+      <div class="part-saving">
+        <dt>Ahorros</dt>
+        <dd><Money value={spent.savings} /><span class="pc-pct">{share(pct(spent.savings))}</span></dd>
+      </div>
+      <div class="part-card">
+        <dt>Tarjetas de crédito</dt>
+        <dd><Money value={spent.card} /><span class="pc-pct">{share(pct(spent.card))}</span></dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="card pc-card pc-free" class:short={over}>
+    <div class="pc-top">
+      <span class="pc-ico"><Icon name={over ? "alert-circle" : "wallet-01"} size={20} /></span>
+      <span class="pc-label">{over ? `Gastaste de más en ${month}` : `Disponible para el mes de ${month}`}</span>
+    </div>
+    <Money value={Math.abs(left)} />
+    <p class="pc-text">
+      {#if free <= 0}
+        Aún no hay dinero disponible para gastar en {month}. Programa tus ingresos o reduce los pagos y ahorros.
+      {:else if over}
+        Tus gastos variables y con tarjeta superan lo disponible del mes. Reduce gastos para cubrir la diferencia.
+      {:else}
+        Lo que queda después de tus gastos variables y con tarjeta.
+      {/if}
+    </p>
+    <div
+      class="pc-meter pc-meter-split pc-left-meter"
+      role="img"
+      aria-label={free > 0 ? `Ya gastaste el ${ofFree(used)} de lo disponible y te queda el ${ofFree(left)}.` : "Aún no hay dinero disponible este mes."}
+    >
+      <span class="is-used" style:width="{freeWidth(used)}%"></span>
+      <span class="is-free" style:width="{freeWidth(left)}%"></span>
+    </div>
+    <dl class="pc-parts pc-reserve-parts pc-left-parts">
+      <div class="part-available">
+        <dt>Disponible del mes</dt>
+        <dd><Money value={free} /><span class="pc-pct">{free > 0 ? "100%" : "—"}</span></dd>
+      </div>
+      <div class="part-used">
+        <dt>Ya gastado</dt>
+        <dd><Money value={used} /><span class="pc-pct">{ofFree(used)}</span></dd>
+      </div>
+      <div class="part-left">
+        <dt>{over ? "Gastado de más" : "Te queda"}</dt>
+        <dd><Money value={Math.abs(left)} /><span class="pc-pct">{over ? "—" : ofFree(left)}</span></dd>
+      </div>
+    </dl>
+  </section>
+{:else}
+  <section class="card pc-card pc-reserve" class:split={hasSavings}>
+    <div class="pc-top">
+      <span class="pc-ico"><Icon name="coins-01" size={20} /></span>
+      <span class="pc-label">Dinero por reservar en {month}</span>
+    </div>
+    <Money value={reserve} />
+    <p class="pc-text">Reserva este monto de tus ingresos para pagos programados y ahorros.</p>
+    <div class="pc-split">
+      <div
+        class="pc-meter pc-meter-split"
+        role="img"
+        aria-label={plan.income > 0
+          ? `De tus ingresos, ${pct(plan.fixed)}% es para pagos programados, ${pct(plan.savings)}% para ahorros y ${pct(remaining)}% queda disponible.`
           : "Aún no hay ingresos programados este mes."}
       >
         <span class="is-fixed" style:width="{width(plan.fixed)}%"></span>
-        {#if hasCards}<span class="is-card" style:width="{width(cards.total)}%"></span>{/if}
         {#if hasSavings}<span class="is-saving" style:width="{width(plan.savings)}%"></span>{/if}
         <span class="is-free" style:width="{width(remaining)}%"></span>
       </div>
     </div>
-    <dl class="pc-parts pc-reserve-parts" class:without-card={!hasCards}>
+    <dl class="pc-parts pc-reserve-parts">
       <div class="part-fixed">
         <dt>Pagos programados</dt>
         <dd><Money value={plan.fixed} /><span class="pc-pct">{share(pct(plan.fixed))}</span></dd>
       </div>
-      {#if hasCards}
-        <div class="part-card">
-          <dt>{cardLabel}</dt>
-          <dd><Money value={cards.total} /><span class="pc-pct">{share(pct(cards.total))}</span></dd>
-        </div>
-      {/if}
       <div class="part-saving">
         <dt>Ahorros</dt>
         <dd><Money value={plan.savings} /><span class="pc-pct">{share(pct(plan.savings))}</span></dd>
@@ -89,48 +168,39 @@
       <span class="pc-label">{short ? `Dinero faltante en ${month}` : `Disponible para gastar en ${month}`}</span>
     </div>
     <Money value={Math.abs(free)} />
-    {#if hasCards}
-      <p class="pc-secondary">Sin contar las tarjetas: <Money value={plan.free} /></p>
-    {/if}
     <p class="pc-text">
       {#if plan.income <= 0}
         Aún no hay ingresos programados en {month}. Programa un ingreso para saber cuánto te queda.
       {:else if short}
-        {hasCards ? "Tus pagos, ahorros y tarjetas" : "Tus pagos y ahorros"} superan tus ingresos del mes. Reduce un gasto o un ahorro para cubrir la
-        diferencia.
-      {:else if hasCards}
-        Tus ingresos después de reservar pagos programados, ahorros y gastos con tarjeta de crédito. Pagar la tarjeta no cambia este monto.
+        Tus pagos y ahorros superan tus ingresos del mes. Reduce un gasto o un ahorro para cubrir la diferencia.
       {:else}
         Tus ingresos después de reservar pagos programados y ahorros.
       {/if}
     </p>
     <div class="pc-meter pc-meter-split pc-available-meter" aria-hidden="true">
       <span class="is-fixed" style:width="{width(plan.fixed)}%"></span>
-      {#if hasCards}<span class="is-card" style:width="{width(cards.total)}%"></span>{/if}
       <span class="is-saving" style:width="{width(plan.savings)}%"></span>
       <span class="is-free" style:width="{width(remaining)}%"></span>
     </div>
-    <dl class="pc-parts pc-free-parts" style:--parts={2 + Number(hasCards)}>
+    <dl class="pc-parts pc-free-parts">
       <div>
         <dt>Ingresos</dt>
         <dd><Money value={plan.income} /></dd>
       </div>
-      {#if hasCards}
-        <div>
-          <dt>Sin contar tarjetas</dt>
-          <dd>{plan.free < 0 ? "—" : share(pct(plan.free))}</dd>
-        </div>
-      {/if}
       <div>
-        <dt>Total</dt>
+        <dt>Disponible</dt>
         <dd>{short ? "—" : share(pct(free))}</dd>
       </div>
     </dl>
   </section>
+{/if}
 </div>
 
 <style>
   .pc {
+    /* Los gastos variables, en amarillo. */
+    --viz-variable: light-dark(oklch(0.8 0.14 90), oklch(0.86 0.13 92));
+
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
     gap: var(--card-gap, var(--sp-16));
@@ -191,12 +261,16 @@
         --dot: var(--viz-expense);
       }
 
-      & .pc-parts .part-card {
-        --dot: var(--viz-card);
-      }
-
       & .pc-parts .part-saving {
         --dot: var(--viz-saving);
+      }
+
+      & .pc-parts .part-variable {
+        --dot: var(--viz-variable);
+      }
+
+      & .pc-parts .part-card {
+        --dot: var(--viz-card);
       }
     }
   }
@@ -225,12 +299,20 @@
       background: var(--viz-expense);
     }
 
+    & .is-saving {
+      background: var(--viz-saving);
+    }
+
+    & .is-variable {
+      background: var(--viz-variable);
+    }
+
     & .is-card {
       background: var(--viz-card);
     }
 
-    & .is-saving {
-      background: var(--viz-saving);
+    & .is-used {
+      background: var(--viz-expense);
     }
 
     & .is-free {
@@ -243,7 +325,7 @@
     opacity: 0.2;
   }
 
-  .pc-available-meter :is(.is-fixed, .is-card, .is-saving) {
+  .pc-available-meter :is(.is-fixed, .is-saving) {
     opacity: 0.2;
   }
 
@@ -282,17 +364,6 @@
     color: var(--text-secondary);
   }
 
-  .pc-secondary {
-    margin: 0;
-    font-size: var(--text-xs);
-    color: var(--text-secondary);
-
-    & :global(.money) {
-      font-size: var(--text-sm);
-      font-weight: 600;
-    }
-  }
-
   .pc-text {
     margin: 0;
     font-size: var(--text-sm);
@@ -316,11 +387,7 @@
   }
 
   .pc-parts.pc-reserve-parts {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-
-    &.without-card {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 
     & .part-total dt::before {
       display: none;
@@ -337,8 +404,14 @@
     }
   }
 
+  /* Los cuatro tipos de gasto: en dos filas cuando no caben. */
+  .pc-parts.pc-reserve-parts.pc-four {
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    row-gap: var(--sp-10);
+  }
+
   .pc-parts.pc-free-parts {
-    grid-template-columns: repeat(var(--parts), minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     @media (max-width: 40rem) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--sp-12);
@@ -405,7 +478,6 @@
       grid-template-areas:
         "ico label"
         "ico money"
-        "secondary secondary"
         "text text"
         "meter meter"
         "parts parts";
@@ -434,11 +506,6 @@
       grid-area: label;
       align-self: end;
       font-size: var(--text-xs);
-    }
-
-    .pc-secondary {
-      grid-area: secondary;
-      margin-top: var(--sp-6);
     }
 
     .pc-text {

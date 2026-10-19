@@ -6,6 +6,7 @@
   import CategoryPill from "../components/app/CategoryPill.svelte";
   import Money from "../components/app/Money.svelte";
   import MonthNav from "../components/mobile/MonthNav.svelte";
+  import PlanCards from "../components/app/PlanCards.svelte";
   import RecurringForm from "../components/app/RecurringForm.svelte";
   import RecurringMonth from "../components/app/RecurringMonth.svelte";
   import Segmented from "../components/app/Segmented.svelte";
@@ -160,6 +161,16 @@
   </header>
 
   <div class="stack">
+    <section>
+      <header class="section-head plan-cards-head">
+        <div>
+          <h2>Plan de {monthLabel(ym, true)}</h2>
+          <p>Cuánto reservar y cuánto queda para gastar. Cambia el mes arriba para ver otro.</p>
+        </div>
+      </header>
+      <PlanCards {ym} />
+    </section>
+
     <RecurringMonth bind:ym />
 
     <!-- El ingreso a la izquierda se abre en bandas hacia lo que se lleva
@@ -296,6 +307,10 @@
 <RecurringForm open={formOpen} item={editing} kind={newKind} onClose={() => (formOpen = false)} />
 
 <style>
+  .plan-cards-head {
+    margin-top: 0;
+  }
+
   .plan-section {
     margin: var(--sp-16) 0 0;
 

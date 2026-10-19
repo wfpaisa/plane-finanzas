@@ -7,13 +7,13 @@
   import Icon from "../Icon.svelte";
   import CategoryPill from "../app/CategoryPill.svelte";
   import Money from "../app/Money.svelte";
+  import PlanCards from "../app/PlanCards.svelte";
   import RecurringForm from "../app/RecurringForm.svelte";
   import RecurringMonth from "../app/RecurringMonth.svelte";
   import Segmented from "../app/Segmented.svelte";
   import SlideIn from "./SlideIn.svelte";
   import BackButton from "./BackButton.svelte";
   import TopBar from "./TopBar.svelte";
-  import { useCardPlan } from "../../lib/cardPlan.svelte";
   import { activeIn, monthlyEquivalent, today, type Kind, type TxType } from "../../lib/finance";
   import { monthLabel, monthName } from "../../lib/format";
   import { nextMonthsChart } from "../../lib/planCharts";
@@ -25,9 +25,8 @@
   let { onBack }: { onBack?: () => void } = $props();
 
   const thisYm = today().slice(0, 7);
-  // Las tarjetas y el plan siguen al mes que se ve en la lista del mes.
+  // El plan sigue al mes que se ve en la lista del mes.
   let ym = $state(thisYm);
-  const cards = useCardPlan(() => ym);
   const KINDS = [
     { id: "income", label: "Ingresos" },
     { id: "expense", label: "Gastos" },
@@ -38,13 +37,8 @@
   let newKind = $state<TxType>("expense");
   let kind = $state<Kind>("expense");
 
-  const plan = $derived(store.planFor(ym));
-  const card = $derived(cards.current.total);
-  const free = $derived(plan.free - card);
   // Las transferencias van con los gastos: también son pagos. Solo suman en el plan las que reservan dinero para un pago.
   const items = $derived(store.recurring.filter((r) => (kind === "income" ? r.kind === "income" : r.kind !== "income")));
-  const barBase = $derived(Math.max(plan.income, plan.fixed + card + plan.savings));
-  const width = (n: number) => (barBase > 0 ? Math.max(0, (n / barBase) * 100) : 0);
 
   // El botón de atrás del teléfono cierra el formulario en vez de salir de la pantalla.
   $effect(() => {
@@ -95,25 +89,12 @@
 
 <header class="section-head pl-section">
   <div>
-    <h2>Tu plan del mes</h2>
-    <p>Compara los ingresos previstos con los pagos, las tarjetas y los ahorros del mes.</p>
+    <h2>Plan de {monthLabel(ym, true)}</h2>
+    <p>Cuánto reservar y cuánto queda para gastar.</p>
   </div>
 </header>
 
-<section class="card pl-top">
-  <div class="pl-bar" aria-hidden="true">
-    <span class="seg-fixed" style:width="{width(plan.fixed)}%"></span>
-    {#if card > 0}<span class="seg-card" style:width="{width(card)}%"></span>{/if}
-    <span class="seg-save" style:width="{width(plan.savings)}%"></span>
-    <span class="seg-free" style:width="{width(free)}%"></span>
-  </div>
-  <dl class="pl-sum" style:--cols={card > 0 ? 2 : 3}>
-    <div><dt>Ingresos</dt><dd><Money value={plan.income} tone="income" /></dd></div>
-    <div><dt><i class="seg-fixed"></i>Pagos</dt><dd><Money value={plan.fixed} tone="expense" /></dd></div>
-    {#if card > 0}<div><dt><i class="seg-card"></i>Tarjetas</dt><dd><Money value={card} tone="expense" /></dd></div>{/if}
-    <div><dt><i class="seg-save"></i>Ahorros</dt><dd><Money value={plan.savings} /></dd></div>
-  </dl>
-</section>
+<div class="pl-cards"><PlanCards {ym} /></div>
 
 <section class="card pl-block">
   <Segmented bind:value={kind} options={KINDS} tabs full label="Movimientos programados" />
@@ -179,70 +160,8 @@
     color: var(--text-muted);
   }
 
-  .pl-top {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-12);
+  .pl-cards {
     margin: var(--sp-12);
-    padding: var(--sp-16);
-  }
-
-
-  .pl-bar {
-    display: flex;
-    height: 0.5rem;
-    overflow: hidden;
-    border-radius: var(--radius-pill, 99px);
-    background: var(--field-bg, var(--bg-hover));
-    box-shadow: var(--field-shadow, none);
-  }
-
-  .seg-fixed {
-    background: var(--viz-expense);
-  }
-
-  .seg-save {
-    background: var(--viz-saving);
-  }
-
-  .seg-card {
-    background: var(--viz-card);
-  }
-
-  .seg-free {
-    background: var(--viz-free);
-  }
-
-  .pl-sum {
-    display: grid;
-    grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
-    row-gap: var(--sp-10);
-    margin: 0;
-    text-align: center;
-
-    & div {
-      min-width: 0;
-    }
-
-    & dt {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--sp-4);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-
-    & dt i {
-      width: 0.5rem;
-      height: 0.5rem;
-      border-radius: 2px;
-    }
-
-    & dd {
-      margin: 0;
-      font-size: var(--text-sm);
-    }
   }
 
   .pl-block {

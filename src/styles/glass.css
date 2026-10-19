@@ -770,6 +770,10 @@ select.field-control {
     --kpi-tone: var(--viz-expense);
   }
 
+  &.tone-saving {
+    --kpi-tone: var(--viz-saving);
+  }
+
   &.tone-warn {
     --kpi-tone: var(--warning);
   }

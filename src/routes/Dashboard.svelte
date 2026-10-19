@@ -11,12 +11,11 @@
   import AccountKpis from "../components/app/AccountKpis.svelte";
   import Analysis from "../components/app/Analysis.svelte";
   import Money from "../components/app/Money.svelte";
-  import PlanCards from "../components/app/PlanCards.svelte";
-  import MonthNav from "../components/mobile/MonthNav.svelte";
+  import PlanCards, { type Spent } from "../components/app/PlanCards.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button } from "../components/ui";
-  import { useCardPlan } from "../lib/cardPlan.svelte";
+  import { isCard } from "../lib/cards";
   import { alpha, colorsFor, tintColor, token } from "../lib/colors";
   import { addMonths, bucketize, byCategory, monthRange, today } from "../lib/finance";
   import { money, moneyShort, monthLabel } from "../lib/format";
@@ -66,10 +65,33 @@
   const monthExpenses = $derived(month.filter((t) => t.type === "expense"));
   const expense = $derived(monthExpenses.reduce((s, t) => s + t.amount, 0));
   const plan = $derived(store.plan);
-  /** El mes de las tarjetas de dinero por reservar y disponible: se cambia con su selector. */
-  let planYm = $state(ym);
-  const cards = useCardPlan(() => planYm);
   const review = $derived(month.filter((t) => t.tags?.includes("revisar")).length);
+
+  /** Lo registrado este mes, por tipo de gasto, como en el resumen de Gastos e ingresos. */
+  const spent = $derived.by((): Spent => {
+    const programmed = (t: Transaction) => !!t.recurring_key || (t.external_id ?? "").startsWith("rec:");
+    const cardIds = new Set(store.accounts.filter(isCard).map((a) => a.id));
+    // De las transferencias solo cuentan las que reservan dinero para un pago.
+    const forPayment = new Set(store.recurring.filter((r) => r.kind === "transfer" && r.for_payment).map((r) => r.id));
+    const sum = { fixed: 0, variable: 0, card: 0, savings: 0 };
+    for (const t of month) {
+      if (t.type === "transfer") {
+        if (forPayment.has((t.recurring_key || t.external_id || "").split(":")[1])) sum.fixed += t.amount;
+      } else if (t.type !== "expense") continue;
+      else if (programmed(t)) sum.fixed += t.amount;
+      else if (cardIds.has(t.account)) sum.card += t.amount;
+      else sum.variable += t.amount;
+    }
+    const goals = new Set(store.savings.map((g) => g.id));
+    const own = new Set(store.accounts.map((a) => a.id));
+    sum.savings = Math.max(
+      0,
+      store.movements
+        .filter((m) => goals.has(m.saving) && m.date.startsWith(ym) && (!m.account || own.has(m.account)))
+        .reduce((a, m) => a + m.amount, 0),
+    );
+    return sum;
+  });
 
   const months = Array.from({ length: 6 }, (_, i) => addMonths(ym, i - 5));
   const buckets = $derived(bucketize(txs, "month", months));
@@ -240,7 +262,7 @@
           <div class="kpi-val"><Money value={expense} tone="expense" /></div>
         </div>
       </div>
-      {@render planBlock()}
+      <PlanCards {ym} {spent} />
 
       <div class="dash-grid">
         <!-- En el celular cada tarjeta lleva su título encima, como sección de la página. -->
@@ -289,25 +311,12 @@
       <div class="kpis-auto">
         <AccountKpis />
       </div>
-      {@render planBlock()}
+      <PlanCards {ym} {spent} />
 
       <Analysis />
     {/if}
   </div>
 </div>
-
-{#snippet planBlock()}
-  <section class="dash-plan">
-    <header class="section-head">
-      <div>
-        <h2>Plan de {monthLabel(planYm, true)}</h2>
-        <p>Cuánto reservar y cuánto queda para gastar. Cambia el mes para ver otro.</p>
-      </div>
-      <MonthNav bind:ym={planYm} />
-    </header>
-    <PlanCards ym={planYm} cards={cards.current} />
-  </section>
-{/snippet}
 
 {#snippet savingsCard()}
   <section class="dash-savings">
@@ -368,6 +377,8 @@
      acomoda igual con el sidebar abierto o cerrado. */
   .dash {
     container-type: inline-size;
+    /* Más aire entre los saldos, los gastos del mes y el resto. */
+    gap: var(--sp-40);
   }
 
   /* Angosto: una columna. Mediano: el flujo a todo el ancho y debajo
@@ -375,12 +386,6 @@
      ocupa dos y a su lado van los gastos encima de los ahorros. */
   /* La separación entre secciones ya la da el hueco de la cuadrícula. */
   .dash-grid .section-head {
-    margin-top: var(--sp-4);
-  }
-
-  /* El selector de mes va a la altura del título. */
-  .dash-plan > .section-head {
-    align-items: center;
     margin-top: var(--sp-4);
   }
 
