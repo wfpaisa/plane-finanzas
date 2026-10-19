@@ -38,13 +38,13 @@
       <span class="pc-ico"><Icon name="coins-01" size={20} /></span>
       <span class="pc-label">Dinero por reservar en {month}</span>
     </div>
-    <Money value={reserve} />
+    <Money value={plan.fixed + plan.savings} />
     {#if hasCards}
-      <p class="pc-secondary">Pagos programados + ahorros: <Money value={plan.fixed + plan.savings} /></p>
+      <p class="pc-secondary">Total de gastos: <Money value={reserve} /></p>
     {/if}
     <p class="pc-text">
       {hasCards
-        ? "Reserva este monto de tus ingresos para pagos programados, ahorros y gastos con tarjeta de crédito."
+        ? "Reserva este monto de tus ingresos para pagos programados y ahorros. El total de gastos suma también lo que debes en tarjetas de crédito."
         : "Reserva este monto de tus ingresos para pagos programados y ahorros."}
     </p>
     <div class="pc-split">

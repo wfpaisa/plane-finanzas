@@ -12,6 +12,7 @@
   import Analysis from "../components/app/Analysis.svelte";
   import Money from "../components/app/Money.svelte";
   import PlanCards from "../components/app/PlanCards.svelte";
+  import MonthNav from "../components/mobile/MonthNav.svelte";
   import Chart from "../components/Chart.svelte";
   import Icon from "../components/Icon.svelte";
   import { Button } from "../components/ui";
@@ -65,7 +66,9 @@
   const monthExpenses = $derived(month.filter((t) => t.type === "expense"));
   const expense = $derived(monthExpenses.reduce((s, t) => s + t.amount, 0));
   const plan = $derived(store.plan);
-  const cards = useCardPlan(() => ym);
+  /** El mes de las tarjetas de dinero por reservar y disponible: se cambia con su selector. */
+  let planYm = $state(ym);
+  const cards = useCardPlan(() => planYm);
   const review = $derived(month.filter((t) => t.tags?.includes("revisar")).length);
 
   const months = Array.from({ length: 6 }, (_, i) => addMonths(ym, i - 5));
@@ -224,7 +227,6 @@
   </header>
 
   <div class="stack dash">
-    <PlanCards {ym} cards={cards.current} />
     {#if mobile}
       <div class="kpis-auto">
         <AccountKpis />
@@ -238,6 +240,7 @@
           <div class="kpi-val"><Money value={expense} tone="expense" /></div>
         </div>
       </div>
+      {@render planBlock()}
 
       <div class="dash-grid">
         <!-- En el celular cada tarjeta lleva su título encima, como sección de la página. -->
@@ -286,11 +289,25 @@
       <div class="kpis-auto">
         <AccountKpis />
       </div>
+      {@render planBlock()}
 
       <Analysis />
     {/if}
   </div>
 </div>
+
+{#snippet planBlock()}
+  <section class="dash-plan">
+    <header class="section-head">
+      <div>
+        <h2>Plan de {monthLabel(planYm, true)}</h2>
+        <p>Cuánto reservar y cuánto queda para gastar. Cambia el mes para ver otro.</p>
+      </div>
+      <MonthNav bind:ym={planYm} />
+    </header>
+    <PlanCards ym={planYm} cards={cards.current} />
+  </section>
+{/snippet}
 
 {#snippet savingsCard()}
   <section class="dash-savings">
@@ -358,6 +375,12 @@
      ocupa dos y a su lado van los gastos encima de los ahorros. */
   /* La separación entre secciones ya la da el hueco de la cuadrícula. */
   .dash-grid .section-head {
+    margin-top: var(--sp-4);
+  }
+
+  /* El selector de mes va a la altura del título. */
+  .dash-plan > .section-head {
+    align-items: center;
     margin-top: var(--sp-4);
   }
 
