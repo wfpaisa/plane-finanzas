@@ -9,6 +9,7 @@
   import Chart from "../Chart.svelte";
   import Icon from "../Icon.svelte";
   import Money from "../app/Money.svelte";
+  import SavingsMonth from "../app/SavingsMonth.svelte";
   import MovementForm from "../app/MovementForm.svelte";
   import SavingForm from "../app/SavingForm.svelte";
   import Segmented from "../app/Segmented.svelte";
@@ -22,12 +23,15 @@
   import { session } from "../../lib/pb.svelte";
   import { paidAt, savingsHistory, simChart, stateChart, valueAt } from "../../lib/savingsCharts";
   import { store } from "../../lib/store.svelte";
+  import { monthContributions, reachedGoal } from "../../lib/savingsMonth";
   import type { Saving, SavingMovement } from "../../lib/types";
 
   /** Sin él es una pestaña: la marca arriba, sin botón de volver. */
   let { onBack }: { onBack?: () => void } = $props();
 
   const ym = today().slice(0, 7);
+  /** Los aportes de este mes, para marcar los ahorros que ya lo completaron. */
+  const contributions = $derived(monthContributions(ym));
   const SHOWN = 8;
   const VIEWS = [
     { id: "estado", label: "Estado" },
@@ -127,6 +131,8 @@
   <div><span>Aporte al mes</span><Money value={totalMonthly} /></div>
 </div>
 
+<SavingsMonth mobile />
+
 {#each list as s (s.id)}
   {@const now = store.savingCurrent(s.id)}
   {@const e = eta(s, now)}
@@ -140,6 +146,7 @@
       <span class="sv-name">
         <span class="sv-title">
           {s.name}
+          {#if contributions.get(s.id)?.done || reachedGoal(s)}<span class="sv-done" title={reachedGoal(s) ? "Meta alcanzada" : "Aporte del mes completo"} aria-label={reachedGoal(s) ? "Meta alcanzada" : "Aporte del mes completo"}><Icon name="checkmark-circle-01" size={14} /></span>{/if}
           {#if s.members?.length || s.owner !== session.id}<Icon name="user-multiple" size={12} />{/if}
         </span>
         <span class="sv-sub">
@@ -234,6 +241,13 @@
 <MovementForm open={movOpen} saving={movSaving} movement={movEditing} onClose={() => (movOpen = false)} />
 
 <style>
+  .sv-done {
+    display: inline-flex;
+    margin-left: var(--sp-4);
+    color: var(--success);
+    vertical-align: -0.1em;
+  }
+
   .sv-head-page {
     margin: 0;
     padding: var(--sp-16) var(--sp-16) 0;

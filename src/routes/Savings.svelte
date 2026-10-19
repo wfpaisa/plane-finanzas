@@ -10,6 +10,7 @@
   import { SvelteSet } from "svelte/reactivity";
 
   import Money from "../components/app/Money.svelte";
+  import SavingsMonth from "../components/app/SavingsMonth.svelte";
   import MovementForm from "../components/app/MovementForm.svelte";
   import SavingForm from "../components/app/SavingForm.svelte";
   import Chart from "../components/Chart.svelte";
@@ -22,6 +23,7 @@
   import { pb, session } from "../lib/pb.svelte";
   import { paidAt, savingsHistory, simChart, stateChart, valueAt } from "../lib/savingsCharts";
   import { reload, store } from "../lib/store.svelte";
+  import { monthContributions, reachedGoal } from "../lib/savingsMonth";
   import type { Saving, SavingMovement } from "../lib/types";
 
   let formOpen = $state(false);
@@ -89,6 +91,8 @@
   const totalSaved = $derived(store.activeSavings.reduce((s, x) => s + store.savingCurrent(x.id), 0));
   const totalMonthly = $derived(store.activeSavings.reduce((s, x) => s + (x.monthly_amount || 0), 0));
   const ym = today().slice(0, 7);
+  /** Los aportes de este mes, para marcar los ahorros que ya lo completaron. */
+  const contributions = $derived(monthContributions(ym));
 
   function eta(s: Saving, current: number) {
     if (!s.target_amount) return null;
@@ -170,6 +174,7 @@
   </header>
 
   <div class="stack">
+    <SavingsMonth />
     {#if list.length}
       <div class="sv-table-wrap card">
         <table class="sv-table">
@@ -195,7 +200,7 @@
                     <Icon name="arrow-right-01" size={14} class="sv-chevron" />
                     <span class="sv-ico" style:--c={colorOf(s.palette)}><Icon name={s.icon || "piggy-bank"} size={17} /></span>
                     <span class="sv-name-text">
-                      <span class="sv-title">{s.name}</span>
+                      <span class="sv-title">{s.name}{#if contributions.get(s.id)?.done || reachedGoal(s)}<span class="sv-done" title={reachedGoal(s) ? "Meta alcanzada" : "Aporte del mes completo"} aria-label={reachedGoal(s) ? "Meta alcanzada" : "Aporte del mes completo"}><Icon name="checkmark-circle-01" size={14} /></span>{/if}</span>
                       <span class="sv-sub">
                         {movsCount(s.id)}{#if holders.length > 1}<span class="sv-dot">·</span>en {holders.length} lugares{/if}
                         {#if s.members?.length || s.owner !== session.id}<span class="sv-dot">·</span><span class="sv-shared"><Icon name="user-multiple" size={12} />Compartido</span>{/if}
@@ -412,6 +417,13 @@
 <MovementForm open={movOpen} saving={movSaving} movement={movEditing} onClose={() => (movOpen = false)} />
 
 <style>
+  .sv-done {
+    display: inline-flex;
+    margin-left: var(--sp-4);
+    color: var(--success);
+    vertical-align: -0.1em;
+  }
+
   /* En angosto la tabla se desliza de lado dentro de su tarjeta; lo que va
      en posición absoluta dentro se ancla aquí para no ensanchar la página. */
   .sv-table-wrap {
