@@ -1,0 +1,339 @@
+/*
+ * Piezas propias de Finanzas que se repiten entre pantallas. Lo demás viene
+ * del catálogo (`components.css`) y de las utilidades (`layout.css`).
+ */
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-20);
+
+  & h1 {
+    margin: 0;
+    font-size: 1.625rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+
+  & p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+}
+
+/* El título de una sección dentro de una página del celular (Resumen,
+   Análisis, Gastos e ingresos): va fuera de la tarjeta, que lleva solo el contenido. */
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-8);
+  margin: var(--sp-20) 0 var(--sp-10);
+  padding: 0 var(--sp-4);
+
+  & > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  & h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  & p {
+    margin: 0.125rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.page {
+  max-width: 76rem;
+  margin: 0 auto;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--sp-14);
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--card-gap);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--card-gap);
+
+  @media (max-width: 64rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.split-even {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--card-gap);
+
+  @media (max-width: 64rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.kpis-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--card-gap);
+
+  @media (max-width: 40rem) {
+    gap: var(--sp-10);
+
+    & .kpi {
+      padding: var(--sp-12);
+      gap: var(--sp-8);
+    }
+
+    & .kpi-label {
+      font-size: var(--text-xs);
+    }
+
+    & .kpi.card .kpi-val {
+      font-size: 1.05rem;
+    }
+  }
+}
+
+.kpi.card .kpi-val {
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+}
+
+.kpi-ico.tone-income {
+  color: var(--success);
+}
+
+.kpi-ico.tone-expense {
+  color: var(--danger);
+}
+
+.kpi-ico.tone-saving {
+  color: var(--viz-saving);
+}
+
+.kpi-ico.tone-warn {
+  color: var(--warning);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: var(--text-xs);
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem var(--sp-10);
+  align-items: center;
+  padding: var(--sp-8) 0;
+
+  & + .bar-row {
+    border-top: var(--border-width) solid var(--border);
+  }
+}
+
+.bar-track {
+  grid-column: 1 / -1;
+  height: 0.5rem;
+  border-radius: 99rem;
+  background: var(--bg-field);
+  overflow: hidden;
+
+  & > span {
+    display: block;
+    height: 100%;
+    border-radius: 99rem;
+    background: var(--tinte, var(--chart-1));
+    transition: width 0.4s;
+  }
+}
+
+.bar-track.over > span {
+  background: var(--danger);
+}
+
+.empty-card {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---------------------------------------------------------------------------
+   Filas con icono, nombre, monto y barra: "Por categoría" en Análisis y los
+   ahorros del Resumen. La fila entera es el botón o el enlace (`.cr-main`);
+   la flecha del final (`.cr-go`) lleva al detalle.
+   --------------------------------------------------------------------------- */
+.cr-list {
+  display: grid;
+  gap: var(--sp-2, 2px);
+  margin: 0 calc(-1 * var(--sp-8));
+  padding: 0;
+  list-style: none;
+}
+
+.cr {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: var(--radius-md, 10px);
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+
+  &:hover,
+  &.on {
+    background: var(--bg-hover);
+  }
+
+  &.dim {
+    opacity: 0.45;
+  }
+
+  /* Con ratón, la flecha aparece al pasar por la fila (o al enfocarla con
+     el teclado); en lo táctil se queda siempre a la vista. */
+  @media (hover: hover) {
+    &:not(:hover) .cr-go:not(:focus-visible) {
+      opacity: 0;
+    }
+  }
+}
+
+.cr-main {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  column-gap: var(--sp-12);
+  row-gap: var(--sp-6);
+  align-items: center;
+  min-width: 0;
+  padding: var(--sp-10) var(--sp-4) var(--sp-10) var(--sp-8);
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cr-ico {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm, 8px);
+}
+
+.cr-text,
+.cr-amount {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.cr-amount {
+  align-items: flex-end;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-name {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.cr-meta {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* El icono y la pista en el tinte claro; el relleno, en el tinte. El tinte
+   lo pone una clase `tint-N` o un `--tinte` en línea (los ahorros, que
+   guardan un color y no una clase). */
+.cr .cr-ico,
+.cr .cr-bar {
+  background: color-mix(in oklab, var(--tinte, var(--chart-1)) 14%, transparent);
+}
+
+.cr .cr-ico {
+  box-shadow: none;
+  color: color-mix(in oklab, var(--tinte, var(--chart-1)) 72%, var(--text-primary));
+}
+
+.cr .cr-bar {
+  grid-column: 2 / -1;
+  height: 0.375rem;
+  border-radius: 99rem;
+  box-shadow: none;
+  overflow: hidden;
+
+  & > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--tinte);
+    transition: width 0.4s;
+  }
+
+  &.over > span {
+    background: var(--danger);
+  }
+}
+
+.cr-budget {
+  grid-column: 2 / -1;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+
+  &.over {
+    color: var(--danger);
+  }
+}
+
+.cr-go {
+  margin-right: var(--sp-4);
+  transition: opacity 0.15s;
+}
+

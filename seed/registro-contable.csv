@@ -1,0 +1,171 @@
+﻿Fecha,Cuenta,Categoría,Subcategorías,Nota,COP,Ingreso/Gasto,Descripción,Importe,Moneda,Cuenta
+24/09/2026 14:22:07,Banco Principal,Variables,Mercado,Fruver,51000,Gasto,,51000.0,COP,51000
+24/09/2026 11:54:56,Fondo de inversión,Intereses,,Rendimientos,46500,Ingreso,,46500.0,COP,46500
+23/09/2026 18:40:59,Efectivo,Variables,Vida social,Cine,150800,Gasto,,150800.0,COP,150800
+22/09/2026 16:11:45,Tarjeta Visa,Variables,Mercado,Fruver,84800,Gasto,,84800.0,COP,84800
+16/09/2026 19:33:35,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/09/2026 19:54:48,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+15/09/2026 09:25:09,Banco Principal,Tarjeta Visa,,Pago tarjeta,946700,Dinero gastado,,946700.0,COP,946700
+14/09/2026 18:36:56,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+14/09/2026 10:24:02,Efectivo,Variables,Hogar,Ferretería,103400,Gasto,,103400.0,COP,103400
+12/09/2026 13:16:01,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+12/09/2026 10:56:06,Efectivo,Variables,Comer afuera,Almuerzo,49900,Gasto,,49900.0,COP,49900
+10/09/2026 18:18:56,Banco Principal,Fijos,Servicios,Energía y agua,257400,Gasto,,257400.0,COP,257400
+08/09/2026 12:02:39,Efectivo,Variables,Mercado,Fruver,89700,Gasto,,89700.0,COP,89700
+07/09/2026 13:08:00,Tarjeta Visa,Variables,Mercado,"Mercado, aseo",220500,Gasto,,220500.0,COP,220500
+05/09/2026 20:58:06,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+04/09/2026 10:07:31,Tarjeta Visa,Variables,Comer afuera,Pizza,40500,Gasto,,40500.0,COP,40500
+03/09/2026 13:52:39,Efectivo,Variables,Vida social,Concierto,65400,Gasto,,65400.0,COP,65400
+01/09/2026 18:57:36,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+28/08/2026 12:06:48,Fondo de inversión,Intereses,,Rendimientos,34100,Ingreso,,34100.0,COP,34100
+25/08/2026 18:43:23,Efectivo,Variables,Comer afuera,Comida con amigos,34900,Gasto,,34900.0,COP,34900
+24/08/2026 10:51:03,Efectivo,Variables,Salud,Cita médica,139000,Gasto,,139000.0,COP,139000
+23/08/2026 18:24:57,Billetera digital,Variables,Transporte,Gasolina,62400,Gasto,,62400.0,COP,62400
+22/08/2026 15:55:29,Banco Principal,Variables,Hogar,Detergente,93800,Gasto,,93800.0,COP,93800
+20/08/2026 14:49:12,Banco Principal,Fijos,Impuestos,Declaración de renta,620000,Gasto,,620000.0,COP,620000
+18/08/2026 10:31:05,Banco Principal,Fondo de inversión,,Prima a inversión,,Dinero gastado,,3.4E7,COP,34000000
+16/08/2026 19:30:43,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/08/2026 13:46:19,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+15/08/2026 09:26:00,Banco Principal,Tarjeta Visa,,Pago tarjeta,846400,Dinero gastado,,846400.0,COP,846400
+14/08/2026 15:22:37,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+13/08/2026 18:05:55,Banco Principal,Variables,Comer afuera,Hamburguesa,85800,Gasto,,85800.0,COP,85800
+12/08/2026 16:36:48,Tarjeta Visa,Variables,Personal,Libros,172800,Gasto,,172800.0,COP,172800
+12/08/2026 09:13:04,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+11/08/2026 09:04:29,Billetera digital,Variables,Transporte,Taxi,14100,Gasto,,14100.0,COP,14100
+10/08/2026 15:46:19,Banco Principal,Fijos,Servicios,Energía y agua,253200,Gasto,,253200.0,COP,253200
+05/08/2026 11:31:51,Efectivo,Variables,Transporte,Gasolina,26100,Gasto,,26100.0,COP,26100
+05/08/2026 10:24:31,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+01/08/2026 19:09:04,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+01/08/2026 13:58:01,Efectivo,Variables,Transporte,Taxi,45000,Gasto,,45000.0,COP,45000
+28/07/2026 18:54:16,Fondo de inversión,Intereses,,Rendimientos,35300,Ingreso,,35300.0,COP,35300
+27/07/2026 14:52:10,Tarjeta Visa,Variables,Transporte,Parqueadero,26200,Gasto,,26200.0,COP,26200
+27/07/2026 09:01:40,Banco Principal,Variables,Personal,Libros,134200,Gasto,,134200.0,COP,134200
+26/07/2026 14:06:23,Tarjeta Visa,Variables,Vida social,Cumpleaños,175500,Gasto,,175500.0,COP,175500
+24/07/2026 18:28:15,Efectivo,Variables,Vida social,Concierto,47300,Gasto,,47300.0,COP,47300
+16/07/2026 19:55:58,Banco Principal,Variables,Transporte,Gasolina,37000,Gasto,,37000.0,COP,37000
+16/07/2026 11:49:13,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/07/2026 19:27:15,Banco Principal,Tarjeta Visa,,Pago tarjeta,958600,Dinero gastado,,958600.0,COP,958600
+15/07/2026 09:38:47,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+14/07/2026 10:32:31,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+12/07/2026 17:03:22,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+10/07/2026 10:41:27,Banco Principal,Fijos,Servicios,Energía y agua,245200,Gasto,,245200.0,COP,245200
+06/07/2026 10:04:36,Tarjeta Visa,Variables,Hogar,Ferretería,102800,Gasto,,102800.0,COP,102800
+05/07/2026 11:09:59,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+04/07/2026 18:29:36,Efectivo,Variables,Transporte,Taxi,91400,Gasto,,91400.0,COP,91400
+01/07/2026 17:29:54,Efectivo,Variables,Vida social,Cine,119100,Gasto,,119100.0,COP,119100
+01/07/2026 16:44:31,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+01/07/2026 15:18:07,Tarjeta Visa,Variables,Comer afuera,Comida con amigos,93400,Gasto,,93400.0,COP,93400
+28/06/2026 18:54:50,Fondo de inversión,Intereses,,Rendimientos,33800,Ingreso,,33800.0,COP,33800
+26/06/2026 14:56:00,Efectivo,Variables,Salud,Cita médica,56000,Gasto,,56000.0,COP,56000
+24/06/2026 16:36:53,Tarjeta Visa,Variables,Mercado,Panadería,38700,Gasto,,38700.0,COP,38700
+23/06/2026 12:30:54,Tarjeta Visa,Variables,Transporte,Gasolina,84400,Gasto,,84400.0,COP,84400
+19/06/2026 18:45:33,Tarjeta Visa,Variables,Mercado,"Mercado, aseo",153000,Gasto,,153000.0,COP,153000
+19/06/2026 09:12:51,Tarjeta Visa,Variables,Transporte,Parqueadero,75900,Gasto,,75900.0,COP,75900
+18/06/2026 10:47:51,Billetera digital,Variables,Viajes,"Tiquetes, hotel",1250000,Gasto,,1250000.0,COP,1250000
+16/06/2026 18:57:46,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/06/2026 18:49:31,Banco Principal,Tarjeta Visa,,Pago tarjeta,940600,Dinero gastado,,940600.0,COP,940600
+15/06/2026 16:42:39,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+14/06/2026 09:51:45,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+13/06/2026 12:29:46,Banco Principal,Variables,Mercado,Supermercado,66000,Gasto,,66000.0,COP,66000
+12/06/2026 15:20:54,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+11/06/2026 20:33:59,Banco Principal,Variables,Personal,Peluquería,190300,Gasto,,190300.0,COP,190300
+10/06/2026 18:22:55,Banco Principal,Fijos,Servicios,Energía y agua,249500,Gasto,,249500.0,COP,249500
+10/06/2026 16:43:26,Tarjeta Visa,Variables,Salud,Farmacia,116600,Gasto,,116600.0,COP,116600
+08/06/2026 11:28:04,Tarjeta Visa,Variables,Vida social,Cine,56700,Gasto,,56700.0,COP,56700
+05/06/2026 11:04:54,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+01/06/2026 18:42:02,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+28/05/2026 13:14:20,Fondo de inversión,Intereses,,Rendimientos,32200,Ingreso,,32200.0,COP,32200
+26/05/2026 18:45:32,Efectivo,Variables,Mercado,"Mercado, aseo",222600,Gasto,,222600.0,COP,222600
+24/05/2026 18:16:11,Tarjeta Visa,Variables,Salud,Farmacia,139500,Gasto,,139500.0,COP,139500
+24/05/2026 15:25:30,Banco Principal,Variables,Hogar,Ferretería,115200,Gasto,,115200.0,COP,115200
+24/05/2026 13:12:27,Banco Principal,Variables,Vida social,Concierto,95100,Gasto,,95100.0,COP,95100
+21/05/2026 20:23:03,Billetera digital,Variables,Personal,Suscripción música,77500,Gasto,,77500.0,COP,77500
+16/05/2026 20:57:40,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/05/2026 20:49:40,Banco Principal,Tarjeta Visa,,Pago tarjeta,747000,Dinero gastado,,747000.0,COP,747000
+15/05/2026 13:18:54,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+14/05/2026 12:05:55,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+13/05/2026 12:56:56,Efectivo,Variables,Transporte,Gasolina,54600,Gasto,,54600.0,COP,54600
+12/05/2026 13:34:52,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+10/05/2026 17:45:51,Banco Principal,Fijos,Servicios,Energía y agua,189400,Gasto,,189400.0,COP,189400
+07/05/2026 20:25:50,Tarjeta Visa,Variables,Comer afuera,Café y pan,95700,Gasto,,95700.0,COP,95700
+06/05/2026 13:17:14,Banco Principal,Variables,Mercado,Fruver,213200,Gasto,,213200.0,COP,213200
+05/05/2026 16:42:23,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+05/05/2026 15:01:27,Banco Principal,Variables,Hogar,Bombillos,103100,Gasto,,103100.0,COP,103100
+01/05/2026 14:25:00,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+28/04/2026 12:23:51,Efectivo,Variables,Mercado,Supermercado,154200,Gasto,,154200.0,COP,154200
+28/04/2026 09:24:15,Fondo de inversión,Intereses,,Rendimientos,44600,Ingreso,,44600.0,COP,44600
+26/04/2026 20:29:53,Banco Principal,Variables,Personal,Libros,76300,Gasto,,76300.0,COP,76300
+26/04/2026 11:17:16,Tarjeta Visa,Variables,Salud,Cita médica,43900,Gasto,,43900.0,COP,43900
+16/04/2026 12:24:18,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/04/2026 20:19:20,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+15/04/2026 12:01:18,Banco Principal,Tarjeta Visa,,Pago tarjeta,969600,Dinero gastado,,969600.0,COP,969600
+14/04/2026 10:51:23,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+12/04/2026 20:10:58,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+11/04/2026 09:46:28,Billetera digital,Variables,Transporte,Parqueadero,95800,Gasto,,95800.0,COP,95800
+10/04/2026 17:54:57,Banco Principal,Fijos,Servicios,Energía y agua,191100,Gasto,,191100.0,COP,191100
+10/04/2026 13:27:07,Billetera digital,Variables,Personal,Suscripción música,27400,Gasto,,27400.0,COP,27400
+09/04/2026 11:44:20,Efectivo,Variables,Personal,Suscripción música,175000,Gasto,,175000.0,COP,175000
+07/04/2026 17:07:46,Tarjeta Visa,Variables,Hogar,Ferretería,99800,Gasto,,99800.0,COP,99800
+06/04/2026 18:52:05,Billetera digital,Variables,Comer afuera,Hamburguesa,84700,Gasto,,84700.0,COP,84700
+05/04/2026 16:37:44,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+01/04/2026 13:57:46,Tarjeta Visa,Variables,Hogar,Bombillos,61500,Gasto,,61500.0,COP,61500
+01/04/2026 11:11:37,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+28/03/2026 13:00:02,Fondo de inversión,Intereses,,Rendimientos,30700,Ingreso,,30700.0,COP,30700
+24/03/2026 16:03:38,Billetera digital,Variables,Hogar,Ferretería,27000,Gasto,,27000.0,COP,27000
+21/03/2026 18:03:51,Billetera digital,Variables,Personal,Ropa,138700,Gasto,,138700.0,COP,138700
+21/03/2026 10:38:51,Tarjeta Visa,Variables,Transporte,Parqueadero,19400,Gasto,,19400.0,COP,19400
+20/03/2026 20:18:44,Banco Principal,Otro,,Venta bicicleta usada,450000,Ingreso,Se la vendí a un vecino,450000.0,COP,450000
+16/03/2026 16:49:39,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/03/2026 13:41:22,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+15/03/2026 11:44:41,Tarjeta Visa,Variables,Transporte,Taxi,37000,Gasto,,37000.0,COP,37000
+15/03/2026 10:50:44,Banco Principal,Tarjeta Visa,,Pago tarjeta,874700,Dinero gastado,,874700.0,COP,874700
+14/03/2026 10:10:00,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+12/03/2026 09:09:41,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+10/03/2026 11:01:11,Banco Principal,Fijos,Servicios,Energía y agua,236400,Gasto,,236400.0,COP,236400
+08/03/2026 15:25:14,Tarjeta Visa,Variables,Mercado,Supermercado,40000,Gasto,,40000.0,COP,40000
+05/03/2026 15:18:09,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+03/03/2026 20:31:44,Tarjeta Visa,Variables,Personal,Ropa,146900,Gasto,,146900.0,COP,146900
+03/03/2026 20:15:39,Tarjeta Visa,Variables,Personal,Ropa,121100,Gasto,,121100.0,COP,121100
+03/03/2026 19:37:58,Tarjeta Visa,Variables,Transporte,Gasolina,54700,Gasto,,54700.0,COP,54700
+02/03/2026 09:31:18,Tarjeta Visa,Variables,Hogar,Ferretería,78400,Gasto,,78400.0,COP,78400
+01/03/2026 16:01:49,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+28/02/2026 20:56:36,Fondo de inversión,Intereses,,Rendimientos,42400,Ingreso,,42400.0,COP,42400
+22/02/2026 16:14:45,Billetera digital,Variables,Vida social,Cine,34800,Gasto,,34800.0,COP,34800
+16/02/2026 15:53:49,Billetera digital,Variables,Hogar,Bombillos,15500,Gasto,,15500.0,COP,15500
+16/02/2026 14:57:01,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/02/2026 19:20:42,Banco Principal,Tarjeta Visa,,Pago tarjeta,954000,Dinero gastado,,954000.0,COP,954000
+15/02/2026 09:05:32,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+14/02/2026 10:27:04,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+13/02/2026 15:13:13,Banco Principal,Variables,Vida social,Cine,178600,Gasto,,178600.0,COP,178600
+12/02/2026 16:52:20,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+12/02/2026 09:28:40,Efectivo,Variables,Transporte,Parqueadero,82600,Gasto,,82600.0,COP,82600
+10/02/2026 18:40:27,Banco Principal,Fijos,Servicios,Energía y agua,242400,Gasto,,242400.0,COP,242400
+09/02/2026 16:47:54,Tarjeta Visa,Variables,Transporte,Taxi,13400,Gasto,,13400.0,COP,13400
+09/02/2026 13:32:25,Efectivo,Variables,Salud,Cita médica,107200,Gasto,,107200.0,COP,107200
+07/02/2026 17:17:42,Billetera digital,Variables,Personal,Peluquería,31500,Gasto,,31500.0,COP,31500
+06/02/2026 14:14:46,Tarjeta Visa,Variables,Mercado,Fruver,62000,Gasto,,62000.0,COP,62000
+05/02/2026 16:07:05,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+02/02/2026 18:00:52,Banco Principal,Variables,Transporte,Gasolina,27300,Gasto,,27300.0,COP,27300
+01/02/2026 10:57:35,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+28/01/2026 18:06:20,Fondo de inversión,Intereses,,Rendimientos,43000,Ingreso,,43000.0,COP,43000
+19/01/2026 17:51:48,Tarjeta Visa,Variables,Vida social,Cumpleaños,94200,Gasto,,94200.0,COP,94200
+16/01/2026 09:45:57,Banco Principal,Efectivo,,Retiro cajero,200000,Dinero gastado,,200000.0,COP,200000
+15/01/2026 14:16:50,Banco Principal,Fondo de inversión,,Ahorro mensual,800000,Dinero gastado,,800000.0,COP,800000
+15/01/2026 10:53:50,Banco Principal,Tarjeta Visa,,Pago tarjeta,1119900,Dinero gastado,,1119900.0,COP,1119900
+14/01/2026 17:21:15,Tarjeta Visa,Fijos,Seguros,Seguro de salud,210000,Gasto,,210000.0,COP,210000
+12/01/2026 12:59:42,Banco Principal,Fijos,Servicios,Internet,95000,Gasto,,95000.0,COP,95000
+12/01/2026 09:01:08,Tarjeta Visa,Variables,Mercado,"Mercado, aseo",248600,Gasto,,248600.0,COP,248600
+11/01/2026 13:37:24,Banco Principal,Variables,Transporte,Parqueadero,54700,Gasto,,54700.0,COP,54700
+10/01/2026 15:09:02,Banco Principal,Fijos,Servicios,Energía y agua,198100,Gasto,,198100.0,COP,198100
+08/01/2026 15:46:16,Tarjeta Visa,Variables,Comer afuera,Almuerzo,77700,Gasto,,77700.0,COP,77700
+07/01/2026 12:36:43,Tarjeta Visa,Variables,Hogar,Bombillos,76900,Gasto,,76900.0,COP,76900
+05/01/2026 17:45:41,Banco Principal,Fijos,Arriendo,Arriendo apartamento,1800000,Gasto,,1800000.0,COP,1800000
+05/01/2026 17:31:45,Efectivo,Variables,Salud,Farmacia,74300,Gasto,,74300.0,COP,74300
+04/01/2026 19:17:01,Tarjeta Visa,Variables,Hogar,Ferretería,27000,Gasto,,27000.0,COP,27000
+03/01/2026 12:04:54,Billetera digital,Variables,Personal,Libros,166500,Gasto,,166500.0,COP,166500
+01/01/2026 15:31:54,Banco Principal,Salario,,Salario,6500000,Ingreso,,6500000.0,COP,6500000
+01/01/2026 12:32:17,Billetera digital,Variables,Mercado,Panadería,155000,Gasto,,155000.0,COP,155000
+31/12/2025 12:50:10,Banco Principal,Modificar saldo,,Nivelación,4200000,Ingreso,,4200000.0,COP,4200000
+31/12/2025 12:47:10,Fondo de inversión,Modificar saldo,,Nivelación,12000000,Ingreso,,1.2E7,COP,12000000
+31/12/2025 12:44:10,Billetera digital,Modificar saldo,,Nivelación,150000,Ingreso,,150000.0,COP,150000
+31/12/2025 12:41:10,Efectivo,Modificar saldo,,Nivelación,180000,Ingreso,,180000.0,COP,180000

@@ -1,0 +1,190 @@
+<!--
+  La barra de lo marcado con clic derecho: cuántos van, sus sumas (lo que
+  se le pase adentro) y las acciones de marcar todos o quitar la marca.
+  Pegada al fondo de la página mientras hay algo marcado; Esc la limpia.
+  También sirve para los filtros activos de una pantalla, con `label` y
+  `clearText`.
+-->
+<script lang="ts">
+  import type { Snippet } from "svelte";
+
+  import Icon from "../Icon.svelte";
+
+  let {
+    count,
+    label,
+    clearText,
+    onAll,
+    onClear,
+    children,
+    actions,
+  }: {
+    count: number;
+    /** Lo que dice la pastilla del conteo; sin él, "N seleccionados". */
+    label?: string;
+    /** Texto del botón de limpiar; sin él es solo la equis. */
+    clearText?: string;
+    /** Sin él no aparece el botón "Todos" (ya está todo marcado). */
+    onAll?: () => void;
+    onClear: () => void;
+    children: Snippet;
+    /** Botones extra de la pantalla, antes de "Todos". */
+    actions?: Snippet;
+  } = $props();
+</script>
+
+<svelte:window onkeydown={(e) => e.key === "Escape" && !document.querySelector(":popover-open") && onClear()} />
+
+<div class="pick-bar" role="status">
+  <span class="pick-count">{label ?? `${count} ${count === 1 ? "seleccionado" : "seleccionados"}`}</span>
+  <span class="pick-sums">{@render children()}</span>
+  <span class="pick-actions">
+    {@render actions?.()}
+    {#if onAll}
+      <button type="button" class="pick-all" onclick={onAll}>Todos</button>
+    {/if}
+    <button
+      type="button"
+      class="pick-clear"
+      class:with-text={!!clearText}
+      aria-label={clearText ?? "Quitar selección"}
+      data-tip="{clearText ?? 'Quitar selección'} (Esc)"
+      onclick={onClear}
+    >
+      {#if clearText}<span>{clearText}</span>{/if}
+      <Icon name="cancel-01" size={14} />
+    </button>
+  </span>
+</div>
+
+<style>
+  /* Pegada al fondo mientras hay algo marcado y centrada en el área de
+     contenido (sin el sidebar): vive dentro de `.page`, así que el
+     `margin-inline: auto` la centra ahí. */
+  .pick-bar {
+    position: sticky;
+    /* La página hace scroll en el documento, así que `sticky` se mide desde
+       el borde de la ventana. */
+    bottom: 0.75rem;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-12);
+    width: fit-content;
+    /* Aire a los dos lados para no chocar con el botón + de la esquina. */
+    max-width: calc(100% - 9rem);
+    margin: var(--sp-20) auto 0;
+    padding: 0.3125rem;
+    border: 1px solid color-mix(in oklab, var(--accent) 55%, transparent);
+    border-radius: 999px;
+    background: var(--bg-float);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-sat, 170%));
+    box-shadow:
+      var(--glass-spec, 0 0 transparent),
+      0 12px 32px -10px color-mix(in oklab, var(--accent) 30%, transparent),
+      var(--shadow-xl);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    animation: pick-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+    & :global(.money) {
+      margin-left: 0.3rem;
+      font-weight: 600;
+    }
+
+    @media (max-width: 56rem) {
+      /* Encima de la barra de navegación de abajo. */
+      bottom: 4.75rem;
+      flex-wrap: wrap;
+      max-width: calc(100% - 4.5rem);
+      margin-left: 0;
+      border-radius: var(--radius-lg);
+    }
+  }
+
+  @keyframes pick-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  .pick-count {
+    flex: none;
+    padding: 0.3125rem 0.75rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: var(--text-xs);
+    font-weight: 700;
+  }
+
+  .pick-sums {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4) var(--sp-16);
+
+    & > :global(span) {
+      white-space: nowrap;
+    }
+  }
+
+  /* Las acciones, separadas de las sumas por un filo. */
+  .pick-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--sp-4);
+    padding-left: var(--sp-10);
+    border-left: 1px solid var(--border);
+  }
+
+  .pick-all,
+  .pick-clear,
+  .pick-actions > :global(.pick-extra) {
+    display: inline-grid;
+    place-items: center;
+    height: 1.875rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+  }
+
+  .pick-actions > :global(.pick-extra) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .pick-actions > :global(.pick-extra[aria-pressed="true"]) {
+    color: var(--accent);
+  }
+
+  .pick-all,
+  .pick-actions > :global(.pick-extra) {
+    padding: 0 0.75rem;
+  }
+
+  .pick-clear {
+    width: 1.875rem;
+
+    &.with-text {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      width: auto;
+      padding: 0 0.75rem;
+    }
+  }
+</style>

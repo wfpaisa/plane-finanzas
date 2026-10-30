@@ -1,0 +1,576 @@
+<!--
+  Ajustes, en tres secciones para no bajar por una página larga:
+  - Cuenta y datos: el perfil, la clave, las invitaciones, lo automático y
+    el respaldo.
+  - Categorías: icono, color, etiquetas y presupuesto. Gasto e ingreso en la
+    misma lista.
+  - Acceso por API: los tokens para asistentes y programas.
+  La sección va en la URL (`?seccion=`), así se puede enlazar.
+-->
+<script lang="ts">
+  import ApiTokens from "../components/app/ApiTokens.svelte";
+  import IconSelect from "../components/app/IconSelect.svelte";
+  import InvitationsCard from "../components/app/InvitationsCard.svelte";
+  import MoneyInput from "../components/app/MoneyInput.svelte";
+  import PasswordCard from "../components/app/PasswordCard.svelte";
+  import Money from "../components/app/Money.svelte";
+  import Segmented from "../components/app/Segmented.svelte";
+  import TagInput from "../components/app/TagInput.svelte";
+  import TintPicker from "../components/app/TintPicker.svelte";
+  import Icon from "../components/Icon.svelte";
+  import { Button, ConfirmDialog, Field, Input, Modal } from "../components/ui";
+  import Tag, { type Tone } from "../components/ui/Tag.svelte";
+  import type { Backup, BackupFiles } from "../lib/backupZip";
+  import type { Kind } from "../lib/finance";
+  import { notify } from "../lib/notify.svelte";
+  import { pb, session } from "../lib/pb.svelte";
+  import { estilo } from "../lib/estilo.svelte";
+  import { CATEGORY_TINT_NAMES, CATEGORY_TINTS, nextCategoryTint, tintFor } from "../lib/palettes";
+  import { go, route } from "../lib/router.svelte";
+  import { reload, store, touchTransactions } from "../lib/store.svelte";
+  import { categoryTags } from "../lib/tags";
+  import type { Category } from "../lib/types";
+
+  const SECTIONS = [
+    { id: "cuenta", label: "Cuenta y datos", icon: "user-circle" },
+    { id: "categorias", label: "Categorías", icon: "tag-01" },
+    { id: "api", label: "Acceso por API", icon: "key-01" },
+  ] as const;
+  type Section = (typeof SECTIONS)[number]["id"];
+
+  const section = $derived.by<Section>(() => {
+    const s = route.query.get("seccion");
+    return SECTIONS.some((x) => x.id === s) ? (s as Section) : "cuenta";
+  });
+
+  let catKind = $state<Kind>("expense");
+  let catQuery = $state("");
+  let catTag = $state("");
+  const cats = $derived.by(() => {
+    const q = catQuery.trim().toLowerCase();
+    return store.categories.filter(
+      (c) =>
+        c.kind === catKind &&
+        (!catTag || c.tags?.includes(catTag)) &&
+        (!q || [c.name, ...(c.tags ?? [])].some((x) => x?.toLowerCase().includes(q))),
+    );
+  });
+  /** Las etiquetas de las categorías de este tipo, para filtrar la lista. */
+  const kindTags = $derived([...new Set(store.categories.filter((c) => c.kind === catKind).flatMap((c) => c.tags ?? []))].sort());
+  const kindCount = (k: Kind) => store.categories.filter((c) => c.kind === k).length;
+
+  let name = $state(session.user?.name ?? "");
+  let savingName = $state(false);
+
+  let open = $state(false);
+  let editing = $state<Category | null>(null);
+  let cName = $state("");
+  let cKind = $state<Kind>("expense");
+  let cIcon = $state("tag-01");
+  /** Vacío: el automático, uno que ninguna otra categoría del tipo tenga. */
+  let cColor = $state("");
+  const autoColor = $derived(nextCategoryTint(store.categories.filter((c) => c.id !== editing?.id), cKind));
+  const shownColor = $derived(cColor || autoColor);
+  let cBudget = $state(0);
+  let cTags = $state<string[]>([]);
+  let busy = $state(false);
+  let confirmDelete = $state(false);
+  let running = $state(false);
+
+  let exporting = $state(false);
+  let backupFile = $state<{ name: string; data: Backup; files: BackupFiles; count: number; attachments: number } | null>(null);
+  let restoring = $state(false);
+  let confirmClean = $state(false);
+  let cleaning = $state(false);
+  let fileInput = $state<HTMLInputElement>();
+
+  function edit(c: Category | null, kind: Kind = "expense") {
+    editing = c;
+    cName = c?.name ?? "";
+    cKind = c?.kind ?? kind;
+    cIcon = c?.icon || "tag-01";
+    cColor = c?.color ?? "";
+    cBudget = c?.budget ?? 0;
+    cTags = [...(c?.tags ?? [])];
+    open = true;
+  }
+
+  async function saveCategory() {
+    if (!cName.trim()) return notify.fail(new Error("Escribe un nombre para la categoría."));
+    busy = true;
+    try {
+      const data = {
+        owner: session.id,
+        name: cName.trim(),
+        kind: cKind,
+        icon: cIcon,
+        color: shownColor,
+        budget: cKind === "expense" ? cBudget : 0,
+        tags: cTags,
+      };
+      if (editing) await pb.collection("categories").update(editing.id, data);
+      else await pb.collection("categories").create(data);
+      await reload("categories");
+      open = false;
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function removeCategory() {
+    if (!editing) return;
+    busy = true;
+    try {
+      await pb.collection("categories").delete(editing.id);
+      await reload("categories");
+      confirmDelete = false;
+      open = false;
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function saveName() {
+    savingName = true;
+    try {
+      await pb.collection("users").update(session.id, { name });
+      await pb.collection("users").authRefresh();
+      notify.done("Perfil guardado");
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      savingName = false;
+    }
+  }
+
+  async function runAutomatic() {
+    running = true;
+    try {
+      const r = await pb.send<{ transactions: number; movements: number }>("/api/finanzas/automatic/run", { method: "POST" });
+      await reload("accounts", "savings");
+      notify.done(`${r.transactions} movimientos programados y ${r.movements} aportes registrados.`);
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      running = false;
+    }
+  }
+
+  async function exportBackup() {
+    exporting = true;
+    try {
+      const { exportZip } = await import("../lib/backupZip");
+      const blob = await exportZip();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `finanzas-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      exporting = false;
+    }
+  }
+
+  async function pickBackup(file: File | undefined) {
+    if (!file) return;
+    try {
+      const { readBackup } = await import("../lib/backupZip");
+      const { backup, files } = await readBackup(file);
+      const count = backup.data.transactions?.length ?? 0;
+      const attachments = [...files.values()].reduce((n, l) => n + l.length, 0);
+      backupFile = { name: file.name, data: backup, files, count, attachments };
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      if (fileInput) fileInput.value = "";
+    }
+  }
+
+  async function restoreBackup() {
+    if (!backupFile) return;
+    restoring = true;
+    try {
+      const r = await pb.send<{ transactions: number; accounts: number; files?: Record<string, string> }>("/api/finanzas/backup", {
+        method: "POST",
+        body: backupFile.data,
+      });
+      let failed = 0;
+      if (backupFile.files.size) {
+        const { uploadFiles } = await import("../lib/backupZip");
+        failed = await uploadFiles(backupFile.files, r.files ?? {});
+      }
+      // El respaldo trae el nombre y el color de fondo: la sesión los recoge.
+      await pb.collection("users").authRefresh();
+      await reload();
+      touchTransactions();
+      const attachments = backupFile.attachments - failed;
+      backupFile = null;
+      notify.done(`Importado: ${r.accounts} cuentas y ${r.transactions} movimientos${attachments ? `, con ${attachments} adjuntos` : ""}.`);
+      if (failed) notify.fail(new Error(`${failed} adjuntos no se pudieron subir.`));
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      restoring = false;
+    }
+  }
+
+  async function cleanAll() {
+    cleaning = true;
+    try {
+      const r = await pb.send<{ transactions: number }>("/api/finanzas/clean", { method: "POST" });
+      await reload();
+      touchTransactions();
+      confirmClean = false;
+      notify.done(`Datos eliminados: ${r.transactions} movimientos.`);
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      cleaning = false;
+    }
+  }
+</script>
+
+<div class="page">
+  <header class="page-head">
+    <div>
+      <h1>Ajustes</h1>
+      <p>{session.user?.email}</p>
+    </div>
+  </header>
+
+  <div class="chips settings-tabs" role="tablist">
+    {#each SECTIONS as t (t.id)}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={section === t.id}
+        class="chip"
+        class:active={section === t.id}
+        onclick={() => go("/ajustes", { seccion: t.id })}
+      >
+        <Icon name={t.icon} />{t.label}
+      </button>
+    {/each}
+  </div>
+
+  {#if section === "categorias"}
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3 class="card-title">Categorías</h3>
+          <p class="card-sub">Agrupan tus ingresos y gastos para mostrar de dónde viene y en qué se va tu dinero.</p>
+        </div>
+        <div class="card-head-actions">
+          <Button size="sm" variant="secondary" onclick={() => edit(null, catKind)}><Icon name="add-01" />Nueva categoría</Button>
+        </div>
+      </div>
+      <div class="card-body stack">
+        <div class="cat-toolbar">
+          <Segmented
+            bind:value={catKind}
+            onchange={() => (catTag = "")}
+            options={[
+              { id: "expense", label: `Gasto · ${kindCount("expense")}` },
+              { id: "income", label: `Ingreso · ${kindCount("income")}` },
+            ]}
+          />
+          <input class="field-control sm cat-search" type="search" placeholder="Buscar" bind:value={catQuery} aria-label="Buscar categoría" />
+        </div>
+        {#if kindTags.length || catTag}
+          <div class="cat-tag-filter" aria-label="Filtrar por etiqueta">
+            {#each [...new Set([catTag, ...kindTags].filter(Boolean))] as t (t)}
+              <Tag tone={catTag === t ? (tintFor(t) as Tone) : "off"} pressed={catTag === t} onclick={() => (catTag = catTag === t ? "" : t)}>#{t}</Tag>
+            {/each}
+          </div>
+        {/if}
+        {#if cats.length}
+          <div class="cat-grid">
+            {#each cats as c (c.id)}
+              <button type="button" class="cat-item" onclick={() => edit(c)}>
+                <span class="cat-ico {c.color || 'tint-10'}"><Icon name={c.icon || "tag-01"} size={16} /></span>
+                <span class="cat-main">
+                  <span class="cat-name">{c.name}</span>
+                  {#if c.tags?.length}
+                    <span class="cat-tags">
+                      {#each c.tags as t (t)}<Tag tone={tintFor(t) as Tone}>#{t}</Tag>{/each}
+                    </span>
+                  {/if}
+                </span>
+                {#if c.budget}<span class="small muted"><Money value={c.budget} />/mes</span>{/if}
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <p class="empty-card">{catQuery ? "No hay categorías que coincidan con la búsqueda." : "No hay categorías de este tipo. Crea una para clasificar tus movimientos."}</p>
+        {/if}
+      </div>
+    </div>
+  {:else if section === "api"}
+    <ApiTokens />
+  {:else}
+    <div class="stack">
+      <div class="split-even">
+        <div class="card">
+          <div class="card-head"><div><h3 class="card-title">Perfil</h3></div></div>
+          <div class="card-body stack">
+            <Field label="Nombre"><Input bind:value={name} /></Field>
+            <div><Button loading={savingName} onclick={saveName}>Guardar</Button></div>
+          </div>
+        </div>
+        <PasswordCard />
+      </div>
+
+      <InvitationsCard />
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Movimientos programados</h3>
+            <p class="card-sub">Cada día a las 6:00 a. m. se registran los ingresos, gastos y aportes automáticos que correspondan. No se mueve dinero en el banco.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <Button loading={running} onclick={runAutomatic}><Icon name="repeat" />Revisar ahora</Button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Apariencia</h3>
+            <p class="card-sub">Elige el estilo y el color. El color se guarda en tu cuenta y el estilo en este navegador.</p>
+          </div>
+        </div>
+        <div class="card-body stack">
+          <!-- Sin <label>: envuelven varios botones, y un clic en el espacio
+               libre pulsaría el primero. -->
+          <div class="field block" role="group" aria-labelledby="estilo-label">
+            <span class="field-label" id="estilo-label">Estilo</span>
+            <Segmented
+              label="Estilo"
+              bind:value={() => estilo.value, (v) => estilo.set(v)}
+              options={[
+                { id: "bruma", label: "Bruma" },
+                { id: "solido", label: "Sólido" },
+              ]}
+            />
+            <span class="field-hint">
+              {estilo.value === "solido"
+                ? "Fondo liso y sombras suaves. El color se aplica a botones, secciones e íconos."
+                : "Fondo con degradado y tarjetas de vidrio. El color tiñe el fondo."}
+            </span>
+          </div>
+          <div class="field block" role="group" aria-labelledby="color-label">
+            <span class="field-label" id="color-label">Color</span>
+            <TintPicker />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Datos</h3>
+            <p class="card-sub">Exporta tus cuentas, categorías, movimientos, programaciones, ahorros y adjuntos en un archivo ZIP. También puedes importar respaldos ZIP o JSON anteriores.</p>
+          </div>
+        </div>
+        <div class="card-body data-actions">
+          <Button loading={exporting} onclick={exportBackup}><Icon name="database-export" />Exportar</Button>
+          <Button onclick={() => fileInput?.click()}><Icon name="database-import" />Importar</Button>
+          <input bind:this={fileInput} type="file" accept=".zip,.json,application/zip,application/json" hidden onchange={(e) => pickBackup(e.currentTarget.files?.[0])} />
+          <span class="flex-1"></span>
+          <Button variant="ghost" class="btn-danger" onclick={() => (confirmClean = true)}><Icon name="delete-02" />Eliminar todos los datos</Button>
+        </div>
+      </div>
+    </div>
+  {/if}
+</div>
+
+<Modal {open} onClose={() => (open = false)} title={editing ? "Editar categoría" : "Nueva categoría"}>
+  <div class="stack">
+    <div class="cat-preview"><Tag tone={shownColor as Tone}><Icon name={cIcon} />{cName || "Categoría"}</Tag></div>
+    <Segmented
+      bind:value={cKind}
+      full
+      options={[
+        { id: "expense", label: "Gasto" },
+        { id: "income", label: "Ingreso" },
+      ]}
+    />
+    <Field label="Nombre"><Input bind:value={cName} autofocus /></Field>
+    <div><p class="eyebrow">Icono</p><IconSelect bind:value={cIcon} /></div>
+    <div>
+      <p class="eyebrow">Color{#if !cColor}<span class="auto-note"> · automático</span>{/if}</p>
+      <div class="tint-row" role="radiogroup" aria-label="Color">
+        {#each CATEGORY_TINTS as t, i (t)}
+          <button
+            type="button"
+            role="radio"
+            class="opt-tile swatch-color"
+            class:selected={shownColor === t}
+            aria-checked={shownColor === t}
+            style:background="var(--tinte-{i + 1})"
+            data-tip={CATEGORY_TINT_NAMES[i]}
+            aria-label={CATEGORY_TINT_NAMES[i]}
+            onclick={() => (cColor = t)}
+          ></button>
+        {/each}
+      </div>
+    </div>
+    <div>
+      <p class="eyebrow">Etiquetas</p>
+      <TagInput bind:value={cTags} suggestions={categoryTags()} />
+      <p class="small muted cat-tag-hint">Los movimientos heredan estas etiquetas. Úsalas para filtrar y agrupar gastos. La etiqueta <b>#fijo</b> identifica gastos fijos en el móvil.</p>
+    </div>
+    {#if cKind === "expense"}
+      <Field label="Límite de gasto mensual (opcional)" hint="La aplicación te mostrará cuánto te queda antes de llegar a este valor."><MoneyInput bind:value={cBudget} /></Field>
+    {/if}
+  </div>
+  {#snippet footer()}
+    {#if editing}
+      <Button variant="ghost" class="btn-danger" onclick={() => (confirmDelete = true)}><Icon name="delete-02" />Eliminar</Button>
+      <span class="flex-1"></span>
+    {/if}
+    <Button onclick={() => (open = false)}>Cancelar</Button>
+    <Button variant="secondary" loading={busy} onclick={saveCategory}>Guardar</Button>
+  {/snippet}
+</Modal>
+
+<ConfirmDialog
+  open={confirmDelete}
+  onClose={() => (confirmDelete = false)}
+  title="Eliminar categoría"
+  message="Los movimientos que usan esta categoría se conservarán, pero quedarán sin categoría."
+  {busy}
+  onConfirm={removeCategory}
+/>
+
+<ConfirmDialog
+  open={!!backupFile}
+  onClose={() => (backupFile = null)}
+  title="Importar respaldo"
+  message={`${backupFile?.name} contiene ${backupFile?.count} movimientos${backupFile?.attachments ? ` y ${backupFile.attachments} adjuntos` : ""}. Al continuar, reemplazará todos tus datos actuales. Descarga primero una copia si quieres conservarlos.`}
+  confirmLabel="Reemplazar todo"
+  busy={restoring}
+  onConfirm={restoreBackup}
+/>
+
+<ConfirmDialog
+  open={confirmClean}
+  onClose={() => (confirmClean = false)}
+  title="Eliminar todos los datos"
+  message="Se eliminarán tus cuentas, movimientos, movimientos programados y ahorros. Tus categorías volverán a las iniciales. Se conservarán tu perfil, tu clave y tus tokens de acceso. Esta acción no se puede deshacer."
+  confirmText="ELIMINAR"
+  confirmHint="Escribe ELIMINAR para confirmar"
+  busy={cleaning}
+  onConfirm={cleanAll}
+/>
+
+<style>
+  .settings-tabs {
+    margin-bottom: var(--sp-16);
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .cat-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-10);
+  }
+
+  .cat-search {
+    width: min(100%, 14rem);
+  }
+
+  .auto-note {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .tint-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-6);
+  }
+
+  .data-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-8);
+  }
+
+  .cat-tag-filter,
+  .cat-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+  }
+
+  .cat-tags {
+    margin-top: var(--sp-4);
+  }
+
+  .cat-tag-hint {
+    margin-top: var(--sp-6);
+  }
+
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: var(--sp-6);
+  }
+
+  .cat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-10);
+    padding: var(--sp-8);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--bg-hover);
+    }
+  }
+
+  .cat-ico {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .cat-main {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  .cat-name {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .cat-preview {
+    display: flex;
+    justify-content: center;
+  }
+</style>

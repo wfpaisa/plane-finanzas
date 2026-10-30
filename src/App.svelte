@@ -1,0 +1,687 @@
+<script lang="ts">
+  import { untrack } from "svelte";
+
+  import Icon from "./components/Icon.svelte";
+  import Logo from "./components/Logo.svelte";
+  import TransactionForm from "./components/app/TransactionForm.svelte";
+  import TxScreen from "./components/mobile/TxScreen.svelte";
+  import TooltipLayer from "./components/TooltipLayer.svelte";
+  import { ErrorNote, Loading, Modal, SuccessNote } from "./components/ui";
+  import ModeToggle from "./components/ui/ModeToggle.svelte";
+  import TabBar from "./components/app/TabBar.svelte";
+  import { copyText } from "./lib/copy";
+  import { notify } from "./lib/notify.svelte";
+  import { logout, session } from "./lib/pb.svelte";
+  import { mobileHash } from "./lib/mobile";
+  import { go, rewriteRoutes, route } from "./lib/router.svelte";
+  import { start, stop, store } from "./lib/store.svelte";
+  import { categoryTags } from "./lib/tags";
+  import { theme } from "./lib/theme.svelte";
+  import { keys, SHORTCUTS } from "./lib/keys";
+  import { txModal } from "./lib/ui.svelte";
+  import Accounts from "./routes/Accounts.svelte";
+  import Dashboard from "./routes/Dashboard.svelte";
+  import Login from "./routes/Login.svelte";
+  import Mobile from "./routes/Mobile.svelte";
+  import Plan from "./routes/Plan.svelte";
+  import Savings from "./routes/Savings.svelte";
+  import Settings from "./routes/Settings.svelte";
+  import Transactions from "./routes/Transactions.svelte";
+
+  const NAV = [
+    { path: "/", label: "Resumen", icon: "dashboard-square-01", mobile: true },
+    {
+      path: "/proyeccion",
+      label: "Gastos e ingresos",
+      short: "Gastos",
+      icon: "chart-line-data-01",
+      mobile: true,
+    },
+    { path: "/ahorros", label: "Ahorros", icon: "piggy-bank", mobile: true },
+    {
+      path: "/movimientos",
+      label: "Movimientos",
+      icon: "exchange-01",
+      mobile: true,
+    },
+    { path: "/cuentas", label: "Cuentas", icon: "wallet-01", mobile: false },
+    { path: "/ajustes", label: "Ajustes", icon: "settings-01", mobile: false },
+  ];
+
+  const PAGES = {
+    "/": Dashboard,
+    "/movimientos": Transactions,
+    "/cuentas": Accounts,
+    "/ahorros": Savings,
+    "/proyeccion": Plan,
+    "/ajustes": Settings,
+  } as Record<string, typeof Dashboard>;
+
+  const Page = $derived(PAGES[route.path] ?? Dashboard);
+
+  $effect(() => {
+    // Análisis ahora va dentro del Resumen, y los correos ya no existen: los
+    // enlaces viejos llevan al Resumen.
+    if (["/estados", "/correos", "/bandeja", "/importar"].includes(route.path)) go("/");
+  });
+
+  // Quien usa la app del teléfono (`#/m`) se queda en ella: un enlace a una
+  // pantalla de escritorio abre su equivalente (ver `mobileHash`). En el
+  // teléfono es la de partida, salvo que la persona haya elegido la completa.
+  const inPhoneApp = () => {
+    try {
+      const vista = localStorage.getItem("finanzas-vista");
+      return (
+        vista === "sencilla" ||
+        (vista !== "completa" && matchMedia("(max-width: 56rem)").matches)
+      );
+    } catch {
+      return false;
+    }
+  };
+  rewriteRoutes((r) =>
+    r.path !== "/m" && inPhoneApp() ? mobileHash(r.path, r.query) : undefined,
+  );
+
+  // Copiar un monto, solo los dígitos, listo para pegar en la app del banco
+  // (salvo `<Money copy={false}>`). Con el mouse, un clic. Con el dedo, dejarlo
+  // presionado hasta que el teléfono vibra (el navegador avisa con el evento
+  // del menú); un toque normal sigue abriendo la fila que lo contiene. Todo va
+  // en captura para ganarle a esa fila cuando sí se copia.
+  $effect(() => {
+    // Por si el navegador no avisa (Safari en iPhone): pasado este tiempo, copia igual.
+    const HOLD = 700;
+    let timer = 0;
+    let held: HTMLElement | null = null;
+    let start = { x: 0, y: 0 };
+    let byTouch = false;
+    // Al soltar después de copiar llega un clic: ese no debe abrir la fila.
+    let swallow = false;
+
+    function copy(el: Element) {
+      swallow = true;
+      release();
+      const shown = el.textContent?.trim() ?? "";
+      const digits = shown.replace(/\D/g, "");
+      if (!digits) return;
+      void copyText(digits).then((ok) =>
+        ok ? notify.done(`Se copió ${shown}.`) : notify.fail(new Error("No se pudo copiar el monto. Inténtalo de nuevo.")),
+      );
+    }
+
+    function release() {
+      clearTimeout(timer);
+      held?.removeAttribute("data-holding");
+      held = null;
+    }
+
+    function onDown(e: PointerEvent) {
+      byTouch = e.pointerType !== "mouse";
+      swallow = false;
+      release();
+      if (!byTouch) return;
+      const el = (e.target as Element | null)?.closest?.<HTMLElement>(".money-copy");
+      if (!el) return;
+      held = el;
+      start = { x: e.clientX, y: e.clientY };
+      el.setAttribute("data-holding", "");
+      timer = window.setTimeout(() => copy(el), HOLD);
+    }
+
+    // Si el dedo se mueve, está desplazando la pantalla: no copia.
+    function onMove(e: PointerEvent) {
+      if (held && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) release();
+    }
+
+    function onClick(e: MouseEvent) {
+      if (swallow) {
+        swallow = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (byTouch) return;
+      const el = (e.target as Element | null)?.closest?.(".money-copy");
+      // Si arrastró para seleccionar texto, no se mete.
+      if (!el || !getSelection()?.isCollapsed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      copy(el);
+    }
+
+    // Dejar presionado: el teléfono vibra y el navegador abriría su menú. En
+    // vez del menú, copia.
+    function onMenu(e: Event) {
+      if (!byTouch) return;
+      const el = (e.target as Element | null)?.closest?.(".money-copy");
+      if (!el) return;
+      e.preventDefault();
+      if (!swallow) copy(el);
+    }
+
+    const opts = { capture: true };
+    addEventListener("pointerdown", onDown, opts);
+    addEventListener("pointermove", onMove, opts);
+    addEventListener("pointerup", release, opts);
+    addEventListener("pointercancel", release, opts);
+    addEventListener("click", onClick, opts);
+    addEventListener("contextmenu", onMenu, opts);
+    return () => {
+      release();
+      removeEventListener("pointerdown", onDown, opts);
+      removeEventListener("pointermove", onMove, opts);
+      removeEventListener("pointerup", release, opts);
+      removeEventListener("pointercancel", release, opts);
+      removeEventListener("click", onClick, opts);
+      removeEventListener("contextmenu", onMenu, opts);
+    };
+  });
+
+  // Entrar carga todo; salir lo suelta. Solo cuenta el id (refrescar la
+  // sesión trae un objeto de usuario nuevo, y eso no es entrar de nuevo), y lo
+  // que lean `start` y `stop` no se sigue.
+  const uid = $derived(session.id);
+  $effect(() => {
+    if (uid) {
+      untrack(() => void start());
+      return () => untrack(() => void stop());
+    }
+  });
+
+  let moreOpen = $state(false);
+
+  // Atajos de toda la app; los de cada pantalla van en ella. Ver `lib/keys.ts`.
+  let helpOpen = $state(false);
+  const onKey = keys({
+    n: () => session.user && route.path !== "/m" && txModal.new(),
+    "?": () => session.user && (helpOpen = true),
+    // 1 … 6: las pantallas en el orden del menú.
+    ...Object.fromEntries(
+      NAV.map((item, i) => [
+        String(i + 1),
+        () => session.user && route.path !== "/m" && go(item.path),
+      ]),
+    ),
+  });
+  const knownTags = $derived([
+    ...new Set([
+      "fijo",
+      "revisar",
+      "viaje",
+      "trabajo",
+      "casa",
+      "salud",
+      "regalo",
+      ...categoryTags(),
+    ]),
+  ]);
+</script>
+
+<!-- El enlace de invitación se abre aunque haya otra sesión en este navegador. -->
+{#if !session.user || route.path === "/invitacion"}
+  <Login />
+{:else if route.path === "/m"}
+  {#if store.loaded}
+    <Mobile />
+  {:else}
+    <Loading label="Cargando tus finanzas" />
+  {/if}
+{:else}
+  <div class="shell">
+    <aside class="sidebar">
+      <a href="#/" class="brand"
+        ><span class="brand-mark"><Logo size={17} /></span>Finanzas</a
+      >
+      <nav class="nav">
+        {#each NAV as item (item.path)}
+          <a
+            href="#{item.path}"
+            class="nav-item"
+            class:active={route.path === item.path}
+          >
+            <Icon name={item.icon} size={18} />{item.label}
+          </a>
+        {/each}
+      </nav>
+      <div class="sidebar-foot">
+        <div class="me">
+          <span class="avatar-letter"
+            >{(session.user.name || session.user.email)
+              .slice(0, 1)
+              .toUpperCase()}</span
+          >
+          <span class="me-name">{session.user.name || session.user.email}</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <ModeToggle
+            dark={theme.name === "dark"}
+            onToggle={(next) => theme.set(next)}
+          />
+          <button
+            type="button"
+            class="btn-icon sm"
+            data-tip="Salir"
+            aria-label="Salir"
+            onclick={logout}
+          >
+            <Icon name="logout-01" size={16} />
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      {#if store.loaded}
+        {#key route.path}
+          <Page />
+        {/key}
+      {:else}
+        <Loading label="Cargando tus finanzas" />
+      {/if}
+    </main>
+
+    <button
+      type="button"
+      class="keys-fab"
+      aria-label="Atajos de teclado"
+      data-tip="Atajos de teclado (?)"
+      data-tip-side="left"
+      onclick={() => (helpOpen = true)}
+    >
+      <Icon name="keyboard" size={16} />
+    </button>
+
+    <button
+      type="button"
+      class="fab"
+      aria-label="Nuevo movimiento"
+      data-tip="Nuevo movimiento"
+      data-tip-side="left"
+      onclick={() => txModal.new()}
+    >
+      <Icon name="add-01" size={24} />
+    </button>
+
+    <TabBar
+      items={[
+        ...NAV.filter((n) => n.mobile).map((n) => ({ id: n.path, label: n.label, short: n.short, icon: n.icon, href: `#${n.path}` })),
+        { id: "mas", label: "Más", icon: "menu-01" },
+      ]}
+      active={moreOpen || !NAV.find((n) => n.path === route.path)?.mobile ? "mas" : route.path}
+      onPick={() => (moreOpen = !moreOpen)}
+    >
+      {#if moreOpen}
+        <div class="more-sheet plane-card">
+          {#each NAV.filter((n) => !n.mobile) as item (item.path)}
+            <a href="#{item.path}" onclick={() => (moreOpen = false)}
+              ><Icon name={item.icon} size={18} />{item.label}</a
+            >
+          {/each}
+          <a href="#/m" onclick={() => (moreOpen = false)}
+            ><Icon name="smart-phone-01" size={18} />Vista del teléfono</a
+          >
+          <div class="more-row">
+            <ModeToggle
+              dark={theme.name === "dark"}
+              onToggle={(next) => theme.set(next)}
+            />
+            <button type="button" class="btn sm" onclick={logout}
+              ><Icon name="logout-01" />Salir</button
+            >
+          </div>
+        </div>
+      {/if}
+    </TabBar>
+  </div>
+{/if}
+
+<svelte:window onkeydown={onKey} />
+
+<Modal
+  open={helpOpen}
+  onClose={() => (helpOpen = false)}
+  title="Atajos de teclado"
+  icon="keyboard"
+>
+  <div class="keys-help">
+    {#each SHORTCUTS as group (group.where)}
+      <section>
+        <p class="eyebrow">{group.where}</p>
+        <dl>
+          {#each group.items as [key, what] (key)}
+            <dt><kbd>{key}</kbd></dt>
+            <dd>{what}</dd>
+          {/each}
+        </dl>
+      </section>
+    {/each}
+    <p class="small muted">No funcionan mientras escribes en un campo.</p>
+  </div>
+</Modal>
+
+{#if session.user && route.path === "/m"}
+  <TxScreen open={txModal.open} tx={txModal.tx} preset={txModal.preset} onClose={() => txModal.close()} />
+{:else if session.user}
+  <TransactionForm
+    open={txModal.open}
+    tx={txModal.tx}
+    preset={txModal.preset}
+    onClose={() => txModal.close()}
+    {knownTags}
+  />
+{/if}
+
+<ErrorNote message={notify.error} />
+<SuccessNote message={notify.ok} duration={3000} />
+<TooltipLayer />
+
+<style>
+  .keys-help {
+    display: grid;
+    gap: var(--sp-16);
+
+    & dl {
+      display: grid;
+      grid-template-columns: 5rem minmax(0, 1fr);
+      gap: var(--sp-8) var(--sp-12);
+      align-items: center;
+      margin: var(--sp-6) 0 0;
+    }
+
+    & dd {
+      margin: 0;
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+    }
+
+    & p {
+      margin: 0;
+    }
+  }
+
+  kbd {
+    display: inline-block;
+    min-width: 1.75rem;
+    padding: 0.125rem var(--sp-6);
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--bg-field);
+    font: inherit;
+    font-family: var(--font-num, inherit);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-primary);
+  }
+
+  /* El marco de las referencias: el menú y la hoja de contenido son dos
+     paneles de vidrio que flotan sobre el lienzo, con aire alrededor. */
+  .shell {
+    display: grid;
+    grid-template-columns: 15.5rem 1fr;
+    gap: var(--sp-12);
+    min-height: 100%;
+    padding: var(--sp-12);
+
+    @media (max-width: 56rem) {
+      grid-template-columns: 1fr;
+      padding: 0;
+    }
+  }
+
+  /* La página hace scroll en el documento; el menú se queda fijo con el
+     alto de la ventana menos el aire del marco. */
+  .sidebar {
+    position: sticky;
+    top: var(--sp-12);
+    align-self: start;
+    height: calc(100dvh - 2 * var(--sp-12));
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-20);
+    padding: var(--sp-20) var(--sp-14);
+    border: 1px solid var(--glass-rim);
+    border-radius: var(--radius-xl);
+    /* Sin desenfoque: detrás solo está el lienzo, casi liso, y desenfocar
+       todo el alto de la ventana multiplicaba el trabajo de la GPU. */
+    background: var(--glass-sheen), var(--bg-sidebar);
+    box-shadow: var(--glass-spec), var(--glass-shadow);
+    overflow-y: auto;
+
+    @media (max-width: 56rem) {
+      display: none;
+    }
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-10);
+    padding: 0 var(--sp-6);
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    /* Igual que el ícono de la app: negro con brillo azul detrás de la F. */
+    background: radial-gradient(
+        circle at 50% 44%,
+        oklch(0.52 0.25 265 / 0.6),
+        transparent 70%
+      ),
+      oklch(0.12 0.005 265);
+    color: #fff;
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.12);
+  }
+
+  .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  /* Los enlaces, sueltos: solo texto e icono. La pantalla actual va en una
+     píldora con relieve, como un botón. */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-12);
+    position: relative;
+    padding: 0.5625rem var(--sp-14);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition:
+      background 0.2s,
+      color 0.2s,
+      box-shadow 0.2s;
+
+    &:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    &.active {
+      background: var(--bg-field);
+      box-shadow: var(--pillow);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+  }
+
+  .sidebar-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-8);
+    margin-top: auto;
+    padding: var(--sp-10) var(--sp-6) 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .me {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    min-width: 0;
+  }
+
+  .avatar-letter {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--bg-field);
+    box-shadow: var(--pillow);
+    color: var(--text-primary);
+    font-size: var(--text-xs);
+    font-weight: 700;
+  }
+
+  .me-name {
+    overflow: hidden;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* La hoja de contenido: el vidrio grande sobre el que se posan las
+     tarjetas. Ella desenfoca el lienzo; lo de dentro ya no lo repite. */
+  .main {
+    min-width: 0;
+    padding: var(--sp-28) 2rem 6rem;
+
+    @media (max-width: 56rem) {
+      padding: var(--sp-16) var(--sp-16) 8rem;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: none;
+    }
+  }
+
+  .fab {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-text);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.16),
+      0 14px 28px -12px oklch(from var(--accent) l c h / 0.8);
+    cursor: pointer;
+    transition:
+      transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.2s;
+
+    &:hover {
+      transform: scale(1.08) rotate(90deg);
+      box-shadow:
+        inset 0 1px 0 oklch(1 0 0 / 0.16),
+        0 18px 32px -12px oklch(from var(--accent) l c h / 0.85);
+    }
+
+    @media (max-width: 56rem) {
+      bottom: 5.25rem;
+      right: 1rem;
+    }
+  }
+
+  /* Encima del botón de agregar y centrado con él. Solo donde hay teclado:
+     en el teléfono y en lo táctil no tiene nada que explicar. */
+  .keys-fab {
+    position: fixed;
+    right: calc(1.5rem + 0.625rem);
+    bottom: calc(1.5rem + 3.5rem + 0.75rem);
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--border-float, var(--border));
+    border-radius: 50%;
+    background: var(--glass-sheen), var(--glass-2);
+    -webkit-backdrop-filter: blur(var(--glass-blur))
+      saturate(var(--glass-sat, 170%));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat, 170%));
+    box-shadow: var(--glass-spec), var(--glass-shadow-float, var(--shadow-xl));
+    color: var(--text-secondary, var(--text-primary));
+    cursor: pointer;
+    transition:
+      transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+      color 0.2s;
+
+    &:hover {
+      transform: scale(1.1);
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 56rem), (hover: none) {
+      display: none;
+    }
+  }
+
+  /* La barra de abajo solo hace falta sin el menú lateral. */
+  .shell > :global(.tabbar) {
+    @media (min-width: 56.01rem) {
+      display: none;
+    }
+  }
+
+  .more-sheet {
+    position: absolute;
+    right: var(--sp-8);
+    bottom: calc(100% + var(--sp-8));
+    display: flex;
+    flex-direction: column;
+    min-width: 12rem;
+    padding: var(--sp-6);
+
+    & a {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-10);
+      padding: var(--sp-10);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: var(--text-sm);
+
+      &:hover {
+        background: var(--bg-hover);
+      }
+    }
+  }
+
+  .more-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--sp-8) var(--sp-6) var(--sp-4);
+    border-top: var(--border-width) solid var(--border);
+    margin-top: var(--sp-4);
+  }
+</style>

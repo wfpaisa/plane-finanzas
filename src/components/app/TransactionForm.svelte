@@ -1,0 +1,369 @@
+<!--
+  Crear o editar una transacción: gasto, ingreso o transferencia entre
+  cuentas, con categoría, etiquetas, notas y adjuntos.
+-->
+<script lang="ts">
+  import { untrack } from "svelte";
+
+  import type { TxType } from "../../lib/finance";
+  import { today } from "../../lib/finance";
+  import { SOURCE_LABEL, TX_TYPES } from "../../lib/labels";
+  import { notify } from "../../lib/notify.svelte";
+  import { offline } from "../../lib/offline.svelte";
+  import { pb, session } from "../../lib/pb.svelte";
+  import { store, touchTransactions } from "../../lib/store.svelte";
+  import type { Transaction, TxDraft } from "../../lib/types";
+  import Icon from "../Icon.svelte";
+  import { Button, ConfirmDialog, DateInput, Field, Input, Modal, Select, Textarea } from "../ui";
+  import AccountSelect from "./AccountSelect.svelte";
+  import MoneyInput from "./MoneyInput.svelte";
+  import Segmented from "./Segmented.svelte";
+  import TagInput from "./TagInput.svelte";
+
+  let {
+    open,
+    tx = null,
+    preset,
+    draft,
+    link,
+    title: titleProp,
+    onClose,
+    onSaved,
+    knownTags = [],
+  }: {
+    open: boolean;
+    tx?: Transaction | null;
+    /** Valores de partida para una nueva (la cuenta desde la que se abre, por ejemplo). */
+    preset?: Partial<Pick<Transaction, "type" | "account" | "category">>;
+    /** Todo ya llenado: por ejemplo, el pago de un programado. */
+    draft?: TxDraft | null;
+    /** El fijo que se paga: queda unido a él por su marca (ver `recurringKey`). */
+    link?: { external_id: string } | null;
+    /** Un título propio, en vez del de siempre. */
+    title?: string;
+    onClose: () => void;
+    onSaved?: () => void;
+    knownTags?: string[];
+  } = $props();
+
+  let type = $state<TxType>("expense");
+  let amount = $state(0);
+  let date = $state(today());
+  let account = $state("");
+  let toAccount = $state("");
+  let category = $state("");
+  let description = $state("");
+  let notes = $state("");
+  let tags = $state<string[]>([]);
+  let files = $state<File[]>([]);
+  let removed = $state<string[]>([]);
+  let busy = $state(false);
+  let confirmDelete = $state(false);
+
+  // Se llena al abrir o al cambiar de tx, y solo entonces: lo demás que
+  // lee (cuentas, saldos) va sin seguir, así un cambio en tiempo real no
+  // borra lo que se está escribiendo, ni el propio llenado lo vuelve a disparar.
+  $effect(() => {
+    if (!open) return;
+    void tx;
+    untrack(() => {
+      type = tx?.type ?? draft?.type ?? preset?.type ?? "expense";
+      amount = tx?.amount ?? draft?.amount ?? 0;
+      date = tx ? tx.date.slice(0, 10) : (draft?.date ?? today());
+      account = tx?.account ?? (draft?.account || preset?.account || store.activeAccounts[0]?.id || "");
+      toAccount = tx?.to_account ?? draft?.to_account ?? "";
+      category = tx?.category ?? draft?.category ?? preset?.category ?? "";
+      description = tx?.description ?? draft?.description ?? "";
+      notes = tx?.notes ?? draft?.notes ?? "";
+      tags = [...(tx?.tags ?? draft?.tags ?? [])];
+      files = [];
+      removed = [];
+    });
+  });
+
+  const cats = $derived(store.categories.filter((c) => c.kind === (type === "income" ? "income" : "expense")));
+
+  // Al cambiar de tipo, una categoría del otro lado deja de valer.
+  $effect(() => {
+    if (category && !cats.some((c) => c.id === category)) category = "";
+  });
+
+  const existing = $derived((tx?.attachments ?? []).filter((f) => !removed.includes(f)));
+  let fileToken = $state("");
+  $effect(() => {
+    if (open && tx?.attachments?.length) {
+      pb.files
+        .getToken()
+        .then((t) => (fileToken = t))
+        .catch(() => {});
+    }
+  });
+
+  async function save() {
+    if (!amount || amount <= 0) return notify.fail(new Error("Escribe un monto mayor que cero."));
+    if (!account) return notify.fail(new Error("Elige la cuenta."));
+    if (type === "transfer" && (!toAccount || toAccount === account))
+      return notify.fail(new Error("Elige una cuenta de destino distinta."));
+    busy = true;
+    try {
+      const data: Record<string, unknown> = {
+        owner: session.id,
+        type,
+        amount,
+        date: `${date} 12:00:00.000Z`,
+        account,
+        to_account: type === "transfer" ? toAccount : "",
+        category: type === "transfer" ? "" : category,
+        description: description.trim(),
+        notes,
+        tags,
+      };
+      // El pago de un programado lleva su marca: así el mes queda pagado.
+      const born = link ? { source: "recurrente", external_id: link.external_id } : { source: "manual" };
+      if (files.length || removed.length) {
+        // Los adjuntos van directo al servidor: necesitan conexión.
+        if (files.length) data["attachments+"] = files;
+        if (removed.length) data["attachments-"] = removed;
+        if (tx) await pb.collection("transactions").update(tx.id, data);
+        else await pb.collection("transactions").create({ ...data, ...born });
+        touchTransactions();
+      } else if (tx) {
+        // Lo demás pasa por la cola: funciona sin internet y se envía después.
+        await offline.update("transactions", tx.id, data, tx);
+      } else {
+        await offline.create("transactions", { ...data, ...born });
+      }
+      notify.done(!offline.online ? "Guardado en este dispositivo. Se enviará al reconectar." : tx ? "Movimiento guardado" : "Movimiento creado");
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function remove() {
+    if (!tx) return;
+    busy = true;
+    try {
+      await offline.remove("transactions", tx.id, tx);
+      confirmDelete = false;
+      onClose();
+    } catch (err) {
+      notify.fail(err);
+    } finally {
+      busy = false;
+    }
+  }
+
+  const title = $derived(titleProp ?? (tx ? "Editar movimiento" : "Nuevo movimiento"));
+</script>
+
+<Modal {open} {onClose} {title}>
+  <div class="tx-form">
+    <Segmented bind:value={type} options={TX_TYPES} full label="Tipo" />
+
+    <div class="form-grid">
+      <Field label="Monto">
+        <MoneyInput bind:value={amount} autofocus={!tx} />
+      </Field>
+      <Field label="Fecha">
+        <DateInput bind:value={date} />
+      </Field>
+      <Field label={type === "transfer" ? "Desde" : "Cuenta"}>
+        <AccountSelect bind:value={account} />
+      </Field>
+      {#if type === "transfer"}
+        <Field label="Hacia">
+          <AccountSelect bind:value={toAccount} placeholder="Elige…" exclude={account} />
+        </Field>
+      {:else}
+        <Field label="Categoría">
+          <Select bind:value={category}>
+            <option value="">Sin categoría</option>
+            {#each cats as c (c.id)}
+              <option value={c.id}>{c.name}{c.tags?.length ? ` · ${c.tags.map((t) => `#${t}`).join(" ")}` : ""}</option>
+            {/each}
+          </Select>
+        </Field>
+      {/if}
+    </div>
+
+    <Field label="Descripción">
+      <Input bind:value={description} placeholder="Mercado del mes, almuerzo, arriendo…" />
+    </Field>
+
+    <Field label="Etiquetas">
+      <TagInput bind:value={tags} suggestions={knownTags} />
+    </Field>
+
+    <Field label="Notas">
+      <Textarea bind:value={notes} rows={2} />
+    </Field>
+
+    <div>
+      <p class="eyebrow">Adjuntos</p>
+      <div class="attach-list">
+        {#each existing as f (f)}
+          <div class="attach">
+            <a
+              href={pb.files.getURL(tx!, f, { token: fileToken })}
+              target="_blank"
+              rel="noreferrer"
+              class="attach-name"
+            >
+              <Icon name="attachment-01" />{f.replace(/_[a-z0-9]{10}(\.[^.]+)$/i, "$1")}
+            </a>
+            <button type="button" class="btn-icon sm" aria-label="Quitar adjunto" onclick={() => (removed = [...removed, f])}>
+              <Icon name="cancel-01" size={12} />
+            </button>
+          </div>
+        {/each}
+        {#each files as f, i (i)}
+          <div class="attach attach-new">
+            <span class="attach-name"><Icon name="file-attachment" />{f.name}</span>
+            <button type="button" class="btn-icon sm" aria-label="Quitar" onclick={() => (files = files.filter((_, j) => j !== i))}>
+              <Icon name="cancel-01" size={12} />
+            </button>
+          </div>
+        {/each}
+      </div>
+      <label class="dropzone attach-drop">
+        <Icon name="attachment-01" size={18} />
+        <span class="dropzone-lead">Agregar factura, recibo o foto</span>
+        <span class="dropzone-hint">Imágenes o PDF, hasta 10 MB</span>
+        <input
+          type="file"
+          multiple
+          accept="image/*,application/pdf"
+          class="dropzone-input"
+          onchange={(e) => {
+            const list = [...(e.currentTarget.files ?? [])];
+            files = [...files, ...list];
+            e.currentTarget.value = "";
+          }}
+        />
+      </label>
+    </div>
+
+    {#if tx?.source && SOURCE_LABEL[tx.source]}
+      <p class="tx-origin">Origen: <b>{SOURCE_LABEL[tx.source]}</b></p>
+    {/if}
+  </div>
+
+  {#snippet footer()}
+    {#if tx}
+      <!-- Borrar va en icono, con su globo de ayuda, apartado de Guardar. -->
+      <button
+        type="button"
+        class="btn-icon foot-icon foot-danger"
+        aria-label="Eliminar"
+        data-tip="Eliminar"
+        onclick={() => (confirmDelete = true)}
+      >
+        <Icon name="delete-02" size={18} />
+      </button>
+      <span class="flex-1 foot-break"></span>
+    {/if}
+    <Button onclick={onClose}>Cancelar</Button>
+    <Button variant="secondary" loading={busy} onclick={save}>Guardar</Button>
+  {/snippet}
+</Modal>
+
+<ConfirmDialog
+  open={confirmDelete}
+  onClose={() => (confirmDelete = false)}
+  title="Eliminar movimiento"
+  message="Se eliminará con sus adjuntos. No se puede deshacer."
+  {busy}
+  onConfirm={remove}
+/>
+
+<style>
+  .tx-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-16);
+  }
+
+  .foot-icon {
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .foot-danger {
+    color: var(--danger);
+  }
+
+  /* En el teléfono: Cancelar y Guardar arriba, repartiéndose el ancho, y el
+     icono en la fila de abajo. */
+  @media (max-width: 30rem) {
+    .foot-break {
+      display: none;
+    }
+
+    .foot-icon {
+      order: 1;
+    }
+
+    :global(.modal-foot:has(.foot-icon) > .btn) {
+      flex: 1 1 calc(50% - 0.3125rem);
+      justify-content: center;
+    }
+  }
+
+  /* Una sola columna, siempre: un campo debajo del otro. */
+  .tx-form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .attach-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-8);
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .attach {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-8);
+    padding: var(--sp-6) var(--sp-10);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+  }
+
+  .attach-new {
+    border-style: dashed;
+  }
+
+  .attach-name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-6);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+  }
+
+  .attach-drop {
+    padding: var(--sp-14);
+  }
+
+  .tx-origin {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+</style>

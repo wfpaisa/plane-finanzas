@@ -1,0 +1,13 @@
+# Vive en el servidor junto a pb_data/. Lo copia ./desplegar.sh.
+# PUERTO elige dónde escucha la app: `3434` (todas las interfaces) o
+# `127.0.0.1:3434` (solo el servidor, detrás de un proxy con HTTPS).
+services:
+  finanzas:
+    image: plane-finanzas:latest
+    container_name: plane-finanzas
+    restart: unless-stopped
+    ports:
+      - "${PUERTO:-3434}:8090"
+    volumes:
+      - ./pb_data:/pb/pb_data
+    # Sin mem_limit: el LXC de Proxmox no expone memory.max a Docker.

@@ -1,0 +1,257 @@
+/**
+ * Respaldo de un usuario: exportar todo a un JSON, borrarlo todo y volverlo a
+ * cargar desde ese JSON.
+ *
+ * Los ids no viajan tal cual: al importar cada registro se crea con un id
+ * nuevo y las relaciones se traducen, así el mismo respaldo sirve para otra
+ * cuenta u otro servidor. Los adjuntos no van en este JSON: aquí solo sus
+ * nombres, y la app los descarga y los empaca junto a él en un zip (ver
+ * src/lib/backupZip.ts); al importar, `files` le dice a qué movimiento nuevo
+ * subir los de cada uno. Del usuario viajan su nombre y su color de fondo.
+ *
+ * Los ahorros compartidos: se exportan y se borran los propios. En los ajenos
+ * no se toca nada, tampoco los aportes que uno hizo ahí.
+ */
+
+var defaults = require(__hooks + "/lib/defaults.js");
+
+var VERSION = 1;
+
+// Los campos que se guardan de cada colección, sin id, dueño ni fechas de registro.
+var FIELDS = {
+  categories: ["name", "kind", "icon", "color", "budget", "tags"],
+  accounts: ["name", "type", "bank", "palette", "icon", "initial_balance", "credit_limit", "exclude_from_total", "archived", "sort", "notes"],
+  recurring: ["name", "kind", "amount", "frequency", "day_of_month", "month", "start_date", "end_date", "category", "account", "to_account", "tags", "saving", "for_payment", "notes", "paused", "auto_create"],
+  transactions: ["type", "date", "account", "to_account", "category", "amount", "description", "notes", "tags", "source", "external_id", "recurring_key"],
+  savings: ["members", "name", "icon", "palette", "target_amount", "target_date", "monthly_amount", "shares", "day_of_month", "annual_rate", "allocations", "auto", "archived", "notes", "kind"],
+  saving_movements: ["saving", "account", "created_by", "amount", "date", "note", "external_id"],
+  ignored_imports: ["external_id"],
+};
+
+function plainOf(record, fields) {
+  var all = JSON.parse(JSON.stringify(record));
+  var out = { id: record.id };
+  for (var i = 0; i < fields.length; i++) out[fields[i]] = all[fields[i]];
+  return out;
+}
+
+function own(app, name, userId) {
+  return app.findRecordsByFilter(name, "owner = {:u}", "created", 0, 0, { u: userId });
+}
+
+function exportData(app, userId) {
+  var data = {};
+  var names = ["categories", "accounts", "recurring", "transactions", "savings", "ignored_imports"];
+  for (var i = 0; i < names.length; i++) {
+    data[names[i]] = own(app, names[i], userId).map(function (r) {
+      var row = plainOf(r, FIELDS[names[i]]);
+      if (names[i] === "transactions") {
+        var files = r.getStringSlice("attachments");
+        if (files.length) row.attachments = files;
+      }
+      return row;
+    });
+  }
+  data.saving_movements = app
+    .findRecordsByFilter("saving_movements", "saving.owner = {:u}", "created", 0, 0, { u: userId })
+    .map(function (r) {
+      return plainOf(r, FIELDS.saving_movements);
+    });
+
+  var user = app.findRecordById("users", userId);
+  data.profile = { name: user.getString("name"), tint: user.getString("tint"), assistant_context: user.getString("assistant_context") };
+  return {
+    app: "finanzas",
+    version: VERSION,
+    exported: new Date().toISOString(),
+    user: user.email(),
+    data: data,
+  };
+}
+
+function seedCategories(app, userId) {
+  var col = app.findCollectionByNameOrId("categories");
+  for (var i = 0; i < defaults.categories.length; i++) {
+    var c = defaults.categories[i];
+    var r = new Record(col);
+    r.set("owner", userId);
+    r.set("name", c.name);
+    r.set("kind", c.kind);
+    r.set("icon", c.icon);
+    if (c.color) r.set("color", c.color);
+    if (c.tags) r.set("tags", c.tags);
+    app.save(r);
+  }
+}
+
+/** Borra todo lo del usuario. */
+function clean(app, userId) {
+  var counts = {};
+  // Primero lo que depende de otros, para que ningún borrado en cascada
+  // descuadre la cuenta.
+  var names = ["transactions", "recurring", "savings", "accounts", "categories", "ignored_imports"];
+  for (var i = 0; i < names.length; i++) {
+    var list = own(app, names[i], userId);
+    for (var j = 0; j < list.length; j++) app.delete(list[j]);
+    counts[names[i]] = list.length;
+  }
+  return counts;
+}
+
+function userExists(app, id) {
+  if (!id) return false;
+  try {
+    app.findRecordById("users", id);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Reemplaza todo lo del usuario por el respaldo. Todo o nada: va en una transacción. */
+function restore(app, userId, backup) {
+  if (!backup || backup.app !== "finanzas" || !backup.data) {
+    throw new Error("El archivo no es un respaldo de Finanzas.");
+  }
+  if (backup.version > VERSION) {
+    throw new Error("El respaldo es de una versión más nueva de la app.");
+  }
+  var data = backup.data;
+  var counts = {};
+  var restoring = require(__hooks + "/lib/restoring.js");
+  restoring.setRestoring(app, userId, true);
+  try {
+    restoreData(app, userId, data, counts);
+  } finally {
+    restoring.setRestoring(app, userId, false);
+  }
+  return counts;
+}
+
+function restoreData(app, userId, data, counts) {
+  app.runInTransaction(function (tx) {
+    clean(tx, userId);
+
+    // viejo id -> nuevo id, por colección.
+    var ids = { categories: {}, accounts: {}, recurring: {}, savings: {}, transactions: {} };
+    function map(name, id) {
+      return id ? ids[name][id] || "" : "";
+    }
+    // Las marcas de lo programado llevan el id del programado (`rec:<id>:…`,
+    // `prov:<id>:…`, `pay:rec:<id>:…`): con los ids nuevos, lo pagado sigue pagado.
+    function remapKey(key) {
+      var m = /^(pay:)?(rec|prov):([^:]+)(.*)$/.exec(String(key || ""));
+      if (!m || !ids.recurring[m[3]]) return key;
+      return (m[1] || "") + m[2] + ":" + ids.recurring[m[3]] + m[4];
+    }
+
+    function insert(name, rows, fix) {
+      var col = tx.findCollectionByNameOrId(name);
+      rows = rows || [];
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var r = new Record(col);
+        var fields = FIELDS[name];
+        for (var f = 0; f < fields.length; f++) {
+          if (row[fields[f]] !== undefined && row[fields[f]] !== null) r.set(fields[f], row[fields[f]]);
+        }
+        if (name !== "saving_movements") r.set("owner", userId);
+        if (fix) fix(r, row);
+        try {
+          tx.save(r);
+        } catch (err) {
+          throw new Error(name + " #" + (i + 1) + ": " + (err && err.message ? err.message : err));
+        }
+        if (ids[name]) ids[name][row.id] = r.id;
+      }
+      counts[name] = rows.length;
+    }
+
+    // Los respaldos de antes traen el grupo (fijo/variable) y no etiquetas.
+    insert("categories", data.categories, function (r, row) {
+      if (!row.tags && row.group) r.set("tags", [row.group]);
+    });
+    insert("accounts", data.accounts);
+    insert("recurring", data.recurring, function (r, row) {
+      r.set("category", map("categories", row.category));
+      r.set("account", map("accounts", row.account));
+      r.set("to_account", map("accounts", row.to_account));
+      // Su provisión todavía no existe: se une cuando ya estén los ahorros.
+      r.set("saving", "");
+    });
+    insert("transactions", data.transactions, function (r, row) {
+      r.set("account", map("accounts", row.account));
+      r.set("to_account", map("accounts", row.to_account));
+      r.set("category", map("categories", row.category));
+      if (row.external_id) r.set("external_id", remapKey(row.external_id));
+      if (row.recurring_key) r.set("recurring_key", remapKey(row.recurring_key));
+    });
+    // Para subir los adjuntos: viejo id -> nuevo, de los que traen alguno.
+    counts.files = {};
+    (data.transactions || []).forEach(function (row) {
+      if (row.attachments && row.attachments.length) counts.files[row.id] = map("transactions", row.id);
+    });
+
+    insert("savings", data.savings, function (r, row) {
+      var members = (row.members || []).filter(function (m) {
+        return m !== userId && userExists(tx, m);
+      });
+      r.set("members", members);
+      // Lo de cada miembro sigue siendo suyo; lo que no es de un miembro es
+      // del dueño, que aquí es quien importa. Los respaldos de antes no lo traen.
+      var shares = {};
+      for (var who in row.shares || {}) {
+        var id = members.indexOf(who) >= 0 ? who : userId;
+        shares[id] = (shares[id] || 0) + (+row.shares[who] || 0);
+      }
+      r.set("shares", shares);
+      r.set(
+        "allocations",
+        (row.allocations || []).map(function (a) {
+          return { account: map("accounts", a.account), percent: a.percent };
+        }),
+      );
+    });
+    insert("saving_movements", data.saving_movements, function (r, row) {
+      var saving = map("savings", row.saving);
+      r.set("saving", saving);
+      // Los aportes de otros miembros siguen siendo suyos si esa persona
+      // existe aquí y es miembro del ahorro; su cuenta no viaja en el respaldo
+      // y queda vacía. A nadie más se le puede atribuir un aporte.
+      var members = [];
+      try {
+        if (saving) members = tx.findRecordById("savings", saving).getStringSlice("members");
+      } catch (_) {}
+      r.set("created_by", members.indexOf(row.created_by) >= 0 && userExists(tx, row.created_by) ? row.created_by : userId);
+      r.set("account", map("accounts", row.account));
+      if (row.external_id) r.set("external_id", remapKey(row.external_id));
+    });
+
+    // Cada recurrente con su provisión, ya con los ids nuevos de los dos.
+    (data.recurring || []).forEach(function (row) {
+      var mine = map("recurring", row.id);
+      var saving = map("savings", row.saving);
+      if (!mine || !saving) return;
+      var r = tx.findRecordById("recurring", mine);
+      r.set("saving", saving);
+      tx.save(r);
+    });
+
+    // Lo borrado a propósito; los respaldos de antes no lo traen.
+    insert("ignored_imports", data.ignored_imports, function (r, row) {
+      r.set("external_id", remapKey(row.external_id));
+    });
+
+    // Nombre, color de fondo y contexto para el asistente; los respaldos de antes no los traen.
+    if (data.profile) {
+      var u = tx.findRecordById("users", userId);
+      if (data.profile.name) u.set("name", data.profile.name);
+      u.set("tint", data.profile.tint || "");
+      if (data.profile.assistant_context !== undefined) u.set("assistant_context", data.profile.assistant_context);
+      tx.save(u);
+    }
+  });
+  return counts;
+}
+
+module.exports = { exportData: exportData, clean: clean, restore: restore, seedCategories: seedCategories };
